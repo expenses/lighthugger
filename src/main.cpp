@@ -131,17 +131,17 @@ int main() {
 
         glfwPollEvents();
 
-        auto u32_max = std::numeric_limits<uint64_t>::max();
+        auto u64_max = std::numeric_limits<uint64_t>::max();
         // Wait on the render fence to be signaled
         // (it's signaled before this loop starts so that we don't just block forever on the first frame)
-        auto err = device.waitForFences(1, &render_fence, true, u32_max);
+        auto err = device.waitForFences(1, &render_fence, true, u64_max);
         err = device.resetFences(1, &render_fence);
         // Reset the command pool instead of resetting the single command buffer as
         // it's cheaper (afaik). Obviously don't do this if multiple command buffers are used.
         device.resetCommandPool(command_pool);
 
         // Acquire the next swapchain image (waiting on the gpu-side and signaling the present semaphore when finished).
-        auto swapchain_image_index = device.acquireNextImageKHR(vk::SwapchainKHR(swapchain), u32_max, present_semaphore, nullptr).value;
+        auto swapchain_image_index = device.acquireNextImageKHR(vk::SwapchainKHR(swapchain), u64_max, present_semaphore, nullptr).value;
 
         // This wraps vkBeginCommandBuffer.
         command_buffer.begin({
