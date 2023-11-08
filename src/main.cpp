@@ -58,11 +58,13 @@ int main() {
     }
     vkb::Instance vkb_inst = inst_ret.value();
 
-    uint32_t width = 640;
-    uint32_t height = 480;
+    vk::Extent2D extent = {
+        .width = 640,
+        .height = 480,
+    };
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    auto window = glfwCreateWindow(width, height, "Window Title", NULL, NULL);
+    auto window = glfwCreateWindow(extent.width, extent.height, "Window Title", NULL, NULL);
 
     VkSurfaceKHR _surface;
     vk::Result err = static_cast<vk::Result>(glfwCreateWindowSurface(vkb_inst.instance, window, NULL, &_surface));
@@ -101,11 +103,10 @@ int main() {
         .use_default_format_selection()
 		//use vsync present mode
 		.set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-		.set_desired_extent(width, height)
+		.set_desired_extent(extent.width, extent.height)
         .build ()
         .value();
 
-    auto cpp_swapchain = vk::SwapchainKHR(swapchain);
     auto swapchain_images = swapchain.get_images().value();
     auto swapchain_image_views = swapchain.get_image_views().value();
 
@@ -127,6 +128,25 @@ int main() {
     float time = 0.0;
 
     while (!glfwWindowShouldClose(window)) {
+        int current_width, current_height;
+        glfwGetWindowSize(window, &current_width, &current_height);
+        vk::Extent2D current_extent = {
+            .width = static_cast<uint32_t>(current_width),
+            .height = static_cast<uint32_t>(current_height)
+        };
+        if (extent != current_extent) {
+            printf("Resizing from %ux%u to %ux%u\n", extent.width, extent.height, current_extent.width, current_extent.height);
+            extent = current_extent;
+
+            swapchain = swapchain_builder
+                .set_desired_extent(extent.width, extent.height)
+                .build ()
+                .value();
+
+            swapchain_images = swapchain.get_images().value();
+            swapchain_image_views = swapchain.get_image_views().value();
+        }
+
         time += 1.0 / 60.0;
 
         glfwPollEvents();
@@ -178,10 +198,7 @@ int main() {
         command_buffer.beginRendering({
             .renderArea = {
                 .offset = {},
-                .extent = {
-                    .width = width,
-                    .height = height,
-                },
+                .extent = extent,
             },
             .layerCount = 1,
             .colorAttachmentCount = 1,
@@ -218,6 +235,7 @@ int main() {
         // This wraps vkQueueSubmit.
         err = graphics_queue.submit(1, &submit_info, render_fence);
 
+        auto cpp_swapchain = vk::SwapchainKHR(swapchain);
         // Present the swapchain image after having wated on the render semaphore.
         // This wraps vkQueuePresentKHR.
         err = graphics_queue.presentKHR({
