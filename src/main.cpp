@@ -43,6 +43,18 @@ void insert_color_image_barrier(vk::CommandBuffer command_buffer, ImageBarrier b
     thsvsCmdPipelineBarrier(command_buffer, nullptr, 0, nullptr, 1, &image_barrier);
 }
 
+struct AllocatedImage {
+    vk::Image image;
+    vma::Allocation allocation;
+};
+
+AllocatedImage create_image(vk::ImageCreateInfo create_info, vma::Allocator allocator) {
+    AllocatedImage image;
+    vma::AllocationCreateInfo alloc_info = {.usage = vma::MemoryUsage::eAuto};
+    auto err = allocator.createImage(&create_info, &alloc_info, &image.image, &image.allocation, nullptr);
+    return image;
+}
+
 int main() {
     glfwInit();
 
@@ -58,6 +70,8 @@ int main() {
     }
     vkb::Instance vkb_inst = inst_ret.value();
 
+    auto instance = vkb_inst.instance;
+
     vk::Extent2D extent = {
         .width = 640,
         .height = 480,
@@ -67,7 +81,7 @@ int main() {
     auto window = glfwCreateWindow(extent.width, extent.height, "Window Title", NULL, NULL);
 
     VkSurfaceKHR _surface;
-    vk::Result err = static_cast<vk::Result>(glfwCreateWindowSurface(vkb_inst.instance, window, NULL, &_surface));
+    vk::Result err = static_cast<vk::Result>(glfwCreateWindowSurface(instance, window, NULL, &_surface));
     vk::SurfaceKHR surface = vk::SurfaceKHR(_surface);
 
     vkb::PhysicalDeviceSelector selector{ vkb_inst };
@@ -92,8 +106,11 @@ int main() {
 
     vk::Device device = vkb_device.device;
 
-    // Create a dispatch loader for device extension functions etc.
-    vk::DispatchLoaderDynamic dispatch_loader( vkb_inst.instance, glfwGetInstanceProcAddress, device );
+    // Init the default dispatch loader for device extension functions etc.
+    // If we don't do this `command_buffer.beginRendering` etc. will segfault as it can't find the function.
+    vk::DispatchLoaderDynamic dldi = vk::DispatchLoaderDynamic( instance, vkGetInstanceProcAddr );
+
+    vk::DispatchLoaderDynamic dldd = vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr, device);
 
     vk::Queue graphics_queue = vkb_device.get_queue (vkb::QueueType::graphics).value();
     auto graphics_queue_family = vkb_device.get_queue_index(vkb::QueueType::graphics).value();
@@ -113,6 +130,70 @@ int main() {
     auto command_pool = device.createCommandPool({
         .queueFamilyIndex = graphics_queue_family,
     });
+
+    // AMD VMA allocator
+
+    vma::AllocatorCreateInfo allocatorCreateInfo = {
+        .physicalDevice = phys_device.physical_device,
+        .device = device,
+        .instance = instance,
+        .vulkanApiVersion = VK_API_VERSION_1_2,
+    };
+
+    vma::Allocator allocator;
+    auto vma_err = vma::createAllocator(&allocatorCreateInfo, &allocator);
+
+
+    auto img2 = device.createImage({
+        .imageType = vk::ImageType::e2D,
+        .format = vk::Format::eR16G16B16A16Sfloat,
+        .extent = vk::Extent3D {
+            .width = extent.width,
+            .height = extent.height,
+            .depth = 1,
+        },
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+    });
+
+    vk::ImageMemoryRequirementsInfo2 req =  {
+        .image = img2
+    };
+    VkMemoryRequirements2 xyzzzzz;
+    //device.getImageMemoryRequirements2(req, dldd);
+
+    std::cout << "!!" << std::endl;
+
+    /*auto scene_referred_framebuffer = create_image({
+        .imageType = vk::ImageType::e2D,
+        .format = vk::Format::eR16G16B16A16Sfloat,
+        .extent = vk::Extent3D {
+            .width = extent.width,
+            .height = extent.height,
+            .depth = 1,
+        },
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+    }, allocator);*/
+
+
+
+    /*auto scene_referred_framebuffer_view = device.createImageView({
+        .image = scene_referred_framebuffer,
+        .viewType = vk::ImageViewType::e2D,
+        .format = vk::Format::eR16G16B16A16Sfloat,
+    });*/
+
+    /*
+    vma::AllocatorInfo info;
+
+    info.instance = instance;
+    info.physicalDevice = phys_device.physical_device;
+    info.device = device;
+    vk::ResultTypeValue<vma::Allocator> allocator = vma::createAllocator(info);
+    */
 
     std::vector<vk::CommandBuffer> command_buffers = device.allocateCommandBuffers({
         .commandPool = command_pool,
@@ -193,8 +274,8 @@ int main() {
                 },
             }
         };
-        // Call the dynamic rendering begin/end functions with the dispatcher.
         // This just clears the swapchain image with the clear color.
+        // Wraps vkCmdBeginRendering
         command_buffer.beginRendering({
             .renderArea = {
                 .offset = {},
@@ -203,8 +284,8 @@ int main() {
             .layerCount = 1,
             .colorAttachmentCount = 1,
             .pColorAttachments = &color_attachment_info
-        }, dispatch_loader);
-        command_buffer.endRendering(dispatch_loader);
+        }, dldd);
+        command_buffer.endRendering(dldd);
 
         // Transition the swapchain image from being used as a color attachment
         // to presenting. Don't discard contents!!
