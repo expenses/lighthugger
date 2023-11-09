@@ -1,6 +1,3 @@
-[submodule "vk-bootstrap"]
-	path = vk-bootstrap
-	url = https://github.com/charles-lunarg/vk-bootstrap
 [submodule "simple_vulkan_synchronization"]
 	path = simple_vulkan_synchronization
 	url = https://github.com/Tobski/simple_vulkan_synchronization/

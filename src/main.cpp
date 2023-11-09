@@ -7,6 +7,15 @@
 // https://github.com/charles-lunarg/vk-bootstrap/blob/main/docs/getting_started.md
 // https://github.com/KhronosGroup/Vulkan-Hpp
 // https://lesleylai.info/en/vk-khr-dynamic-rendering/
+// https://github.com/dokipen3d/vulkanHppMinimalExample/blob/master/main.cpp
+
+const vk::ImageSubresourceRange COLOR_SUBRESOURCE_RANGE = {
+    .aspectMask = vk::ImageAspectFlagBits::eColor,
+    .baseMipLevel = 0,
+    .levelCount = 1,
+    .baseArrayLayer = 0,
+    .layerCount = 1,
+};
 
 // Make inserting color image transition barriers easier.
 
@@ -22,24 +31,18 @@ struct ImageBarrier {
 
 void insert_color_image_barrier(vk::CommandBuffer command_buffer, ImageBarrier barrier) {
     ThsvsImageBarrier image_barrier = {
-            .prevAccessCount = 1,
-            .pPrevAccesses = &barrier.prev_access,
-            .nextAccessCount = 1,
-            .pNextAccesses = &barrier.next_access,
-            .prevLayout = barrier.prev_layout,
-            .nextLayout = barrier.next_layout,
-            .discardContents = barrier.discard_contents,
-            .srcQueueFamilyIndex = barrier.queue_family,
-            .dstQueueFamilyIndex = barrier.queue_family,
-            .image = barrier.image,
-            .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            }
-        };
+        .prevAccessCount = 1,
+        .pPrevAccesses = &barrier.prev_access,
+        .nextAccessCount = 1,
+        .pNextAccesses = &barrier.next_access,
+        .prevLayout = barrier.prev_layout,
+        .nextLayout = barrier.next_layout,
+        .discardContents = barrier.discard_contents,
+        .srcQueueFamilyIndex = barrier.queue_family,
+        .dstQueueFamilyIndex = barrier.queue_family,
+        .image = barrier.image,
+        .subresourceRange = COLOR_SUBRESOURCE_RANGE
+    };
     thsvsCmdPipelineBarrier(command_buffer, nullptr, 0, nullptr, 1, &image_barrier);
 }
 
@@ -55,28 +58,128 @@ AllocatedImage create_image(vk::ImageCreateInfo create_info, vma::Allocator allo
     return image;
 }
 
+VKAPI_ATTR VkBool32 VKAPI_CALL debug_message_callback( VkDebugUtilsMessageSeverityFlagBitsEXT       messageSeverity,
+                                                 VkDebugUtilsMessageTypeFlagsEXT              messageTypes,
+                                                 VkDebugUtilsMessengerCallbackDataEXT const * pCallbackData,
+                                                 void * /*pUserData*/ )
+{
+    std::cout
+        << "["
+        << vk::to_string(static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>( messageSeverity ))
+        << "]["
+        << vk::to_string( static_cast<vk::DebugUtilsMessageTypeFlagsEXT>( messageTypes ) )
+        << "]["
+        << pCallbackData->pMessageIdName
+        << "]\t"
+        << pCallbackData->pMessage
+        << std::endl;
+
+  return false;
+}
+
+std::vector<vk::ImageView> create_swapchain_image_views(vk::Device device, const std::vector<vk::Image>& swapchain_images, vk::Format swapchain_format) {
+    std::vector<vk::ImageView> views;
+
+    for (vk::Image image: swapchain_images) {
+        views.push_back(device.createImageView({
+            .image = image,
+            .viewType = vk::ImageViewType::e2D,
+            .format = swapchain_format,
+            .subresourceRange = COLOR_SUBRESOURCE_RANGE
+        }));
+    }
+
+    return views;
+}
+
 int main() {
     glfwInit();
 
-    // Most of this stuff is copied right from VkBootstrap
-    vkb::InstanceBuilder builder;
-    auto inst_ret = builder.set_app_name ("Example Vulkan Application")
-                        .request_validation_layers ()
-                        .use_default_debug_messenger ()
-                        .build ();
-    if (!inst_ret) {
-        std::cerr << "Failed to create Vulkan instance. Error: " << inst_ret.error().message() << "\n";
-        return -1;
-    }
-    vkb::Instance vkb_inst = inst_ret.value();
+    auto vulkan_version = VK_API_VERSION_1_2;
 
-    auto instance = vkb_inst.instance;
+    vk::ApplicationInfo appInfo = {
+        .pApplicationName = "Hello Triangle",
+        .applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0), .pEngineName = "No Engine",
+        .engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0), .apiVersion = vulkan_version
+    };
+
+    auto glfwExtensionCount = 0u;
+    auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    std::vector<const char*> instance_extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    std::vector<const char*> layers;
+
+    auto debug_enabled = true;
+
+    if (debug_enabled) {
+        instance_extensions.push_back("VK_EXT_debug_utils");
+        layers.push_back("VK_LAYER_KHRONOS_validation");
+    }
+
+    VULKAN_HPP_DEFAULT_DISPATCHER.init();
+
+    auto instance = vk::createInstance(vk::InstanceCreateInfo{
+        .flags = {}, .pApplicationInfo = &appInfo,
+        .enabledLayerCount = static_cast<uint32_t>(layers.size()), .ppEnabledLayerNames = layers.data(),
+        .enabledExtensionCount = static_cast<uint32_t>(instance_extensions.size()), .ppEnabledExtensionNames = instance_extensions.data() });
+
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(instance, vkGetInstanceProcAddr);
+
+    if (debug_enabled) {
+        auto messenger = instance.createDebugUtilsMessengerEXT({
+            .flags = {},
+            .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eError | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+                vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo,
+            .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+                vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
+            .pfnUserCallback = debug_message_callback
+        }, nullptr);
+    }
+
+    // todo: physical device and queue family selection.
+    std::vector<vk::PhysicalDevice> physicalDevices = instance.enumeratePhysicalDevices();
+    auto phys_device = physicalDevices[0];
+    auto queueFamilyProperties = phys_device.getQueueFamilyProperties();
+    auto queue_fam = queueFamilyProperties[0];
+
+    uint32_t graphics_queue_family = 0;
+
+    float queue_prio = 1.0f;
+
+    vk::DeviceQueueCreateInfo device_queue_create_info = {
+        .queueCount = 1,
+        .pQueuePriorities = &queue_prio
+    };
+
+
+    vk::PhysicalDeviceDynamicRenderingFeatures dyn_rendering_features = {
+        .dynamicRendering = true
+    };
+
+    std::vector<const char*> device_extensions = {
+        "VK_KHR_swapchain",
+        "VK_KHR_dynamic_rendering"
+    };
+
+    vk::Device device = phys_device.createDevice({
+        .pNext = &dyn_rendering_features,
+        .queueCreateInfoCount = 1,
+        .pQueueCreateInfos = &device_queue_create_info,
+        .enabledLayerCount = 0,
+        .ppEnabledLayerNames = nullptr,
+        .enabledExtensionCount = static_cast<uint32_t>(device_extensions.size()),
+        .ppEnabledExtensionNames = device_extensions.data(),
+    }, nullptr);
+
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(instance, vkGetInstanceProcAddr, device);
+
+    auto graphics_queue = device.getQueue(graphics_queue_family, 0);
 
     vk::Extent2D extent = {
         .width = 640,
         .height = 480,
     };
 
+    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     auto window = glfwCreateWindow(extent.width, extent.height, "Window Title", NULL, NULL);
 
@@ -84,48 +187,20 @@ int main() {
     vk::Result err = static_cast<vk::Result>(glfwCreateWindowSurface(instance, window, NULL, &_surface));
     vk::SurfaceKHR surface = vk::SurfaceKHR(_surface);
 
-    vkb::PhysicalDeviceSelector selector{ vkb_inst };
-    auto phys_device = selector.set_surface (surface)
-                        // Require the dynamic rendering extension
-                        .add_required_extension("VK_KHR_dynamic_rendering")
-                        // Dependencies of the above
-                        .add_required_extension("VK_KHR_depth_stencil_resolve")
-                        .add_required_extension("VK_KHR_create_renderpass2")
-                        .add_required_extension("VK_KHR_multiview")
-                        .add_required_extension("VK_KHR_maintenance2")
-                        .set_minimum_version (1, 2)
-                        .select ()
-                        .value ();
+    // Todo: get minimagecount and imageformat properly.
+    auto swapchain_format = vk::Format::eB8G8R8A8Srgb;
+    auto swapchain = device.createSwapchainKHR({
+        .surface = surface,
+        .minImageCount = 3,
+        .imageFormat = swapchain_format,
+        .imageExtent = extent,
+        .imageArrayLayers = 1,
+        .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
+        .presentMode = vk::PresentModeKHR::eFifo
+    });
 
-    vk::PhysicalDeviceDynamicRenderingFeatures dyn_rendering_features = {
-        .dynamicRendering = true
-    };
-
-    vkb::DeviceBuilder device_builder{ phys_device };
-    auto vkb_device = device_builder.add_pNext(&dyn_rendering_features).build().value();
-
-    vk::Device device = vkb_device.device;
-
-    // Init the default dispatch loader for device extension functions etc.
-    // If we don't do this `command_buffer.beginRendering` etc. will segfault as it can't find the function.
-    vk::DispatchLoaderDynamic dldi = vk::DispatchLoaderDynamic( instance, vkGetInstanceProcAddr );
-
-    vk::DispatchLoaderDynamic dldd = vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr, device);
-
-    vk::Queue graphics_queue = vkb_device.get_queue (vkb::QueueType::graphics).value();
-    auto graphics_queue_family = vkb_device.get_queue_index(vkb::QueueType::graphics).value();
-
-    vkb::SwapchainBuilder swapchain_builder{ phys_device, vkb_device, surface };
-    auto swapchain = swapchain_builder
-        .use_default_format_selection()
-		//use vsync present mode
-		.set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-		.set_desired_extent(extent.width, extent.height)
-        .build ()
-        .value();
-
-    auto swapchain_images = swapchain.get_images().value();
-    auto swapchain_image_views = swapchain.get_image_views().value();
+    auto swapchain_images = device.getSwapchainImagesKHR(swapchain);
+    auto swapchain_image_views = create_swapchain_image_views(device, swapchain_images, swapchain_format);
 
     auto command_pool = device.createCommandPool({
         .queueFamilyIndex = graphics_queue_family,
@@ -134,17 +209,16 @@ int main() {
     // AMD VMA allocator
 
     vma::AllocatorCreateInfo allocatorCreateInfo = {
-        .physicalDevice = phys_device.physical_device,
+        .physicalDevice = phys_device,
         .device = device,
         .instance = instance,
-        .vulkanApiVersion = VK_API_VERSION_1_2,
+        .vulkanApiVersion = vulkan_version,
     };
 
     vma::Allocator allocator;
     auto vma_err = vma::createAllocator(&allocatorCreateInfo, &allocator);
 
-
-    auto img2 = device.createImage({
+    auto scene_referred_framebuffer = create_image({
         .imageType = vk::ImageType::e2D,
         .format = vk::Format::eR16G16B16A16Sfloat,
         .extent = vk::Extent3D {
@@ -155,45 +229,7 @@ int main() {
         .mipLevels = 1,
         .arrayLayers = 1,
         .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-    });
-
-    vk::ImageMemoryRequirementsInfo2 req =  {
-        .image = img2
-    };
-    VkMemoryRequirements2 xyzzzzz;
-    //device.getImageMemoryRequirements2(req, dldd);
-
-    std::cout << "!!" << std::endl;
-
-    /*auto scene_referred_framebuffer = create_image({
-        .imageType = vk::ImageType::e2D,
-        .format = vk::Format::eR16G16B16A16Sfloat,
-        .extent = vk::Extent3D {
-            .width = extent.width,
-            .height = extent.height,
-            .depth = 1,
-        },
-        .mipLevels = 1,
-        .arrayLayers = 1,
-        .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-    }, allocator);*/
-
-
-
-    /*auto scene_referred_framebuffer_view = device.createImageView({
-        .image = scene_referred_framebuffer,
-        .viewType = vk::ImageViewType::e2D,
-        .format = vk::Format::eR16G16B16A16Sfloat,
-    });*/
-
-    /*
-    vma::AllocatorInfo info;
-
-    info.instance = instance;
-    info.physicalDevice = phys_device.physical_device;
-    info.device = device;
-    vk::ResultTypeValue<vma::Allocator> allocator = vma::createAllocator(info);
-    */
+    }, allocator);
 
     std::vector<vk::CommandBuffer> command_buffers = device.allocateCommandBuffers({
         .commandPool = command_pool,
@@ -216,8 +252,10 @@ int main() {
             .height = static_cast<uint32_t>(current_height)
         };
         if (extent != current_extent) {
-            printf("Resizing from %ux%u to %ux%u\n", extent.width, extent.height, current_extent.width, current_extent.height);
-            extent = current_extent;
+            // todo: handle resizing again.
+
+            //printf("Resizing from %ux%u to %ux%u\n", extent.width, extent.height, current_extent.width, current_extent.height);
+            /*extent = current_extent;
 
             swapchain = swapchain_builder
                 .set_desired_extent(extent.width, extent.height)
@@ -225,7 +263,7 @@ int main() {
                 .value();
 
             swapchain_images = swapchain.get_images().value();
-            swapchain_image_views = swapchain.get_image_views().value();
+            swapchain_image_views = swapchain.get_image_views().value();*/
         }
 
         time += 1.0 / 60.0;
@@ -284,8 +322,8 @@ int main() {
             .layerCount = 1,
             .colorAttachmentCount = 1,
             .pColorAttachments = &color_attachment_info
-        }, dldd);
-        command_buffer.endRendering(dldd);
+        });
+        command_buffer.endRendering();
 
         // Transition the swapchain image from being used as a color attachment
         // to presenting. Don't discard contents!!
