@@ -124,8 +124,10 @@ int main() {
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(instance, vkGetInstanceProcAddr);
 
+    vk::DebugUtilsMessengerEXT messenger;
+
     if (debug_enabled) {
-        auto messenger = instance.createDebugUtilsMessengerEXT({
+        messenger = instance.createDebugUtilsMessengerEXT({
             .flags = {},
             .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eError | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
                 vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo,
@@ -179,7 +181,6 @@ int main() {
         .height = 480,
     };
 
-    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     auto window = glfwCreateWindow(extent.width, extent.height, "Window Title", NULL, NULL);
 
@@ -188,19 +189,20 @@ int main() {
     vk::SurfaceKHR surface = vk::SurfaceKHR(_surface);
 
     // Todo: get minimagecount and imageformat properly.
-    auto swapchain_format = vk::Format::eB8G8R8A8Srgb;
-    auto swapchain = device.createSwapchainKHR({
+    vk::SwapchainCreateInfoKHR swapchain_create_info = {
         .surface = surface,
         .minImageCount = 3,
-        .imageFormat = swapchain_format,
+        .imageFormat = vk::Format::eB8G8R8A8Srgb,
+        .imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
         .imageExtent = extent,
         .imageArrayLayers = 1,
         .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
-        .presentMode = vk::PresentModeKHR::eFifo
-    });
+        .presentMode = vk::PresentModeKHR::eFifo,
+    };
+    auto swapchain = device.createSwapchainKHR(swapchain_create_info);
 
     auto swapchain_images = device.getSwapchainImagesKHR(swapchain);
-    auto swapchain_image_views = create_swapchain_image_views(device, swapchain_images, swapchain_format);
+    auto swapchain_image_views = create_swapchain_image_views(device, swapchain_images, swapchain_create_info.imageFormat);
 
     auto command_pool = device.createCommandPool({
         .queueFamilyIndex = graphics_queue_family,
@@ -252,18 +254,19 @@ int main() {
             .height = static_cast<uint32_t>(current_height)
         };
         if (extent != current_extent) {
-            // todo: handle resizing again.
+            extent = current_extent;
 
-            //printf("Resizing from %ux%u to %ux%u\n", extent.width, extent.height, current_extent.width, current_extent.height);
-            /*extent = current_extent;
+            swapchain_create_info.imageExtent = extent;
+            swapchain_create_info.oldSwapchain = swapchain;
 
-            swapchain = swapchain_builder
-                .set_desired_extent(extent.width, extent.height)
-                .build ()
-                .value();
+            // todo: this prints a validation error on resize. Still works fine though.
+            // ideally https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_swapchain_maintenance1.html is used to avoid this.
+            swapchain = device.createSwapchainKHR(swapchain_create_info);
 
-            swapchain_images = swapchain.get_images().value();
-            swapchain_image_views = swapchain.get_image_views().value();*/
+            swapchain_images = device.getSwapchainImagesKHR(swapchain);
+            swapchain_image_views = create_swapchain_image_views(device, swapchain_images, swapchain_create_info.imageFormat);
+
+            device.destroySwapchainKHR(swapchain_create_info.oldSwapchain);
         }
 
         time += 1.0 / 60.0;
@@ -280,7 +283,7 @@ int main() {
         device.resetCommandPool(command_pool);
 
         // Acquire the next swapchain image (waiting on the gpu-side and signaling the present semaphore when finished).
-        auto swapchain_image_index = device.acquireNextImageKHR(vk::SwapchainKHR(swapchain), u64_max, present_semaphore, nullptr).value;
+        auto swapchain_image_index = device.acquireNextImageKHR(swapchain, u64_max, present_semaphore, nullptr).value;
 
         // This wraps vkBeginCommandBuffer.
         command_buffer.begin({
@@ -354,14 +357,13 @@ int main() {
         // This wraps vkQueueSubmit.
         err = graphics_queue.submit(1, &submit_info, render_fence);
 
-        auto cpp_swapchain = vk::SwapchainKHR(swapchain);
         // Present the swapchain image after having wated on the render semaphore.
         // This wraps vkQueuePresentKHR.
         err = graphics_queue.presentKHR({
             .waitSemaphoreCount = 1,
             .pWaitSemaphores = &render_semaphore,
             .swapchainCount = 1,
-            .pSwapchains = &cpp_swapchain,
+            .pSwapchains = &swapchain,
             .pImageIndices = &swapchain_image_index,
         });
     }
