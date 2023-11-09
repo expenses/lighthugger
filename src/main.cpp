@@ -233,6 +233,13 @@ int main() {
         .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
     }, allocator);
 
+    auto scene_referred_framebuffer_view = device.createImageView({
+            .image = scene_referred_framebuffer.image,
+            .viewType = vk::ImageViewType::e2D,
+            .format = vk::Format::eR16G16B16A16Sfloat,
+            .subresourceRange = COLOR_SUBRESOURCE_RANGE
+        });
+
     std::vector<vk::CommandBuffer> command_buffers = device.allocateCommandBuffers({
         .commandPool = command_pool,
         .level = vk::CommandBufferLevel::ePrimary,
@@ -267,6 +274,26 @@ int main() {
             swapchain_image_views = create_swapchain_image_views(device, swapchain_images, swapchain_create_info.imageFormat);
 
             device.destroySwapchainKHR(swapchain_create_info.oldSwapchain);
+
+            scene_referred_framebuffer = create_image({
+                .imageType = vk::ImageType::e2D,
+                .format = vk::Format::eR16G16B16A16Sfloat,
+                .extent = vk::Extent3D {
+                    .width = extent.width,
+                    .height = extent.height,
+                    .depth = 1,
+                },
+                .mipLevels = 1,
+                .arrayLayers = 1,
+                .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+            }, allocator);
+
+            scene_referred_framebuffer_view = device.createImageView({
+                    .image = scene_referred_framebuffer.image,
+                    .viewType = vk::ImageViewType::e2D,
+                    .format = vk::Format::eR16G16B16A16Sfloat,
+                    .subresourceRange = COLOR_SUBRESOURCE_RANGE
+                });
         }
 
         time += 1.0 / 60.0;
@@ -304,6 +331,30 @@ int main() {
 
         // Setup a clear color.
         std::array<float, 4> clear_color = {fabsf(sinf(time)), 0.1, 0.1, 1.0};
+
+
+        vk::RenderingAttachmentInfoKHR framebuffer_attachment_info = {
+            .imageView = scene_referred_framebuffer_view,
+            .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+            .loadOp = vk::AttachmentLoadOp::eClear,
+            .storeOp = vk::AttachmentStoreOp::eStore,
+            .clearValue = {
+                .color = {
+                    .float32 = clear_color,
+                },
+            }
+        };
+        command_buffer.beginRendering({
+            .renderArea = {
+                .offset = {},
+                .extent = extent,
+            },
+            .layerCount = 1,
+            .colorAttachmentCount = 1,
+            .pColorAttachments = &framebuffer_attachment_info
+        });
+        command_buffer.endRendering();
+
         vk::RenderingAttachmentInfoKHR color_attachment_info = {
             .imageView = swapchain_image_views[swapchain_image_index],
             .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
