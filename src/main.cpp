@@ -35,7 +35,7 @@ struct ImageBarrier {
     vk::Image image;
 };
 
-void insert_color_image_barrier(vk::CommandBuffer command_buffer, ImageBarrier barrier) {
+void insert_color_image_barrier(const vk::raii::CommandBuffer& command_buffer, ImageBarrier barrier) {
     ThsvsImageBarrier image_barrier = {
         .prevAccessCount = 1,
         .pPrevAccesses = &barrier.prev_access,
@@ -49,19 +49,36 @@ void insert_color_image_barrier(vk::CommandBuffer command_buffer, ImageBarrier b
         .image = barrier.image,
         .subresourceRange = COLOR_SUBRESOURCE_RANGE
     };
-    thsvsCmdPipelineBarrier(command_buffer, nullptr, 0, nullptr, 1, &image_barrier);
+    thsvsCmdPipelineBarrier(*command_buffer, nullptr, 0, nullptr, 1, &image_barrier);
 }
 
 struct AllocatedImage {
     vk::Image image;
     vma::Allocation allocation;
+    vma::Allocator allocator;
+
+    AllocatedImage(vk::Image image_, vma::Allocation allocation_, vma::Allocator allocator_): image(image_), allocation(allocation_), allocator(allocator_) {
+    }
+
+    ~AllocatedImage() {
+        allocator.destroyImage(image, allocation);
+    }
+
+    // https://radekvit.medium.com/move-semantics-in-c-and-rust-the-case-for-destructive-moves-d816891c354b
+    AllocatedImage& operator=(AllocatedImage&& other) {
+        std::swap(image, other.image);
+        std::swap(allocation, other.allocation);
+        std::swap(allocator, other.allocator);
+        return *this;
+    }
 };
 
 AllocatedImage create_image(vk::ImageCreateInfo create_info, vma::Allocator allocator) {
-    AllocatedImage image;
+    vk::Image image;
+    vma::Allocation allocation;
     vma::AllocationCreateInfo alloc_info = {.usage = vma::MemoryUsage::eAuto};
-    auto err = allocator.createImage(&create_info, &alloc_info, &image.image, &image.allocation, nullptr);
-    return image;
+    auto err = allocator.createImage(&create_info, &alloc_info, &image, &allocation, nullptr);
+    return AllocatedImage(image, allocation, allocator);
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debug_message_callback( VkDebugUtilsMessageSeverityFlagBitsEXT       messageSeverity,
@@ -83,8 +100,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debug_message_callback( VkDebugUtilsMessageSeveri
   return false;
 }
 
-std::vector<vk::ImageView> create_swapchain_image_views(vk::Device device, const std::vector<vk::Image>& swapchain_images, vk::Format swapchain_format) {
-    std::vector<vk::ImageView> views;
+std::vector<vk::raii::ImageView> create_swapchain_image_views(const vk::raii::Device& device, const std::vector<vk::Image>& swapchain_images, vk::Format swapchain_format) {
+    std::vector<vk::raii::ImageView> views;
 
     for (vk::Image image: swapchain_images) {
         views.push_back(device.createImageView({
@@ -123,14 +140,16 @@ int main() {
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
 
-    auto instance = vk::createInstance(vk::InstanceCreateInfo{
+    vk::raii::Context context;
+
+    vk::raii::Instance instance(context, vk::InstanceCreateInfo{
         .flags = {}, .pApplicationInfo = &appInfo,
         .enabledLayerCount = static_cast<uint32_t>(layers.size()), .ppEnabledLayerNames = layers.data(),
         .enabledExtensionCount = static_cast<uint32_t>(instance_extensions.size()), .ppEnabledExtensionNames = instance_extensions.data() });
 
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(instance, vkGetInstanceProcAddr);
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(*instance, vkGetInstanceProcAddr);
 
-    vk::DebugUtilsMessengerEXT messenger;
+    std::optional<vk::raii::DebugUtilsMessengerEXT> messenger = std::nullopt;
 
     if (debug_enabled) {
         messenger = instance.createDebugUtilsMessengerEXT({
@@ -144,7 +163,7 @@ int main() {
     }
 
     // todo: physical device and queue family selection.
-    std::vector<vk::PhysicalDevice> physicalDevices = instance.enumeratePhysicalDevices();
+    std::vector<vk::raii::PhysicalDevice> physicalDevices = instance.enumeratePhysicalDevices();
     auto phys_device = physicalDevices[0];
     auto queueFamilyProperties = phys_device.getQueueFamilyProperties();
     auto queue_fam = queueFamilyProperties[0];
@@ -168,7 +187,7 @@ int main() {
         "VK_KHR_dynamic_rendering"
     };
 
-    vk::Device device = phys_device.createDevice({
+    vk::raii::Device device = phys_device.createDevice({
         .pNext = &dyn_rendering_features,
         .queueCreateInfoCount = 1,
         .pQueueCreateInfos = &device_queue_create_info,
@@ -178,7 +197,7 @@ int main() {
         .ppEnabledExtensionNames = device_extensions.data(),
     }, nullptr);
 
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(instance, vkGetInstanceProcAddr, device);
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(*instance, vkGetInstanceProcAddr, *device);
 
     auto graphics_queue = device.getQueue(graphics_queue_family, 0);
 
@@ -193,12 +212,12 @@ int main() {
     glfwSetKeyCallback(window, key_callback);
 
     VkSurfaceKHR _surface;
-    vk::Result err = static_cast<vk::Result>(glfwCreateWindowSurface(instance, window, NULL, &_surface));
-    vk::SurfaceKHR surface = vk::SurfaceKHR(_surface);
+    vk::Result err = static_cast<vk::Result>(glfwCreateWindowSurface(*instance, window, NULL, &_surface));
+    vk::raii::SurfaceKHR surface = vk::raii::SurfaceKHR(instance, _surface);
 
     // Todo: get minimagecount and imageformat properly.
     vk::SwapchainCreateInfoKHR swapchain_create_info = {
-        .surface = surface,
+        .surface = *surface,
         .minImageCount = 3,
         .imageFormat = vk::Format::eB8G8R8A8Srgb,
         .imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
@@ -209,19 +228,19 @@ int main() {
     };
     auto swapchain = device.createSwapchainKHR(swapchain_create_info);
 
-    auto swapchain_images = device.getSwapchainImagesKHR(swapchain);
+    auto swapchain_images = swapchain.getImages();
     auto swapchain_image_views = create_swapchain_image_views(device, swapchain_images, swapchain_create_info.imageFormat);
 
-    auto command_pool = device.createCommandPool({
+    vk::raii::CommandPool command_pool = device.createCommandPool({
         .queueFamilyIndex = graphics_queue_family,
     });
 
     // AMD VMA allocator
 
     vma::AllocatorCreateInfo allocatorCreateInfo = {
-        .physicalDevice = phys_device,
-        .device = device,
-        .instance = instance,
+        .physicalDevice = *phys_device,
+        .device = *device,
+        .instance = *instance,
         .vulkanApiVersion = vulkan_version,
     };
 
@@ -248,16 +267,16 @@ int main() {
             .subresourceRange = COLOR_SUBRESOURCE_RANGE
         });
 
-    std::vector<vk::CommandBuffer> command_buffers = device.allocateCommandBuffers({
-        .commandPool = command_pool,
+    auto command_buffers = device.allocateCommandBuffers(vk::CommandBufferAllocateInfo {
+        .commandPool = *command_pool,
         .level = vk::CommandBufferLevel::ePrimary,
         .commandBufferCount = 1
     });
-    vk::CommandBuffer command_buffer = command_buffers[0];
+    auto command_buffer = std::move(command_buffers[0]);
 
-    vk::Semaphore present_semaphore = device.createSemaphore({});
-    vk::Semaphore render_semaphore = device.createSemaphore({});
-    vk::Fence render_fence = device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
+    auto present_semaphore = device.createSemaphore({});
+    auto render_semaphore = device.createSemaphore({});
+    auto render_fence = device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
 
     float time = 0.0;
 
@@ -272,16 +291,14 @@ int main() {
             extent = current_extent;
 
             swapchain_create_info.imageExtent = extent;
-            swapchain_create_info.oldSwapchain = swapchain;
+            swapchain_create_info.oldSwapchain = *swapchain;
 
             // todo: this prints a validation error on resize. Still works fine though.
             // ideally https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_swapchain_maintenance1.html is used to avoid this.
             swapchain = device.createSwapchainKHR(swapchain_create_info);
 
-            swapchain_images = device.getSwapchainImagesKHR(swapchain);
+            swapchain_images = swapchain.getImages();
             swapchain_image_views = create_swapchain_image_views(device, swapchain_images, swapchain_create_info.imageFormat);
-
-            device.destroySwapchainKHR(swapchain_create_info.oldSwapchain);
 
             scene_referred_framebuffer = create_image({
                 .imageType = vk::ImageType::e2D,
@@ -311,14 +328,14 @@ int main() {
         auto u64_max = std::numeric_limits<uint64_t>::max();
         // Wait on the render fence to be signaled
         // (it's signaled before this loop starts so that we don't just block forever on the first frame)
-        auto err = device.waitForFences(1, &render_fence, true, u64_max);
-        err = device.resetFences(1, &render_fence);
+        auto err = device.waitForFences({*render_fence}, true, u64_max);
+        device.resetFences({*render_fence});
         // Reset the command pool instead of resetting the single command buffer as
         // it's cheaper (afaik). Obviously don't do this if multiple command buffers are used.
-        device.resetCommandPool(command_pool);
+        command_pool.reset();
 
         // Acquire the next swapchain image (waiting on the gpu-side and signaling the present semaphore when finished).
-        auto swapchain_image_index = device.acquireNextImageKHR(swapchain, u64_max, present_semaphore, nullptr).value;
+        auto [acquire_err, swapchain_image_index] = swapchain.acquireNextImage(u64_max, *present_semaphore);
 
         // This wraps vkBeginCommandBuffer.
         command_buffer.begin({
@@ -342,7 +359,7 @@ int main() {
 
 
         vk::RenderingAttachmentInfoKHR framebuffer_attachment_info = {
-            .imageView = scene_referred_framebuffer_view,
+            .imageView = *scene_referred_framebuffer_view,
             .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
             .loadOp = vk::AttachmentLoadOp::eClear,
             .storeOp = vk::AttachmentStoreOp::eStore,
@@ -364,7 +381,7 @@ int main() {
         command_buffer.endRendering();
 
         vk::RenderingAttachmentInfoKHR color_attachment_info = {
-            .imageView = swapchain_image_views[swapchain_image_index],
+            .imageView = *swapchain_image_views[swapchain_image_index],
             .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
             .loadOp = vk::AttachmentLoadOp::eClear,
             .storeOp = vk::AttachmentStoreOp::eStore,
@@ -406,26 +423,29 @@ int main() {
         // signaling the render semaphore when the commands are finished.
         vk::SubmitInfo submit_info = {
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &present_semaphore,
+            .pWaitSemaphores = &*present_semaphore,
             .pWaitDstStageMask = &dst_stage_mask,
             .commandBufferCount = 1,
-            .pCommandBuffers = &command_buffer,
+            .pCommandBuffers = &*command_buffer,
             .signalSemaphoreCount = 1,
-            .pSignalSemaphores = &render_semaphore,
+            .pSignalSemaphores = &*render_semaphore,
         };
         // This wraps vkQueueSubmit.
-        err = graphics_queue.submit(1, &submit_info, render_fence);
+        graphics_queue.submit(submit_info, *render_fence);
 
         // Present the swapchain image after having wated on the render semaphore.
         // This wraps vkQueuePresentKHR.
         err = graphics_queue.presentKHR({
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &render_semaphore,
+            .pWaitSemaphores = &*render_semaphore,
             .swapchainCount = 1,
-            .pSwapchains = &swapchain,
+            .pSwapchains = &*swapchain,
             .pImageIndices = &swapchain_image_index,
         });
     }
+
+    // Wait until the device is idle so that we don't get destructor warnings about currently in-use resources.
+    device.waitIdle();
 
     return 0;
 }
