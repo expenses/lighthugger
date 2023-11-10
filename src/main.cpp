@@ -9,6 +9,12 @@
 // https://lesleylai.info/en/vk-khr-dynamic-rendering/
 // https://github.com/dokipen3d/vulkanHppMinimalExample/blob/master/main.cpp
 
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+    }
+}
+
 const vk::ImageSubresourceRange COLOR_SUBRESOURCE_RANGE = {
     .aspectMask = vk::ImageAspectFlagBits::eColor,
     .baseMipLevel = 0,
@@ -183,6 +189,8 @@ int main() {
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     auto window = glfwCreateWindow(extent.width, extent.height, "Window Title", NULL, NULL);
+
+    glfwSetKeyCallback(window, key_callback);
 
     VkSurfaceKHR _surface;
     vk::Result err = static_cast<vk::Result>(glfwCreateWindowSurface(instance, window, NULL, &_surface));
