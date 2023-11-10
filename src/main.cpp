@@ -57,9 +57,6 @@ struct AllocatedImage {
     vma::Allocation allocation;
     vma::Allocator allocator;
 
-    AllocatedImage(vk::Image image_, vma::Allocation allocation_, vma::Allocator allocator_): image(image_), allocation(allocation_), allocator(allocator_) {
-    }
-
     ~AllocatedImage() {
         allocator.destroyImage(image, allocation);
     }
@@ -78,7 +75,7 @@ AllocatedImage create_image(vk::ImageCreateInfo create_info, vma::Allocator allo
     vma::Allocation allocation;
     vma::AllocationCreateInfo alloc_info = {.usage = vma::MemoryUsage::eAuto};
     auto err = allocator.createImage(&create_info, &alloc_info, &image, &allocation, nullptr);
-    return AllocatedImage(image, allocation, allocator);
+    return AllocatedImage {image, allocation, allocator};
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debug_message_callback( VkDebugUtilsMessageSeverityFlagBitsEXT       messageSeverity,
@@ -446,6 +443,10 @@ int main() {
 
     // Wait until the device is idle so that we don't get destructor warnings about currently in-use resources.
     device.waitIdle();
+
+    // Todo: this needs to happen after all the allocated memory is destructed.
+    // The allocator should be placed in a raii wrapper before any allocations are made.
+    allocator.destroy();
 
     return 0;
 }
