@@ -387,20 +387,21 @@ int main() {
         });
         command_buffer.endRendering();
 
-        insert_color_image_barrier(command_buffer, {
-            .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-            .next_access = THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
-            .discard_contents = false,
-            .queue_family = graphics_queue_family,
-            .image = scene_referred_framebuffer.image
-        });
-
-        insert_color_image_barrier(command_buffer, {
-            .prev_access = THSVS_ACCESS_NONE,
-            .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-            .discard_contents = true,
-            .queue_family = graphics_queue_family,
-            .image = swapchain_images[swapchain_image_index]
+        insert_color_image_barriers(command_buffer, std::array {
+            ImageBarrier {
+                .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
+                .next_access = THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+                .discard_contents = false,
+                .queue_family = graphics_queue_family,
+                .image = scene_referred_framebuffer.image
+            },
+            ImageBarrier {
+                .prev_access = THSVS_ACCESS_NONE,
+                .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
+                .discard_contents = true,
+                .queue_family = graphics_queue_family,
+                .image = swapchain_images[swapchain_image_index]
+            }
         });
 
         vk::RenderingAttachmentInfoKHR color_attachment_info = {
