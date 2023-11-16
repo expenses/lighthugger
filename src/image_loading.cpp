@@ -12,6 +12,8 @@ AllocatedImage load_dds(
 ) {
     std::ifstream stream(filepath, std::ios::binary);
 
+    assert(stream);
+
     DWORD dwMagic;
     DDS_HEADER header;
     DDS_HEADER_DXT10 header10;

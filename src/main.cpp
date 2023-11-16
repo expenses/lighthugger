@@ -287,7 +287,7 @@ int main() {
 
     // Load all resources
     auto display_transform_lut = load_dds(
-        "tony-mc-mapface/shader/tony_mc_mapface.dds",
+        "external/tony-mc-mapface/shader/tony_mc_mapface.dds",
         allocator,
         command_buffer,
         graphics_queue_family,

@@ -1,12 +1,12 @@
 [submodule "simple_vulkan_synchronization"]
-	path = simple_vulkan_synchronization
+	path = external/simple_vulkan_synchronization
 	url = https://github.com/Tobski/simple_vulkan_synchronization/
 [submodule "VulkanMemoryAllocator-Hpp"]
-	path = VulkanMemoryAllocator-Hpp
+	path = external/VulkanMemoryAllocator-Hpp
 	url = https://github.com/YaaZ/VulkanMemoryAllocator-Hpp/
 [submodule "tony-mc-mapface"]
-	path = tony-mc-mapface
+	path = external/tony-mc-mapface
 	url = https://github.com/h3r2tic/tony-mc-mapface/
 [submodule "tinyobjloader"]
-	path = tinyobjloader
+	path = external/tinyobjloader
 	url = https://github.com/tinyobjloader/tinyobjloader
