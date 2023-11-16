@@ -13,7 +13,10 @@ struct ImageBarrier {
 };
 
 template<size_t N>
-void insert_color_image_barriers(const vk::raii::CommandBuffer& command_buffer, const std::array<ImageBarrier, N>& barriers) {
+void insert_color_image_barriers(
+    const vk::raii::CommandBuffer& command_buffer,
+    const std::array<ImageBarrier, N>& barriers
+) {
     std::array<ThsvsImageBarrier, N> thsvs_barriers;
 
     for (size_t i = 0; i < thsvs_barriers.size(); i++) {
@@ -22,15 +25,21 @@ void insert_color_image_barriers(const vk::raii::CommandBuffer& command_buffer, 
             .pPrevAccesses = &barriers[i].prev_access,
             .nextAccessCount = 1,
             .pNextAccesses = &barriers[i].next_access,
-            .prevLayout = THSVS_IMAGE_LAYOUT_OPTIMAL,//barrier.prev_layout,
-            .nextLayout = THSVS_IMAGE_LAYOUT_OPTIMAL,//barrier.next_layout,
+            .prevLayout = THSVS_IMAGE_LAYOUT_OPTIMAL,  //barrier.prev_layout,
+            .nextLayout = THSVS_IMAGE_LAYOUT_OPTIMAL,  //barrier.next_layout,
             .discardContents = barriers[i].discard_contents,
             .srcQueueFamilyIndex = barriers[i].queue_family,
             .dstQueueFamilyIndex = barriers[i].queue_family,
             .image = barriers[i].image,
-            .subresourceRange = COLOR_SUBRESOURCE_RANGE
-        };
+            .subresourceRange = COLOR_SUBRESOURCE_RANGE};
     }
 
-    thsvsCmdPipelineBarrier(*command_buffer, nullptr, 0, nullptr, thsvs_barriers.size(), thsvs_barriers.data());
+    thsvsCmdPipelineBarrier(
+        *command_buffer,
+        nullptr,
+        0,
+        nullptr,
+        thsvs_barriers.size(),
+        thsvs_barriers.data()
+    );
 }

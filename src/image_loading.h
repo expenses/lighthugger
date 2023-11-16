@@ -1,3 +1,16 @@
+#include "allocations.h"
+
+struct LoadedImage {
+    AllocatedImage image;
+    AllocatedBuffer staging_buffer;
+};
+
+LoadedImage load_dds(
+    const char* filepath,
+    vma::Allocator allocator,
+    const vk::raii::CommandBuffer& command_buffer,
+    uint32_t graphics_queue_family
+);
 
 /*
 const std::array<uint8_t, 12> KTX2_IDENTIFIER = {
@@ -62,9 +75,3 @@ void load_ktx2_image(const char* filepath) {
     assert(header.supercompression_scheme == 0);
 }
 */
-struct LoadedImage {
-    AllocatedImage image;
-    AllocatedBuffer staging_buffer;
-};
-
-LoadedImage load_dds(const char* filepath, vma::Allocator allocator, const vk::raii::CommandBuffer& command_buffer, uint32_t graphics_queue_family);

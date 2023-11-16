@@ -6,10 +6,10 @@
 #include <thsvs_simpler_vulkan_synchronization.h>
 
 #define VMA_VULKAN_VERSION 1002000
-#include "vk_mem_alloc.hpp"
-
-#include <stdexcept>
+#include <cmath>
 #include <iostream>
 #include <limits>
-#include <cmath>
 #include <optional>
+#include <stdexcept>
+
+#include "vk_mem_alloc.hpp"

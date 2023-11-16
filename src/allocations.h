@@ -1,3 +1,4 @@
+#pragma once
 
 struct AllocatedImage {
     vk::Image image;
@@ -10,18 +11,28 @@ struct AllocatedImage {
         std::swap(allocator, other.allocator);
     }
 
-    AllocatedImage(vk::ImageCreateInfo create_info, vma::Allocator allocator_, const char* name = nullptr) {
+    AllocatedImage(
+        vk::ImageCreateInfo create_info,
+        vma::Allocator allocator_,
+        const char* name = nullptr
+    ) {
         allocator = allocator_;
-        vma::AllocationCreateInfo alloc_info = {.requiredFlags = vk::MemoryPropertyFlagBits::eDeviceLocal};
-        auto err = allocator.createImage(&create_info, &alloc_info, &image, &allocation, nullptr);
+        vma::AllocationCreateInfo alloc_info = {
+            .requiredFlags = vk::MemoryPropertyFlagBits::eDeviceLocal};
+        auto err = allocator.createImage(
+            &create_info,
+            &alloc_info,
+            &image,
+            &allocation,
+            nullptr
+        );
 
         if (name) {
             auto device = allocator.getAllocatorInfo().device;
-            device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT{
+            device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
                 .objectType = vk::ObjectType::eImage,
                 .objectHandle = reinterpret_cast<uint64_t>(&*image),
-                .pObjectName = name
-            });
+                .pObjectName = name});
         }
     }
 
@@ -33,7 +44,8 @@ struct AllocatedImage {
     }
 
     ~AllocatedImage() {
-        if (allocator) allocator.destroyImage(image, allocation);
+        if (allocator)
+            allocator.destroyImage(image, allocation);
     }
 };
 
@@ -48,23 +60,42 @@ struct AllocatedBuffer {
         std::swap(allocator, other.allocator);
     }
 
-    AllocatedBuffer(vk::BufferCreateInfo create_info, vma::AllocationCreateInfo alloc_info, vma::Allocator allocator_, const char* name = nullptr) {
+    AllocatedBuffer(
+        vk::BufferCreateInfo create_info,
+        vma::AllocationCreateInfo alloc_info,
+        vma::Allocator allocator_,
+        const char* name = nullptr
+    ) {
         allocator = allocator_;
-        auto err = allocator.createBuffer(&create_info, &alloc_info, &buffer, &allocation, nullptr);
+        auto err = allocator.createBuffer(
+            &create_info,
+            &alloc_info,
+            &buffer,
+            &allocation,
+            nullptr
+        );
         if (name) {
             auto device = allocator.getAllocatorInfo().device;
-            device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT{
+            device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
                 .objectType = vk::ObjectType::eBuffer,
                 .objectHandle = reinterpret_cast<uint64_t>(&*buffer),
-                .pObjectName = name
-            });
+                .pObjectName = name});
         }
     }
 
-    AllocatedBuffer(vk::BufferCreateInfo create_info, vma::Allocator allocator_): AllocatedBuffer(create_info, {.usage = vma::MemoryUsage::eAuto}, allocator_) {}
+    AllocatedBuffer(
+        vk::BufferCreateInfo create_info,
+        vma::Allocator allocator_
+    ) :
+        AllocatedBuffer(
+            create_info,
+            {.usage = vma::MemoryUsage::eAuto},
+            allocator_
+        ) {}
 
     ~AllocatedBuffer() {
-        if (allocator) allocator.destroyBuffer(buffer, allocation);
+        if (allocator)
+            allocator.destroyBuffer(buffer, allocation);
     }
 
     AllocatedBuffer& operator=(AllocatedBuffer&& other) {
