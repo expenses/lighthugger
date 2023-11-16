@@ -10,7 +10,7 @@ add_subdirectory(VulkanMemoryAllocator-Hpp)
 file(GLOB SRC_FILES src/*.cpp)
 add_executable(vkcpptest ${SRC_FILES})
 
-target_include_directories(vkcpptest PRIVATE src simple_vulkan_synchronization VulkanMemoryAllocator-Hpp/include)
+target_include_directories(vkcpptest PRIVATE src simple_vulkan_synchronization VulkanMemoryAllocator-Hpp/include tinyobjloader)
 target_link_libraries(vkcpptest glfw Vulkan::Vulkan)
 target_precompile_headers(vkcpptest PRIVATE src/pch.h)
 target_compile_features(vkcpptest PUBLIC cxx_std_20)

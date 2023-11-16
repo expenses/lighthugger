@@ -1,15 +1,14 @@
 #include "image_loading.h"
 
-#include <fstream>
-
 #include "dds.h"
 #include "sync.h"
 
-LoadedImage load_dds(
+AllocatedImage load_dds(
     const char* filepath,
     vma::Allocator allocator,
     const vk::raii::CommandBuffer& command_buffer,
-    uint32_t graphics_queue_family
+    uint32_t graphics_queue_family,
+    std::vector<AllocatedBuffer>& temp_buffers
 ) {
     std::ifstream stream(filepath, std::ios::binary);
 
@@ -36,7 +35,7 @@ LoadedImage load_dds(
     auto height = header.dwHeight;
     auto depth = header.dwDepth;
 
-    auto bpp = 4;
+    auto bytes_per_pixel = 4;
 
     std::cout << offset << " " << vk::to_string(format) << " " << header.dwWidth
               << " " << header.dwHeight << " " << header10.resourceDimension
@@ -63,7 +62,7 @@ LoadedImage load_dds(
         image_name.data()
     );
 
-    auto data_size = width * height * depth * 4;
+    auto data_size = width * height * depth * bytes_per_pixel;
 
     auto staging_buffer_name = std::string(filepath) + " staging buffer";
 
@@ -122,7 +121,7 @@ LoadedImage load_dds(
             .image = image.image}}
     );
 
-    return {
-        .image = std::move(image),
-        .staging_buffer = std::move(staging_buffer)};
+    temp_buffers.push_back(std::move(staging_buffer));
+
+    return image;
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util.h"
+
 struct AllocatedImage {
     vk::Image image;
     vma::Allocation allocation;
@@ -19,13 +21,13 @@ struct AllocatedImage {
         allocator = allocator_;
         vma::AllocationCreateInfo alloc_info = {
             .requiredFlags = vk::MemoryPropertyFlagBits::eDeviceLocal};
-        auto err = allocator.createImage(
+        check_vk_result(allocator.createImage(
             &create_info,
             &alloc_info,
             &image,
             &allocation,
             nullptr
-        );
+        ));
 
         if (name) {
             auto device = allocator.getAllocatorInfo().device;
@@ -67,13 +69,13 @@ struct AllocatedBuffer {
         const char* name = nullptr
     ) {
         allocator = allocator_;
-        auto err = allocator.createBuffer(
+        check_vk_result(allocator.createBuffer(
             &create_info,
             &alloc_info,
             &buffer,
             &allocation,
             nullptr
-        );
+        ));
         if (name) {
             auto device = allocator.getAllocatorInfo().device;
             device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
@@ -103,5 +105,12 @@ struct AllocatedBuffer {
         std::swap(allocation, other.allocation);
         std::swap(allocator, other.allocator);
         return *this;
+    }
+
+    void map_and_memcpy(void* src, size_t count) {
+        auto ptr = allocator.mapMemory(allocation);
+        std::memcpy(ptr, src, count);
+        allocator.unmapMemory(allocation);
+        allocator.flushAllocation(allocation, 0, VK_WHOLE_SIZE);
     }
 };

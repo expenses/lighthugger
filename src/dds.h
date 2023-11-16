@@ -14,7 +14,7 @@ struct DDS_PIXELFORMAT {
     DWORD dwABitMask;
 };
 
-typedef struct {
+struct DDS_HEADER {
     DWORD dwSize;
     DWORD dwFlags;
     DWORD dwHeight;
@@ -29,9 +29,9 @@ typedef struct {
     DWORD dwCaps3;
     DWORD dwCaps4;
     DWORD dwReserved2;
-} DDS_HEADER;
+};
 
-typedef enum DXGI_FORMAT {
+enum DXGI_FORMAT {
     DXGI_FORMAT_UNKNOWN = 0,
     DXGI_FORMAT_R32G32B32A32_TYPELESS = 1,
     DXGI_FORMAT_R32G32B32A32_FLOAT = 2,
@@ -156,7 +156,7 @@ typedef enum DXGI_FORMAT {
     DXGI_FORMAT_FORCE_UINT = 0xffffffff
 };
 
-typedef enum D3D10_RESOURCE_DIMENSION {
+enum D3D10_RESOURCE_DIMENSION {
     D3D10_RESOURCE_DIMENSION_UNKNOWN = 0,
     D3D10_RESOURCE_DIMENSION_BUFFER = 1,
     D3D10_RESOURCE_DIMENSION_TEXTURE1D = 2,
@@ -164,13 +164,13 @@ typedef enum D3D10_RESOURCE_DIMENSION {
     D3D10_RESOURCE_DIMENSION_TEXTURE3D = 4
 };
 
-typedef struct {
+struct DDS_HEADER_DXT10 {
     DXGI_FORMAT dxgiFormat;
     D3D10_RESOURCE_DIMENSION resourceDimension;
     UINT miscFlag;
     UINT arraySize;
     UINT miscFlags2;
-} DDS_HEADER_DXT10;
+};
 
 vk::Format translate_dxgi_to_vulkan(DXGI_FORMAT dxgi_format) {
     switch (dxgi_format) {

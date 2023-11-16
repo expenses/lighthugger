@@ -1,7 +1,5 @@
 #include "pipelines.h"
 
-#include <fstream>
-
 const auto RGBA_MASK = vk::ColorComponentFlagBits::eR
     | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB
     | vk::ColorComponentFlagBits::eA;
@@ -101,6 +99,12 @@ Pipelines Pipelines::compile_pipelines(
         vk::DescriptorSetLayoutBinding {
             .binding = 2,
             .descriptorType = vk::DescriptorType::eSampledImage,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+        },
+        vk::DescriptorSetLayoutBinding {
+            .binding = 3,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eFragment,
         }};

@@ -1,6 +1,7 @@
 #include "allocations.h"
 #include "debugging.h"
 #include "image_loading.h"
+#include "mesh_loading.h"
 #include "pch.h"
 #include "pipelines.h"
 #include "sync.h"
@@ -15,7 +16,7 @@
 // https://github.com/dokipen3d/vulkanHppMinimalExample/blob/master/main.cpp
 
 static void
-key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+key_callback(GLFWwindow* window, int key, int /*scancode*/, int action, int /*mods*/) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
@@ -108,7 +109,7 @@ int main() {
         instance.enumeratePhysicalDevices();
     auto phys_device = physicalDevices[0];
     auto queueFamilyProperties = phys_device.getQueueFamilyProperties();
-    auto queue_fam = queueFamilyProperties[0];
+    //auto queue_fam = queueFamilyProperties[0];
 
     uint32_t graphics_queue_family = 0;
 
@@ -161,9 +162,9 @@ int main() {
     glfwSetKeyCallback(window, key_callback);
 
     VkSurfaceKHR _surface;
-    vk::Result err = static_cast<vk::Result>(
+    check_vk_result(static_cast<vk::Result>(
         glfwCreateWindowSurface(*instance, window, NULL, &_surface)
-    );
+    ));
     vk::raii::SurfaceKHR surface = vk::raii::SurfaceKHR(instance, _surface);
 
     // Todo: get minimagecount and imageformat properly.
@@ -200,7 +201,7 @@ int main() {
     };
 
     vma::Allocator allocator;
-    auto vma_err = vma::createAllocator(&allocatorCreateInfo, &allocator);
+    check_vk_result(vma::createAllocator(&allocatorCreateInfo, &allocator));
 
     auto scene_referred_framebuffer = AllocatedImage(
         {
@@ -245,12 +246,15 @@ int main() {
     auto pipelines =
         Pipelines::compile_pipelines(device, swapchain_create_info.imageFormat);
 
-    std::array<vk::DescriptorPoolSize, 2> pool_sizes = {
+    auto pool_sizes = std::array {
         vk::DescriptorPoolSize {
             .type = vk::DescriptorType::eSampledImage,
             .descriptorCount = 1024},
         vk::DescriptorPoolSize {
             .type = vk::DescriptorType::eSampler,
+            .descriptorCount = 1024},
+        vk::DescriptorPoolSize {
+            .type = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1024}};
 
     auto descriptor_pool = device.createDescriptorPool(
@@ -274,18 +278,20 @@ int main() {
 
     });
 
-    auto init_fence = device.createFence({});
+    std::vector<AllocatedBuffer> temp_buffers;
+    auto powerplant = load_obj("powerplant/Powerplant.obj", allocator);
 
     command_buffer.begin(
         {.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit}
     );
 
     // Load all resources
-    auto display_transform_lut_loaded = load_dds(
+    auto display_transform_lut = load_dds(
         "tony-mc-mapface/shader/tony_mc_mapface.dds",
         allocator,
         command_buffer,
-        graphics_queue_family
+        graphics_queue_family,
+        temp_buffers
     );
 
     command_buffer.end();
@@ -298,16 +304,16 @@ int main() {
         .commandBufferCount = 1,
         .pCommandBuffers = &*command_buffer,
     };
+    auto init_fence = device.createFence({});
     graphics_queue.submit(submit_info, *init_fence);
 
     auto u64_max = std::numeric_limits<uint64_t>::max();
 
-    auto init_err = device.waitForFences({*init_fence}, true, u64_max);
+    check_vk_result(device.waitForFences({*init_fence}, true, u64_max));
 
-    // Drop staging buffer.
-    { auto _ = std::move(display_transform_lut_loaded.staging_buffer); }
+    // Drop temp buffers.
+    temp_buffers.clear();
 
-    auto display_transform_lut = std::move(display_transform_lut_loaded.image);
     auto display_transform_view = device.createImageView(
         {.image = display_transform_lut.image,
          .viewType = vk::ImageViewType::e3D,
@@ -324,6 +330,11 @@ int main() {
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
 
     auto sampler_info = vk::DescriptorImageInfo {.sampler = *sampler};
+
+    auto buffer_info = vk::DescriptorBufferInfo {
+        .buffer = powerplant.vertices.buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE};
 
     // Write initial descriptor sets.
     device.updateDescriptorSets(
@@ -344,7 +355,13 @@ int main() {
              .dstBinding = 2,
              .descriptorCount = 1,
              .descriptorType = vk::DescriptorType::eSampledImage,
-             .pImageInfo = &lut_image_info}},
+             .pImageInfo = &lut_image_info},
+         vk::WriteDescriptorSet {
+             .dstSet = *scene_referred_framebuffer_ds,
+             .dstBinding = 3,
+             .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eStorageBuffer,
+             .pBufferInfo = &buffer_info}},
         {}
     );
 
@@ -420,7 +437,7 @@ int main() {
 
         // Wait on the render fence to be signaled
         // (it's signaled before this loop starts so that we don't just block forever on the first frame)
-        auto err = device.waitForFences({*render_fence}, true, u64_max);
+        check_vk_result(device.waitForFences({*render_fence}, true, u64_max));
         device.resetFences({*render_fence});
         // Reset the command pool instead of resetting the single command buffer as
         // it's cheaper (afaik). Obviously don't do this if multiple command buffers are used.
@@ -442,8 +459,8 @@ int main() {
         command_buffer.setViewport(
             0,
             {vk::Viewport {
-                .width = extent.width,
-                .height = extent.height,
+                .width = static_cast<float>(extent.width),
+                .height = static_cast<float>(extent.height),
                 .minDepth = 0.0,
                 .maxDepth = 1.0}}
         );
@@ -458,20 +475,13 @@ int main() {
                 .image = scene_referred_framebuffer.image}}
         );
 
-        // Setup a clear color.
-        std::array<float, 4> clear_color = {fabsf(sinf(time)), 0.1, 0.1, 1.0};
 
         vk::RenderingAttachmentInfoKHR framebuffer_attachment_info = {
             .imageView = *scene_referred_framebuffer_view,
             .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-            .loadOp = vk::AttachmentLoadOp::eClear,
+            .loadOp = vk::AttachmentLoadOp::eDontCare,
             .storeOp = vk::AttachmentStoreOp::eStore,
-            .clearValue = {
-                .color =
-                    {
-                        .float32 = clear_color,
-                    },
-            }};
+            };
         command_buffer.beginRendering(
             {.renderArea =
                  {
@@ -505,7 +515,7 @@ int main() {
         vk::RenderingAttachmentInfoKHR color_attachment_info = {
             .imageView = *swapchain_image_views[swapchain_image_index],
             .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-            .loadOp = vk::AttachmentLoadOp::eClear,
+            .loadOp = vk::AttachmentLoadOp::eDontCare,
             .storeOp = vk::AttachmentStoreOp::eStore,
             .clearValue = {}};
         // This just clears the swapchain image with the clear color.
@@ -568,13 +578,13 @@ int main() {
 
         // Present the swapchain image after having wated on the render semaphore.
         // This wraps vkQueuePresentKHR.
-        err = graphics_queue.presentKHR({
+        check_vk_result(graphics_queue.presentKHR({
             .waitSemaphoreCount = 1,
             .pWaitSemaphores = &*render_semaphore,
             .swapchainCount = 1,
             .pSwapchains = &*swapchain,
             .pImageIndices = &swapchain_image_index,
-        });
+        }));
     }
 
     // Wait until the device is idle so that we don't get destructor warnings about currently in-use resources.

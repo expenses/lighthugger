@@ -18,6 +18,7 @@ V2P VSMain(uint vId : SV_VertexID)
 [[vk::binding(0)]] Texture2D<float3> source_tex;
 [[vk::binding(1)]] SamplerState samp;
 [[vk::binding(2)]] Texture3D<float3> display_transform_lut;
+[[vk::binding(3)]] StructuredBuffer<float3> vertices;
 
 float3 tony_mc_mapface(float3 stimulus) {
     // Apply a non-linear transform that the LUT is encoded with.
@@ -38,5 +39,5 @@ float4 PSMain(V2P psIn) : SV_Target0
     float3 stimulus = source_tex.Sample(samp, psIn.Uv);
 
 
-    return float4(tony_mc_mapface(stimulus), 1.0);
+    return float4(vertices.Load(0), 1.0);
 }

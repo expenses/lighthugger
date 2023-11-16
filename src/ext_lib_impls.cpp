@@ -6,4 +6,7 @@
 #include "vk_mem_alloc.h"
 #include "vk_mem_alloc.hpp"
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE

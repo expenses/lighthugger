@@ -7,3 +7,6 @@
 [submodule "tony-mc-mapface"]
 	path = tony-mc-mapface
 	url = https://github.com/h3r2tic/tony-mc-mapface/
+[submodule "tinyobjloader"]
+	path = tinyobjloader
+	url = https://github.com/tinyobjloader/tinyobjloader
