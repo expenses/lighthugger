@@ -23,6 +23,6 @@
             "verifyBufferAccess": false
         },
         "queuedFrameCap": 0,
-        "workingDir": ""
+        "workingDir": "/home/ashley/projects/vulkancpp"
     }
 }

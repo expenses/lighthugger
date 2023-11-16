@@ -2,6 +2,7 @@
 #include "allocations.h"
 #include "sync.h"
 #include "debugging.h"
+#include "pipelines.h"
 
 // Sources:
 // https://vkguide.dev
@@ -198,6 +199,8 @@ int main() {
 
     float time = 0.0;
 
+    Pipelines pipelines(device, swapchain_create_info.imageFormat);
+
     while (!glfwWindowShouldClose(window)) {
         int current_width, current_height;
         glfwGetWindowSize(window, &current_width, &current_height);
@@ -260,6 +263,21 @@ int main() {
             .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
         });
 
+        command_buffer.setScissor(0, {
+            vk::Rect2D {
+                .offset = {},
+                .extent = extent
+            }
+        });
+        command_buffer.setViewport(0, {
+            vk::Viewport {
+                .width = extent.width,
+                .height = extent.height,
+                .minDepth = 0.0,
+                .maxDepth = 1.0
+            }
+        });
+
         // Transition the swapchain image from whatever it was before
         // to being used as a color attachment, discarding contents in the process.
         insert_color_image_barrier(command_buffer, {
@@ -317,6 +335,10 @@ int main() {
             .colorAttachmentCount = 1,
             .pColorAttachments = &color_attachment_info
         });
+
+        command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipelines.display_transform);
+        command_buffer.draw(3, 1, 0, 0);
+
         command_buffer.endRendering();
 
         // Transition the swapchain image from being used as a color attachment
