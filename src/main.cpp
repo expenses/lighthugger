@@ -403,13 +403,13 @@ int main() {
             }
         });
 
-        insert_color_image_barrier(command_buffer, {
+        insert_color_image_barriers(command_buffer, std::array{ImageBarrier{
             .prev_access = THSVS_ACCESS_NONE,
             .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
             .discard_contents = true,
             .queue_family = graphics_queue_family,
             .image = scene_referred_framebuffer.image
-        });
+        }});
 
         // Setup a clear color.
         std::array<float, 4> clear_color = {fabsf(sinf(time)), 0.1, 0.1, 1.0};
@@ -482,13 +482,13 @@ int main() {
 
         // Transition the swapchain image from being used as a color attachment
         // to presenting. Don't discard contents!!
-        insert_color_image_barrier(command_buffer, {
+        insert_color_image_barriers(command_buffer, std::array{ImageBarrier{
             .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
             .next_access = THSVS_ACCESS_PRESENT,
             .discard_contents = false,
             .queue_family = graphics_queue_family,
             .image = swapchain_images[swapchain_image_index]
-        });
+        }});
 
         command_buffer.end();
 

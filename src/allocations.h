@@ -7,12 +7,7 @@ struct AllocatedImage {
     AllocatedImage(AllocatedImage&& other) {
         std::swap(image, other.image);
         std::swap(allocation, other.allocation);
-        // Swapping the allocator will cause the moved-from `other`'s
-        // allocator to be set to nullptr, which causes a segfault
-        // when trying to destroy an image. Just copying the value means that
-        // destroyImage is called with a valid allocator but image and allocation set to
-        // nullptr, which does nothing.
-        allocator = other.allocator;
+        std::swap(allocator, other.allocator);
     }
 
     AllocatedImage(vk::ImageCreateInfo create_info, vma::Allocator allocator_, const char* name = nullptr) {
@@ -38,7 +33,7 @@ struct AllocatedImage {
     }
 
     ~AllocatedImage() {
-        allocator.destroyImage(image, allocation);
+        if (allocator) allocator.destroyImage(image, allocation);
     }
 };
 
@@ -50,7 +45,7 @@ struct AllocatedBuffer {
     AllocatedBuffer(AllocatedBuffer&& other) {
         std::swap(buffer, other.buffer);
         std::swap(allocation, other.allocation);
-        allocator = other.allocator;
+        std::swap(allocator, other.allocator);
     }
 
     AllocatedBuffer(vk::BufferCreateInfo create_info, vma::AllocationCreateInfo alloc_info, vma::Allocator allocator_, const char* name = nullptr) {
@@ -69,7 +64,7 @@ struct AllocatedBuffer {
     AllocatedBuffer(vk::BufferCreateInfo create_info, vma::Allocator allocator_): AllocatedBuffer(create_info, {.usage = vma::MemoryUsage::eAuto}, allocator_) {}
 
     ~AllocatedBuffer() {
-        allocator.destroyBuffer(buffer, allocation);
+        if (allocator) allocator.destroyBuffer(buffer, allocation);
     }
 
     AllocatedBuffer& operator=(AllocatedBuffer&& other) {
