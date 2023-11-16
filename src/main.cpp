@@ -3,6 +3,7 @@
 #include "sync.h"
 #include "debugging.h"
 #include "pipelines.h"
+#include "image_loading.h"
 
 // Sources:
 // https://vkguide.dev
@@ -177,7 +178,7 @@ int main() {
         .mipLevels = 1,
         .arrayLayers = 1,
         .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-    }, allocator);
+    }, allocator, "scene_referred_framebuffer");
 
     auto scene_referred_framebuffer_view = device.createImageView({
             .image = scene_referred_framebuffer.image,
@@ -234,8 +235,48 @@ int main() {
 
     });
 
+    auto init_fence = device.createFence({});
+
+    command_buffer.begin({
+        .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
+    });
+
+    // Load all resources
+    auto display_transform_lut_loaded = load_dds("tony-mc-mapface/shader/tony_mc_mapface.dds", allocator, command_buffer, graphics_queue_family);
+
+    command_buffer.end();
+
+    vk::PipelineStageFlags dst_stage_mask = vk::PipelineStageFlagBits::eTransfer;
+
+    vk::SubmitInfo submit_info = {
+        .pWaitDstStageMask = &dst_stage_mask,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &*command_buffer,
+    };
+    graphics_queue.submit(submit_info, *init_fence);
+
+    auto u64_max = std::numeric_limits<uint64_t>::max();
+
+    auto init_err = device.waitForFences({*init_fence}, true, u64_max);
+
+    // Drop staging buffer.
+    {auto _ = std::move(display_transform_lut_loaded.staging_buffer);}
+
+    auto display_transform_lut = std::move(display_transform_lut_loaded.image);
+    auto display_transform_view = device.createImageView({
+            .image = display_transform_lut.image,
+            .viewType = vk::ImageViewType::e3D,
+            .format = vk::Format::eE5B9G9R9UfloatPack32,
+            .subresourceRange = COLOR_SUBRESOURCE_RANGE
+        });
+
     auto image_info = vk::DescriptorImageInfo {
         .imageView = *scene_referred_framebuffer_view,
+        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+    };
+
+    auto lut_image_info = vk::DescriptorImageInfo {
+        .imageView = *display_transform_view,
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
     };
 
@@ -243,6 +284,8 @@ int main() {
         .sampler = *sampler
     };
 
+
+    // Write initial descriptor sets.
     device.updateDescriptorSets({
         vk::WriteDescriptorSet {
             .dstSet = *scene_referred_framebuffer_ds,
@@ -257,6 +300,13 @@ int main() {
             .descriptorCount = 1,
             .descriptorType = vk::DescriptorType::eSampler,
             .pImageInfo = &sampler_info
+        },
+        vk::WriteDescriptorSet {
+            .dstSet = *scene_referred_framebuffer_ds,
+            .dstBinding = 2,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eSampledImage,
+            .pImageInfo = &lut_image_info
         }
     }, {});
 
@@ -293,7 +343,7 @@ int main() {
                 .mipLevels = 1,
                 .arrayLayers = 1,
                 .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-            }, allocator);
+            }, allocator, "scene_referred_framebuffer");
 
             scene_referred_framebuffer_view = device.createImageView({
                     .image = scene_referred_framebuffer.image,
@@ -302,27 +352,26 @@ int main() {
                     .subresourceRange = COLOR_SUBRESOURCE_RANGE
                 });
 
-                image_info = vk::DescriptorImageInfo {
-        .imageView = *scene_referred_framebuffer_view,
-        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-    };
+            image_info = vk::DescriptorImageInfo {
+                .imageView = *scene_referred_framebuffer_view,
+                .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+            };
 
-    device.updateDescriptorSets({
-        vk::WriteDescriptorSet {
-            .dstSet = *scene_referred_framebuffer_ds,
-            .dstBinding = 0,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eSampledImage,
-            .pImageInfo = &image_info
-        }
-    }, {});
+            device.updateDescriptorSets({
+                vk::WriteDescriptorSet {
+                    .dstSet = *scene_referred_framebuffer_ds,
+                    .dstBinding = 0,
+                    .descriptorCount = 1,
+                    .descriptorType = vk::DescriptorType::eSampledImage,
+                    .pImageInfo = &image_info
+                }
+            }, {});
         }
 
         time += 1.0 / 60.0;
 
         glfwPollEvents();
 
-        auto u64_max = std::numeric_limits<uint64_t>::max();
         // Wait on the render fence to be signaled
         // (it's signaled before this loop starts so that we don't just block forever on the first frame)
         auto err = device.waitForFences({*render_fence}, true, u64_max);

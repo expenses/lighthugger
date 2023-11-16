@@ -82,7 +82,7 @@ struct Pipelines {
         auto blit_vs = create_shader_from_file(device, "compiled_shaders/blit_vs.spv");
         auto blit_ps = create_shader_from_file(device, "compiled_shaders/blit_ps.spv");
 
-        std::array<vk::DescriptorSetLayoutBinding, 2> texture_sampler_bindings = {
+        auto texture_sampler_bindings = std::array {
             vk::DescriptorSetLayoutBinding {
                 .binding = 0,
                 .descriptorType = vk::DescriptorType::eSampledImage,
@@ -92,6 +92,12 @@ struct Pipelines {
             vk::DescriptorSetLayoutBinding {
                 .binding = 1,
                 .descriptorType = vk::DescriptorType::eSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            },
+            vk::DescriptorSetLayoutBinding {
+                .binding = 2,
+                .descriptorType = vk::DescriptorType::eSampledImage,
                 .descriptorCount = 1,
                 .stageFlags = vk::ShaderStageFlagBits::eFragment,
             }

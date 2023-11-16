@@ -4,3 +4,6 @@
 [submodule "VulkanMemoryAllocator-Hpp"]
 	path = VulkanMemoryAllocator-Hpp
 	url = https://github.com/YaaZ/VulkanMemoryAllocator-Hpp/
+[submodule "tony-mc-mapface"]
+	path = tony-mc-mapface
+	url = https://github.com/h3r2tic/tony-mc-mapface/
