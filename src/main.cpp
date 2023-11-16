@@ -1,4 +1,7 @@
 #include "pch.h"
+#include "allocations.h"
+#include "sync.h"
+#include "debugging.h"
 
 // Sources:
 // https://vkguide.dev
@@ -13,88 +16,6 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
-}
-
-const vk::ImageSubresourceRange COLOR_SUBRESOURCE_RANGE = {
-    .aspectMask = vk::ImageAspectFlagBits::eColor,
-    .baseMipLevel = 0,
-    .levelCount = 1,
-    .baseArrayLayer = 0,
-    .layerCount = 1,
-};
-
-// Make inserting color image transition barriers easier.
-
-struct ImageBarrier {
-    ThsvsAccessType prev_access;
-    ThsvsAccessType next_access;
-    ThsvsImageLayout prev_layout;
-    ThsvsImageLayout next_layout;
-    bool discard_contents;
-    uint32_t queue_family;
-    vk::Image image;
-};
-
-void insert_color_image_barrier(const vk::raii::CommandBuffer& command_buffer, ImageBarrier barrier) {
-    ThsvsImageBarrier image_barrier = {
-        .prevAccessCount = 1,
-        .pPrevAccesses = &barrier.prev_access,
-        .nextAccessCount = 1,
-        .pNextAccesses = &barrier.next_access,
-        .prevLayout = barrier.prev_layout,
-        .nextLayout = barrier.next_layout,
-        .discardContents = barrier.discard_contents,
-        .srcQueueFamilyIndex = barrier.queue_family,
-        .dstQueueFamilyIndex = barrier.queue_family,
-        .image = barrier.image,
-        .subresourceRange = COLOR_SUBRESOURCE_RANGE
-    };
-    thsvsCmdPipelineBarrier(*command_buffer, nullptr, 0, nullptr, 1, &image_barrier);
-}
-
-struct AllocatedImage {
-    vk::Image image;
-    vma::Allocation allocation;
-    vma::Allocator allocator;
-
-    ~AllocatedImage() {
-        allocator.destroyImage(image, allocation);
-    }
-
-    // https://radekvit.medium.com/move-semantics-in-c-and-rust-the-case-for-destructive-moves-d816891c354b
-    AllocatedImage& operator=(AllocatedImage&& other) {
-        std::swap(image, other.image);
-        std::swap(allocation, other.allocation);
-        std::swap(allocator, other.allocator);
-        return *this;
-    }
-};
-
-AllocatedImage create_image(vk::ImageCreateInfo create_info, vma::Allocator allocator) {
-    vk::Image image;
-    vma::Allocation allocation;
-    vma::AllocationCreateInfo alloc_info = {.usage = vma::MemoryUsage::eAuto};
-    auto err = allocator.createImage(&create_info, &alloc_info, &image, &allocation, nullptr);
-    return AllocatedImage {image, allocation, allocator};
-}
-
-VKAPI_ATTR VkBool32 VKAPI_CALL debug_message_callback( VkDebugUtilsMessageSeverityFlagBitsEXT       messageSeverity,
-                                                 VkDebugUtilsMessageTypeFlagsEXT              messageTypes,
-                                                 VkDebugUtilsMessengerCallbackDataEXT const * pCallbackData,
-                                                 void * /*pUserData*/ )
-{
-    std::cout
-        << "["
-        << vk::to_string(static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>( messageSeverity ))
-        << "]["
-        << vk::to_string( static_cast<vk::DebugUtilsMessageTypeFlagsEXT>( messageTypes ) )
-        << "]["
-        << pCallbackData->pMessageIdName
-        << "]\t"
-        << pCallbackData->pMessage
-        << std::endl;
-
-  return false;
 }
 
 std::vector<vk::raii::ImageView> create_swapchain_image_views(const vk::raii::Device& device, const std::vector<vk::Image>& swapchain_images, vk::Format swapchain_format) {
@@ -244,7 +165,7 @@ int main() {
     vma::Allocator allocator;
     auto vma_err = vma::createAllocator(&allocatorCreateInfo, &allocator);
 
-    auto scene_referred_framebuffer = create_image({
+    auto scene_referred_framebuffer = AllocatedImage({
         .imageType = vk::ImageType::e2D,
         .format = vk::Format::eR16G16B16A16Sfloat,
         .extent = vk::Extent3D {
@@ -297,7 +218,7 @@ int main() {
             swapchain_images = swapchain.getImages();
             swapchain_image_views = create_swapchain_image_views(device, swapchain_images, swapchain_create_info.imageFormat);
 
-            scene_referred_framebuffer = create_image({
+            scene_referred_framebuffer = AllocatedImage({
                 .imageType = vk::ImageType::e2D,
                 .format = vk::Format::eR16G16B16A16Sfloat,
                 .extent = vk::Extent3D {
@@ -344,8 +265,6 @@ int main() {
         insert_color_image_barrier(command_buffer, {
             .prev_access = THSVS_ACCESS_NONE,
             .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-            .prev_layout = THSVS_IMAGE_LAYOUT_OPTIMAL,
-            .next_layout = THSVS_IMAGE_LAYOUT_OPTIMAL,
             .discard_contents = true,
             .queue_family = graphics_queue_family,
             .image = swapchain_images[swapchain_image_index]
@@ -353,7 +272,6 @@ int main() {
 
         // Setup a clear color.
         std::array<float, 4> clear_color = {fabsf(sinf(time)), 0.1, 0.1, 1.0};
-
 
         vk::RenderingAttachmentInfoKHR framebuffer_attachment_info = {
             .imageView = *scene_referred_framebuffer_view,
@@ -406,8 +324,6 @@ int main() {
         insert_color_image_barrier(command_buffer, {
             .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
             .next_access = THSVS_ACCESS_PRESENT,
-            .prev_layout = THSVS_IMAGE_LAYOUT_OPTIMAL,
-            .next_layout = THSVS_IMAGE_LAYOUT_OPTIMAL,
             .discard_contents = false,
             .queue_family = graphics_queue_family,
             .image = swapchain_images[swapchain_image_index]
