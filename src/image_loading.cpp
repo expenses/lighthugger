@@ -72,8 +72,11 @@ AllocatedImage load_dds(
         vk::BufferCreateInfo {
             .size = data_size,
             .usage = vk::BufferUsageFlagBits::eTransferSrc},
-        {.flags = vma::AllocationCreateFlagBits::eMapped,
-         .requiredFlags = vk::MemoryPropertyFlagBits::eHostVisible},
+        {
+            .flags = vma::AllocationCreateFlagBits::eMapped
+                | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+            .usage = vma::MemoryUsage::eAuto,
+        },
         allocator
     );
 

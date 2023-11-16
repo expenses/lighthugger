@@ -74,93 +74,156 @@ create_shader_from_file(const vk::raii::Device& device, const char* filepath) {
     return shader;
 }
 
+DescriptorSetLayouts
+create_descriptor_set_layouts(const vk::raii::Device& device) {
+    auto geometry_bindings =
+        std::array {// Vertices
+                    vk::DescriptorSetLayoutBinding {
+                        .binding = 0,
+                        .descriptorType = vk::DescriptorType::eStorageBuffer,
+                        .descriptorCount = 1,
+                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                    },
+                    // Indices
+                    vk::DescriptorSetLayoutBinding {
+                        .binding = 1,
+                        .descriptorType = vk::DescriptorType::eStorageBuffer,
+                        .descriptorCount = 1,
+                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                    }};
+
+    auto display_transform_bindings =
+        std::array {// scene-referred framebuffer
+                    vk::DescriptorSetLayoutBinding {
+                        .binding = 0,
+                        .descriptorType = vk::DescriptorType::eSampledImage,
+                        .descriptorCount = 1,
+                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                    },
+                    // sampler
+                    vk::DescriptorSetLayoutBinding {
+                        .binding = 1,
+                        .descriptorType = vk::DescriptorType::eSampler,
+                        .descriptorCount = 1,
+                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                    },
+                    // display transform LUT
+                    vk::DescriptorSetLayoutBinding {
+                        .binding = 2,
+                        .descriptorType = vk::DescriptorType::eSampledImage,
+                        .descriptorCount = 1,
+                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                    }};
+
+    return DescriptorSetLayouts {
+        .display_transform = device.createDescriptorSetLayout({
+            .bindingCount = display_transform_bindings.size(),
+            .pBindings = display_transform_bindings.data(),
+        }),
+        .geometry = device.createDescriptorSetLayout({
+            .bindingCount = geometry_bindings.size(),
+            .pBindings = geometry_bindings.data(),
+        }),
+    };
+}
+
 Pipelines Pipelines::compile_pipelines(
     const vk::raii::Device& device,
     vk::Format swapchain_format
 ) {
-    auto blit_vs =
-        create_shader_from_file(device, "compiled_shaders/blit_vs.spv");
-    auto blit_ps =
-        create_shader_from_file(device, "compiled_shaders/blit_ps.spv");
+    auto descriptor_set_layouts = create_descriptor_set_layouts(device);
 
-    auto texture_sampler_bindings = std::array {
-        vk::DescriptorSetLayoutBinding {
-            .binding = 0,
-            .descriptorType = vk::DescriptorType::eSampledImage,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-        },
-        vk::DescriptorSetLayoutBinding {
-            .binding = 1,
-            .descriptorType = vk::DescriptorType::eSampler,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-        },
-        vk::DescriptorSetLayoutBinding {
-            .binding = 2,
-            .descriptorType = vk::DescriptorType::eSampledImage,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-        },
-        vk::DescriptorSetLayoutBinding {
-            .binding = 3,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-        }};
-
-    auto texture_sampler_dsl = device.createDescriptorSetLayout({
-        .bindingCount = texture_sampler_bindings.size(),
-        .pBindings = texture_sampler_bindings.data(),
-    });
-
-    std::array<vk::DescriptorSetLayout, 1> descriptor_set_layouts = {
-        *texture_sampler_dsl};
+    auto descriptor_set_layout_array = std::array {
+        *descriptor_set_layouts.display_transform,
+        *descriptor_set_layouts.geometry};
 
     auto pipeline_layout =
         device.createPipelineLayout(vk::PipelineLayoutCreateInfo {
-            .setLayoutCount = descriptor_set_layouts.size(),
-            .pSetLayouts = descriptor_set_layouts.data(),
+            .setLayoutCount = descriptor_set_layout_array.size(),
+            .pSetLayouts = descriptor_set_layout_array.data(),
             .pushConstantRangeCount = 0,
             .pPushConstantRanges = nullptr,
         });
 
-    std::array<vk::PipelineShaderStageCreateInfo, 2> blit_stages = {
+    auto clear_pretty =
+        create_shader_from_file(device, "compiled_shaders/clear_pretty.spv");
+
+    auto fullscreen_tri =
+        create_shader_from_file(device, "compiled_shaders/fullscreen_tri.spv");
+
+    auto display_transform = create_shader_from_file(
+        device,
+        "compiled_shaders/display_transform.spv"
+    );
+
+    auto blit_stages = std::array {
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eVertex,
-            .module = *blit_vs,
+            .module = *fullscreen_tri,
             .pName = "VSMain",
         },
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eFragment,
-            .module = *blit_ps,
+            .module = *display_transform,
+            .pName = "PSMain"}};
+
+    auto clear_pretty_stages = std::array {
+        vk::PipelineShaderStageCreateInfo {
+            .stage = vk::ShaderStageFlagBits::eVertex,
+            .module = *fullscreen_tri,
+            .pName = "VSMain",
+        },
+        vk::PipelineShaderStageCreateInfo {
+            .stage = vk::ShaderStageFlagBits::eFragment,
+            .module = *clear_pretty,
             .pName = "PSMain"}};
 
     auto swapchain_format_rendering_info = vk::PipelineRenderingCreateInfoKHR {
         .colorAttachmentCount = 1,
         .pColorAttachmentFormats = &swapchain_format};
 
-    std::array<vk::GraphicsPipelineCreateInfo, 1> pipeline_infos = {
-        // display_transform
-        vk::GraphicsPipelineCreateInfo {
-            .pNext = &swapchain_format_rendering_info,
-            .stageCount = blit_stages.size(),
-            .pStages = blit_stages.data(),
-            .pVertexInputState = &EMPTY_VERTEX_INPUT,
-            .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
-            .pViewportState = &DEFAULT_VIEWPORT_STATE,
-            .pRasterizationState = &FILL_RASTERIZATION,
-            .pMultisampleState = &NO_MULTISAMPLING,
-            .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
-            .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
-            .layout = *pipeline_layout,
-        }};
+    auto rgba16f = vk::Format::eR16G16B16A16Sfloat;
+
+    auto rgba16f_format_rendering_info = vk::PipelineRenderingCreateInfoKHR {
+        .colorAttachmentCount = 1,
+        .pColorAttachmentFormats = &rgba16f};
+
+    auto pipeline_infos =
+        std::array {// display_transform
+                    vk::GraphicsPipelineCreateInfo {
+                        .pNext = &swapchain_format_rendering_info,
+                        .stageCount = blit_stages.size(),
+                        .pStages = blit_stages.data(),
+                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
+                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
+                        .pRasterizationState = &FILL_RASTERIZATION,
+                        .pMultisampleState = &NO_MULTISAMPLING,
+                        .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
+                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+                        .layout = *pipeline_layout,
+                    },
+                    // display_transform
+                    vk::GraphicsPipelineCreateInfo {
+                        .pNext = &rgba16f_format_rendering_info,
+                        .stageCount = clear_pretty_stages.size(),
+                        .pStages = clear_pretty_stages.data(),
+                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
+                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
+                        .pRasterizationState = &FILL_RASTERIZATION,
+                        .pMultisampleState = &NO_MULTISAMPLING,
+                        .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
+                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+                        .layout = *pipeline_layout,
+                    }};
 
     auto pipelines = device.createGraphicsPipelines(nullptr, pipeline_infos);
 
     return Pipelines {
         .display_transform = std::move(pipelines[0]),
+        .clear_pretty = std::move(pipelines[1]),
         .pipeline_layout = std::move(pipeline_layout),
-        .texture_sampler_dsl = std::move(texture_sampler_dsl),
+        .dsl = std::move(descriptor_set_layouts),
     };
 }

@@ -20,7 +20,7 @@ struct AllocatedImage {
     ) {
         allocator = allocator_;
         vma::AllocationCreateInfo alloc_info = {
-            .requiredFlags = vk::MemoryPropertyFlagBits::eDeviceLocal};
+            .usage = vma::MemoryUsage::eAuto};
         check_vk_result(allocator.createImage(
             &create_info,
             &alloc_info,

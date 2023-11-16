@@ -29,6 +29,8 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
         indices.push_back(index.vertex_index);
     }
 
+    // Todo: should use staging buffers instead of host-accessible storage buffers.
+
     std::string index_buffer_name = std::string(filepath) + " index buffer";
 
     AllocatedBuffer index_buffer(
@@ -36,7 +38,10 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
             .size = indices.size() * sizeof(uint32_t),
             .usage = vk::BufferUsageFlagBits::eTransferSrc
                 | vk::BufferUsageFlagBits::eStorageBuffer},
-        {.requiredFlags = vk::MemoryPropertyFlagBits::eHostVisible},
+        {
+            .flags = vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+            .usage = vma::MemoryUsage::eAuto,
+        },
         allocator,
         index_buffer_name.data()
     );
@@ -46,7 +51,10 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
         {.size = attrib.vertices.size() * sizeof(float),
          .usage = vk::BufferUsageFlagBits::eTransferSrc
              | vk::BufferUsageFlagBits::eStorageBuffer},
-        {.requiredFlags = vk::MemoryPropertyFlagBits::eHostVisible},
+        {
+            .flags = vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+            .usage = vma::MemoryUsage::eAuto,
+        },
         allocator,
         vertex_buffer_name.data()
     );
@@ -59,6 +67,5 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
     return Mesh {
         .vertices = std::move(vertex_buffer),
         .indices = std::move(index_buffer),
-        .num_indices = indices.size()
-    };
+        .num_indices = indices.size()};
 }

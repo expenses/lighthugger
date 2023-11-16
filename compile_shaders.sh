@@ -1,2 +1,3 @@
-dxc src/shaders/blit_srgb.hlsl -spirv -T vs_6_0 -E VSMain -Fo compiled_shaders/blit_vs.spv
-dxc src/shaders/blit_srgb.hlsl -spirv -T ps_6_0 -E PSMain -Fo compiled_shaders/blit_ps.spv
+dxc src/shaders/display_transform.hlsl -HV 2021 -Werror -Wall -spirv -T lib_6_7 -Fo compiled_shaders/display_transform.spv
+dxc src/shaders/fullscreen_tri.hlsl -HV 2021 -Werror -Wall -spirv -T lib_6_7 -Fo compiled_shaders/fullscreen_tri.spv
+dxc src/shaders/clear_pretty.hlsl -HV 2021 -Werror -Wall -spirv -T lib_6_7 -Fo compiled_shaders/clear_pretty.spv

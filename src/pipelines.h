@@ -1,8 +1,14 @@
+struct DescriptorSetLayouts {
+    vk::raii::DescriptorSetLayout display_transform;
+    vk::raii::DescriptorSetLayout geometry;
+};
 
 struct Pipelines {
     vk::raii::Pipeline display_transform;
+    vk::raii::Pipeline clear_pretty;
     vk::raii::PipelineLayout pipeline_layout;
-    vk::raii::DescriptorSetLayout texture_sampler_dsl;
+
+    DescriptorSetLayouts dsl;
 
     static Pipelines compile_pipelines(
         const vk::raii::Device& device,

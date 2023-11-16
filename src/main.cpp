@@ -15,8 +15,13 @@
 // https://lesleylai.info/en/vk-khr-dynamic-rendering/
 // https://github.com/dokipen3d/vulkanHppMinimalExample/blob/master/main.cpp
 
-static void
-key_callback(GLFWwindow* window, int key, int /*scancode*/, int action, int /*mods*/) {
+static void key_callback(
+    GLFWwindow* window,
+    int key,
+    int /*scancode*/,
+    int action,
+    int /*mods*/
+) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
@@ -263,8 +268,8 @@ int main() {
          .pPoolSizes = pool_sizes.data()}
     );
 
-    std::array<vk::DescriptorSetLayout, 1> descriptor_set_layouts = {
-        *pipelines.texture_sampler_dsl};
+    auto descriptor_set_layouts =
+        std::array {*pipelines.dsl.display_transform, *pipelines.dsl.geometry};
 
     auto descriptor_sets =
         device.allocateDescriptorSets(vk::DescriptorSetAllocateInfo {
@@ -273,9 +278,11 @@ int main() {
             .pSetLayouts = descriptor_set_layouts.data()});
 
     auto scene_referred_framebuffer_ds = std::move(descriptor_sets[0]);
+    auto geometry_ds = std::move(descriptor_sets[1]);
 
     auto sampler = device.createSampler({
-
+        .magFilter = vk::Filter::eLinear,
+        .minFilter = vk::Filter::eLinear,
     });
 
     std::vector<AllocatedBuffer> temp_buffers;
@@ -336,6 +343,11 @@ int main() {
         .offset = 0,
         .range = VK_WHOLE_SIZE};
 
+    auto index_buffer_info = vk::DescriptorBufferInfo {
+        .buffer = powerplant.indices.buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE};
+
     // Write initial descriptor sets.
     device.updateDescriptorSets(
         {vk::WriteDescriptorSet {
@@ -357,11 +369,17 @@ int main() {
              .descriptorType = vk::DescriptorType::eSampledImage,
              .pImageInfo = &lut_image_info},
          vk::WriteDescriptorSet {
-             .dstSet = *scene_referred_framebuffer_ds,
-             .dstBinding = 3,
+             .dstSet = *geometry_ds,
+             .dstBinding = 0,
              .descriptorCount = 1,
              .descriptorType = vk::DescriptorType::eStorageBuffer,
-             .pBufferInfo = &buffer_info}},
+             .pBufferInfo = &buffer_info},
+         vk::WriteDescriptorSet {
+             .dstSet = *geometry_ds,
+             .dstBinding = 1,
+             .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eStorageBuffer,
+             .pBufferInfo = &index_buffer_info}},
         {}
     );
 
@@ -464,6 +482,13 @@ int main() {
                 .minDepth = 0.0,
                 .maxDepth = 1.0}}
         );
+        command_buffer.bindDescriptorSets(
+            vk::PipelineBindPoint::eGraphics,
+            *pipelines.pipeline_layout,
+            0,
+            {*scene_referred_framebuffer_ds, *geometry_ds},
+            {}
+        );
 
         insert_color_image_barriers(
             command_buffer,
@@ -475,13 +500,12 @@ int main() {
                 .image = scene_referred_framebuffer.image}}
         );
 
-
         vk::RenderingAttachmentInfoKHR framebuffer_attachment_info = {
             .imageView = *scene_referred_framebuffer_view,
             .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
             .loadOp = vk::AttachmentLoadOp::eDontCare,
             .storeOp = vk::AttachmentStoreOp::eStore,
-            };
+        };
         command_buffer.beginRendering(
             {.renderArea =
                  {
@@ -492,6 +516,12 @@ int main() {
              .colorAttachmentCount = 1,
              .pColorAttachments = &framebuffer_attachment_info}
         );
+        command_buffer.bindPipeline(
+            vk::PipelineBindPoint::eGraphics,
+            *pipelines.clear_pretty
+        );
+
+        command_buffer.draw(3, 1, 0, 0);
         command_buffer.endRendering();
 
         insert_color_image_barriers(
@@ -535,13 +565,7 @@ int main() {
             vk::PipelineBindPoint::eGraphics,
             *pipelines.display_transform
         );
-        command_buffer.bindDescriptorSets(
-            vk::PipelineBindPoint::eGraphics,
-            *pipelines.pipeline_layout,
-            0,
-            {*scene_referred_framebuffer_ds},
-            {}
-        );
+
         command_buffer.draw(3, 1, 0, 0);
 
         command_buffer.endRendering();
