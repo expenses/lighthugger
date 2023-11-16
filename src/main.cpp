@@ -199,7 +199,66 @@ int main() {
 
     float time = 0.0;
 
-    Pipelines pipelines(device, swapchain_create_info.imageFormat);
+    auto pipelines = Pipelines::compile_pipelines(device, swapchain_create_info.imageFormat);
+
+    std::array<vk::DescriptorPoolSize, 2> pool_sizes = {
+        vk::DescriptorPoolSize {
+            .type = vk::DescriptorType::eSampledImage,
+            .descriptorCount = 1024
+        },
+        vk::DescriptorPoolSize {
+            .type = vk::DescriptorType::eSampler,
+            .descriptorCount = 1024
+        }
+    };
+
+    auto descriptor_pool = device.createDescriptorPool({
+        .maxSets = 128,
+        .poolSizeCount = pool_sizes.size(),
+        .pPoolSizes = pool_sizes.data()
+    });
+
+    std::array<vk::DescriptorSetLayout, 1> descriptor_set_layouts = {
+        *pipelines.texture_sampler_dsl
+    };
+
+    auto descriptor_sets = device.allocateDescriptorSets(vk::DescriptorSetAllocateInfo {
+        .descriptorPool = *descriptor_pool,
+        .descriptorSetCount = descriptor_set_layouts.size(),
+        .pSetLayouts = descriptor_set_layouts.data()
+    });
+
+    auto scene_referred_framebuffer_ds = std::move(descriptor_sets[0]);
+
+    auto sampler = device.createSampler({
+
+    });
+
+    auto image_info = vk::DescriptorImageInfo {
+        .imageView = *scene_referred_framebuffer_view,
+        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+    };
+
+    auto sampler_info = vk::DescriptorImageInfo {
+        .sampler = *sampler
+    };
+
+    device.updateDescriptorSets({
+        vk::WriteDescriptorSet {
+            .dstSet = *scene_referred_framebuffer_ds,
+            .dstBinding = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eSampledImage,
+            .pImageInfo = &image_info
+        },
+        vk::WriteDescriptorSet {
+            .dstSet = *scene_referred_framebuffer_ds,
+            .dstBinding = 1,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eSampler,
+            .pImageInfo = &sampler_info
+        }
+    }, {});
 
     while (!glfwWindowShouldClose(window)) {
         int current_width, current_height;
@@ -209,6 +268,8 @@ int main() {
             .height = static_cast<uint32_t>(current_height)
         };
         if (extent != current_extent) {
+            graphics_queue.waitIdle();
+
             extent = current_extent;
 
             swapchain_create_info.imageExtent = extent;
@@ -240,6 +301,21 @@ int main() {
                     .format = vk::Format::eR16G16B16A16Sfloat,
                     .subresourceRange = COLOR_SUBRESOURCE_RANGE
                 });
+
+                image_info = vk::DescriptorImageInfo {
+        .imageView = *scene_referred_framebuffer_view,
+        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+    };
+
+    device.updateDescriptorSets({
+        vk::WriteDescriptorSet {
+            .dstSet = *scene_referred_framebuffer_ds,
+            .dstBinding = 0,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eSampledImage,
+            .pImageInfo = &image_info
+        }
+    }, {});
         }
 
         time += 1.0 / 60.0;
@@ -278,14 +354,12 @@ int main() {
             }
         });
 
-        // Transition the swapchain image from whatever it was before
-        // to being used as a color attachment, discarding contents in the process.
         insert_color_image_barrier(command_buffer, {
             .prev_access = THSVS_ACCESS_NONE,
             .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
             .discard_contents = true,
             .queue_family = graphics_queue_family,
-            .image = swapchain_images[swapchain_image_index]
+            .image = scene_referred_framebuffer.image
         });
 
         // Setup a clear color.
@@ -313,16 +387,28 @@ int main() {
         });
         command_buffer.endRendering();
 
+        insert_color_image_barrier(command_buffer, {
+            .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
+            .next_access = THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+            .discard_contents = false,
+            .queue_family = graphics_queue_family,
+            .image = scene_referred_framebuffer.image
+        });
+
+        insert_color_image_barrier(command_buffer, {
+            .prev_access = THSVS_ACCESS_NONE,
+            .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
+            .discard_contents = true,
+            .queue_family = graphics_queue_family,
+            .image = swapchain_images[swapchain_image_index]
+        });
+
         vk::RenderingAttachmentInfoKHR color_attachment_info = {
             .imageView = *swapchain_image_views[swapchain_image_index],
             .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
             .loadOp = vk::AttachmentLoadOp::eClear,
             .storeOp = vk::AttachmentStoreOp::eStore,
-            .clearValue = {
-                .color = {
-                    .float32 = clear_color,
-                },
-            }
+            .clearValue = {}
         };
         // This just clears the swapchain image with the clear color.
         // Wraps vkCmdBeginRendering
@@ -337,6 +423,9 @@ int main() {
         });
 
         command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipelines.display_transform);
+        command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipelines.pipeline_layout, 0, {
+            *scene_referred_framebuffer_ds
+        }, {});
         command_buffer.draw(3, 1, 0, 0);
 
         command_buffer.endRendering();

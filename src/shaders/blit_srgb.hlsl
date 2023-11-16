@@ -15,11 +15,11 @@ V2P VSMain(uint vId : SV_VertexID)
     return vsOut;
 }
 
-//[[vk::binding(0)]] Texture2D<float3> source_tex;
-//[[vk::binding(1)]] SamplerState samp;
+[[vk::binding(0)]] Texture2D<float3> source_tex;
+[[vk::binding(1)]] SamplerState samp;
 
 [shader("pixel")]
 float4 PSMain(V2P psIn) : SV_Target0
 {
-    return float4(1.0, 1.0, 1.0, 1.0);//source_tex.Sample(samp, psIn.Uv), 1.0);
+    return float4(source_tex.Sample(samp, psIn.Uv), 1.0);
 }

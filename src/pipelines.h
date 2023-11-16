@@ -25,13 +25,42 @@ vk::raii::ShaderModule create_shader_from_file(const vk::raii::Device& device, c
 
 struct Pipelines {
     vk::raii::Pipeline display_transform;
+    vk::raii::PipelineLayout pipeline_layout;
+    vk::raii::DescriptorSetLayout texture_sampler_dsl;
 
-    static std::vector<vk::raii::Pipeline> compile_pipelines(const vk::raii::Device& device, vk::Format swapchain_format) {
+    static Pipelines compile_pipelines(const vk::raii::Device& device, vk::Format swapchain_format) {
         auto blit_vs = create_shader_from_file(device, "compiled_shaders/blit_vs.spv");
         auto blit_ps = create_shader_from_file(device, "compiled_shaders/blit_ps.spv");
 
-        auto pipeline_layout = device.createPipelineLayout({
+        std::array<vk::DescriptorSetLayoutBinding, 2> texture_sampler_bindings = {
+            vk::DescriptorSetLayoutBinding {
+                .binding = 0,
+                .descriptorType = vk::DescriptorType::eSampledImage,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            },
+            vk::DescriptorSetLayoutBinding {
+                .binding = 1,
+                .descriptorType = vk::DescriptorType::eSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            }
+        };
 
+        auto texture_sampler_dsl = device.createDescriptorSetLayout({
+            .bindingCount = texture_sampler_bindings.size(),
+            .pBindings = texture_sampler_bindings.data(),
+        });
+
+        std::array<vk::DescriptorSetLayout, 1> descriptor_set_layouts = {
+            *texture_sampler_dsl
+        };
+
+        auto pipeline_layout = device.createPipelineLayout(vk::PipelineLayoutCreateInfo {
+            .setLayoutCount = descriptor_set_layouts.size(),
+            .pSetLayouts = descriptor_set_layouts.data(),
+            .pushConstantRangeCount = 0,
+            .pPushConstantRanges = nullptr,
         });
 
         std::array<vk::PipelineShaderStageCreateInfo, 2> blit_stages = {
@@ -122,9 +151,12 @@ struct Pipelines {
             pipeline_info
         };
 
-        return device.createGraphicsPipelines(nullptr, pipeline_infos);
-    }
+        auto pipelines = device.createGraphicsPipelines(nullptr, pipeline_infos);
 
-    Pipelines(std::vector<vk::raii::Pipeline> pipelines): display_transform(std::move(pipelines[0])) {}
-    Pipelines(const vk::raii::Device& device, vk::Format swapchain_format): Pipelines(compile_pipelines(device, swapchain_format)) {}
+        return Pipelines {
+            .display_transform = std::move(pipelines[0]),
+            .pipeline_layout = std::move(pipeline_layout),
+            .texture_sampler_dsl = std::move(texture_sampler_dsl),
+        };
+    }
 };
