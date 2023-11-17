@@ -26,10 +26,9 @@ AllocatedBuffer allocate_from_vector(
 }
 
 Mesh load_obj(const char* filepath, vma::Allocator allocator) {
-    tinyobj::ObjReaderConfig reader_config;
     tinyobj::ObjReader reader;
 
-    assert(reader.ParseFromFile(filepath, reader_config));
+    assert(reader.ParseFromFile(filepath));
     if (!reader.Warning().empty()) {
         std::cout << "TinyObjReader: " << reader.Warning();
     }
@@ -38,14 +37,10 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
     auto& shapes = reader.GetShapes();
     auto& materials = reader.GetMaterials();
 
-    std::cout << shapes.size() << " " << materials.size() << std::endl;
+    auto str_filepath = std::string(filepath);
 
-    for (auto& shape : shapes) {
-        // Check that all geometry is triangulated
-        for (auto num_face_vertices : shape.mesh.num_face_vertices) {
-            assert(num_face_vertices == 3);
-        }
-    }
+    auto m = materials[0];
+    auto material_filepath = str_filepath.substr(0, str_filepath.rfind("/") + 1) + m.diffuse_texname;
 
     std::vector<uint32_t> indices;
     std::vector<uint32_t> material_ids;
@@ -54,6 +49,7 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
             assert(index.vertex_index == index.normal_index);
             indices.push_back(index.vertex_index);
         }
+        // :( material ids are stored unindexed.
         for (uint32_t material_id : shape.mesh.material_ids) {
             material_ids.push_back(material_id);
             material_ids.push_back(material_id);
@@ -61,8 +57,6 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
         }
     }
 
-    std::cout << indices.size() << "; " << material_ids.size() << "; "
-              << attrib.vertices.size() << std::endl;
 
     // Todo: should use staging buffers instead of host-accessible storage buffers.
 
@@ -104,6 +98,6 @@ MeshBufferAddresses Mesh::get_addresses(const vk::raii::Device& device) {
         .positions = device.getBufferAddress({.buffer = vertices.buffer}),
         .indices = device.getBufferAddress({.buffer = indices.buffer}),
         .normals = device.getBufferAddress({.buffer = normals.buffer}),
-        .material_ids =
+        .material_indices =
             device.getBufferAddress({.buffer = material_ids.buffer})};
 }

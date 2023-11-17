@@ -14,14 +14,14 @@ AllocatedImage load_dds(
 
     assert(stream);
 
-    DWORD dwMagic;
+    std::array<char, 4> dwMagic;
     DDS_HEADER header;
     DDS_HEADER_DXT10 header10;
-    stream.read((char*)&dwMagic, sizeof dwMagic);
+    stream.read(dwMagic.data(), sizeof dwMagic);
 
-    //auto expected_magic = DWORD{'D', 'D', 'S', ' '};
+    auto expected_magic = std::array{'D', 'D', 'S', ' '};
 
-    //assert(dwMagic == expected_magic);
+    assert(dwMagic == expected_magic);
 
     stream.read((char*)&header, sizeof header);
 

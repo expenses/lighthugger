@@ -62,7 +62,10 @@ const auto DEPTH_TEST_EQUAL = vk::PipelineDepthStencilStateCreateInfo {
 std::vector<uint8_t> read_file_to_bytes(const char* filepath) {
     std::ifstream file_stream(filepath, std::ios::binary);
 
-    assert(file_stream);
+    if (!file_stream) {
+        dbg(filepath);
+        abort();
+    }
 
     std::vector<uint8_t> contents(
         (std::istreambuf_iterator<char>(file_stream)),

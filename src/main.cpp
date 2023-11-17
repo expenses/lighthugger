@@ -30,25 +30,6 @@ static void key_callback(
     }
 }
 
-std::vector<vk::raii::ImageView> create_swapchain_image_views(
-    const vk::raii::Device& device,
-    const std::vector<vk::Image>& swapchain_images,
-    vk::Format swapchain_format
-) {
-    std::vector<vk::raii::ImageView> views;
-
-    for (vk::Image image : swapchain_images) {
-        views.push_back(device.createImageView(
-            {.image = image,
-             .viewType = vk::ImageViewType::e2D,
-             .format = swapchain_format,
-             .subresourceRange = COLOR_SUBRESOURCE_RANGE}
-        ));
-    }
-
-    return views;
-}
-
 struct ImageWithView {
     AllocatedImage image;
     vk::raii::ImageView view;
@@ -71,19 +52,6 @@ ImageWithView create_image_with_view(
     );
     return {.image = std::move(image), .view = std::move(view)};
 }
-
-struct PersistentlyMappedBuffer {
-    AllocatedBuffer buffer;
-    void* mapped_ptr;
-
-    PersistentlyMappedBuffer(AllocatedBuffer buffer_) :
-        buffer(std::move(buffer_)) {
-        auto buffer_info =
-            buffer.allocator.getAllocationInfo(buffer.allocation);
-        mapped_ptr = buffer_info.pMappedData;
-        assert(mapped_ptr);
-    }
-};
 
 int main() {
     glfwInit();

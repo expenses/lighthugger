@@ -6,6 +6,7 @@
 #include <GLFW/glfw3.h>
 #include <thsvs_simpler_vulkan_synchronization.h>
 #include <tiny_obj_loader.h>
+#include <dbg.h>
 
 #include <cmath>
 #include <fstream>

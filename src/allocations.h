@@ -1,6 +1,5 @@
 #pragma once
 
-#include "util.h"
 
 struct AllocatedImage {
     vk::Image image;
@@ -17,26 +16,7 @@ struct AllocatedImage {
         vk::ImageCreateInfo create_info,
         vma::Allocator allocator_,
         const char* name = nullptr
-    ) {
-        allocator = allocator_;
-        vma::AllocationCreateInfo alloc_info = {
-            .usage = vma::MemoryUsage::eAuto};
-        check_vk_result(allocator.createImage(
-            &create_info,
-            &alloc_info,
-            &image,
-            &allocation,
-            nullptr
-        ));
-
-        if (name) {
-            auto device = allocator.getAllocatorInfo().device;
-            device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-                .objectType = vk::ObjectType::eImage,
-                .objectHandle = reinterpret_cast<uint64_t>(&*image),
-                .pObjectName = name});
-        }
-    }
+    );
 
     AllocatedImage& operator=(AllocatedImage&& other) {
         std::swap(image, other.image);
@@ -67,23 +47,7 @@ struct AllocatedBuffer {
         vma::AllocationCreateInfo alloc_info,
         vma::Allocator allocator_,
         const char* name = nullptr
-    ) {
-        allocator = allocator_;
-        check_vk_result(allocator.createBuffer(
-            &create_info,
-            &alloc_info,
-            &buffer,
-            &allocation,
-            nullptr
-        ));
-        if (name) {
-            auto device = allocator.getAllocatorInfo().device;
-            device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-                .objectType = vk::ObjectType::eBuffer,
-                .objectHandle = reinterpret_cast<uint64_t>(&*buffer),
-                .pObjectName = name});
-        }
-    }
+    );
 
     AllocatedBuffer(
         vk::BufferCreateInfo create_info,
