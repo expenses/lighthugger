@@ -79,6 +79,12 @@ ImageWithView load_dds(
 
     auto bytes_per_pixel = 4;
 
+    auto current_pos = stream.tellg();
+    stream.seekg(0, stream.end);
+    auto bytes_remaining = uint32_t(stream.tellg() - current_pos);
+    stream.seekg(current_pos, stream.beg);
+
+    dbg(header.dwMipMapCount, bytes_remaining);
     //dbg(offset, vk::to_string(format), header.dwWidth, header.dwHeight, header10.resourceDimension);
 
     auto extent = vk::Extent3D {
@@ -87,6 +93,8 @@ ImageWithView load_dds(
         .depth = depth,
     };
 
+    auto mip_levels = header.dwMipMapCount;
+
     auto image_name = std::string(filepath) + " image";
 
     auto image = create_image_with_view(
@@ -94,7 +102,7 @@ ImageWithView load_dds(
             .imageType = image_type,
             .format = format,
             .extent = extent,
-            .mipLevels = 1,
+            .mipLevels = mip_levels,
             .arrayLayers = 1,
             .usage = vk::ImageUsageFlagBits::eSampled
                 | vk::ImageUsageFlagBits::eTransferDst},
@@ -104,13 +112,11 @@ ImageWithView load_dds(
         image_view_type
     );
 
-    auto data_size = width * height * depth * bytes_per_pixel;
-
     auto staging_buffer_name = std::string(filepath) + " staging buffer";
 
     auto staging_buffer = AllocatedBuffer(
         vk::BufferCreateInfo {
-            .size = data_size,
+            .size = bytes_remaining,
             .usage = vk::BufferUsageFlagBits::eTransferSrc},
         {
             .flags = vma::AllocationCreateFlagBits::eMapped
@@ -124,7 +130,7 @@ ImageWithView load_dds(
 
     assert(info.pMappedData);
 
-    stream.read((char*)info.pMappedData, data_size);
+    stream.read((char*)info.pMappedData, bytes_remaining);
 
     insert_color_image_barriers(
         command_buffer,
@@ -133,27 +139,43 @@ ImageWithView load_dds(
             .next_access = THSVS_ACCESS_TRANSFER_WRITE,
             .discard_contents = true,
             .queue_family = graphics_queue_family,
-            .image = image.image.image}}
+            .image = image.image.image,
+            .subresource_range = {
+    .aspectMask = vk::ImageAspectFlagBits::eColor,
+    .baseMipLevel = 0,
+    .levelCount = mip_levels,
+    .baseArrayLayer = 0,
+    .layerCount = 1,
+}}}
     );
+
+    uint64_t buffer_offset = 0;
+
+    for (uint32_t i = 0; i < std::max(int(mip_levels) - 3, 0); i++) {
+
+
 
     command_buffer.copyBufferToImage(
         staging_buffer.buffer,
         image.image.image,
         vk::ImageLayout::eTransferDstOptimal,
         {vk::BufferImageCopy {
-            .bufferOffset = 0,
-            .bufferRowLength = width,
-            .bufferImageHeight = height,
+            .bufferOffset = buffer_offset,
             .imageSubresource =
                 {
                     .aspectMask = vk::ImageAspectFlagBits::eColor,
-                    .mipLevel = 0,
+                    .mipLevel = uint32_t(i),
                     .baseArrayLayer = 0,
                     .layerCount = 1,
                 },
             .imageOffset = {},
             .imageExtent = extent}}
     );
+
+    buffer_offset += (extent.width * extent.height) / 2;
+    extent.width = std::max(extent.width >> 1, 1u);
+    extent.height = std::max(extent.height >> 1, 1u);
+    }
 
     insert_color_image_barriers(
         command_buffer,

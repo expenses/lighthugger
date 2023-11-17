@@ -306,13 +306,14 @@ int main() {
         .addressModeW = vk::SamplerAddressMode::eClampToEdge,
     });
 
-    auto repeat_sampler = device.createSampler({
-        .magFilter = vk::Filter::eLinear,
-        .minFilter = vk::Filter::eLinear,
-        .addressModeU = vk::SamplerAddressMode::eRepeat,
-        .addressModeV = vk::SamplerAddressMode::eRepeat,
-        .addressModeW = vk::SamplerAddressMode::eRepeat,
-    });
+    auto repeat_sampler = device.createSampler(
+        {.magFilter = vk::Filter::eLinear,
+         .minFilter = vk::Filter::eLinear,
+         .addressModeU = vk::SamplerAddressMode::eRepeat,
+         .addressModeV = vk::SamplerAddressMode::eRepeat,
+         .addressModeW = vk::SamplerAddressMode::eRepeat,
+         .maxLod = VK_LOD_CLAMP_NONE}
+    );
 
     std::vector<AllocatedBuffer> temp_buffers;
 

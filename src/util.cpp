@@ -37,6 +37,10 @@ ImageWithView create_image_with_view(
     vk::ImageViewType view_type,
     vk::ImageSubresourceRange subresource_range
 ) {
+    // TODO: handle subres ranges better
+    subresource_range.levelCount = create_info.mipLevels;
+    dbg(subresource_range.levelCount);
+
     auto image = AllocatedImage(create_info, allocator, name);
     auto view = device.createImageView(
         {.image = image.image,
