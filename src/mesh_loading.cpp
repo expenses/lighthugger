@@ -37,7 +37,8 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
         vk::BufferCreateInfo {
             .size = indices.size() * sizeof(uint32_t),
             .usage = vk::BufferUsageFlagBits::eTransferSrc
-                | vk::BufferUsageFlagBits::eStorageBuffer},
+                | vk::BufferUsageFlagBits::eStorageBuffer
+                | vk::BufferUsageFlagBits::eIndexBuffer},
         {
             .flags = vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
             .usage = vma::MemoryUsage::eAuto,
@@ -55,7 +56,8 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
     auto vertex_buffer = AllocatedBuffer(
         {.size = attrib.vertices.size() * sizeof(float),
          .usage = vk::BufferUsageFlagBits::eTransferSrc
-             | vk::BufferUsageFlagBits::eStorageBuffer},
+             | vk::BufferUsageFlagBits::eStorageBuffer
+             | vk::BufferUsageFlagBits::eVertexBuffer},
         {
             .flags = vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
             .usage = vma::MemoryUsage::eAuto,

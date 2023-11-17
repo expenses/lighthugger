@@ -195,6 +195,26 @@ Pipelines Pipelines::compile_pipelines(
         .colorAttachmentCount = 1,
         .pColorAttachmentFormats = &rgba16f};
 
+    auto binding_desc = vk::VertexInputBindingDescription {
+        .binding = 0,
+        .stride = 4 * 3,
+        .inputRate = vk::VertexInputRate::eVertex
+    };
+
+    auto attr_desc = vk::VertexInputAttributeDescription {
+        .location = 0,
+        .binding = 0,
+        .format = vk::Format::eR32G32B32Sfloat,
+        .offset = 0,
+    };
+
+    auto input_state = vk::PipelineVertexInputStateCreateInfo {
+        .vertexBindingDescriptionCount = 1,
+        .pVertexBindingDescriptions = &binding_desc,
+        .vertexAttributeDescriptionCount = 1,
+        .pVertexAttributeDescriptions = &attr_desc
+    };
+
     auto pipeline_infos =
         std::array {// display_transform
                     vk::GraphicsPipelineCreateInfo {

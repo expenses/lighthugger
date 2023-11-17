@@ -7,7 +7,10 @@
 };
 
 [shader("vertex")]
-V2P VSMain(uint vId : SV_VertexID)
+V2P VSMain(
+    uint vId : SV_VertexID
+    //[[vk::location(0)]] float3 vertex: POSITION0
+)
 {
     uint index = indices.Load(vId);
 

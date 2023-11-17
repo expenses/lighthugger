@@ -289,12 +289,12 @@ int main() {
     );
 
     glm::mat4 View = glm::lookAt(
-        glm::vec3(4, 3, -3),
-        glm::vec3(0, 0, 0),
+        glm::vec3(100, 0, -40),
+        glm::vec3(109.7, 0, -38),
         glm::vec3(0, 1, 0)
     );
 
-    auto matrix = View * perspective;
+    auto matrix = perspective * View;
 
     auto uniform_buffer = AllocatedBuffer(
         vk::BufferCreateInfo {
@@ -542,6 +542,12 @@ int main() {
             {*scene_referred_framebuffer_ds, *geometry_ds},
             {}
         );
+        /*command_buffer.bindIndexBuffer(
+            powerplant.indices.buffer,
+            0,
+            vk::IndexType::eUint32
+        );
+        command_buffer.bindVertexBuffers(0, {powerplant.vertices.buffer}, {0});*/
 
         insert_color_image_barriers(
             command_buffer,
