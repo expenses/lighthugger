@@ -70,6 +70,11 @@ ImageWithView create_image_with_view(
     return {.image = std::move(image), .view = std::move(view)};
 }
 
+struct PersistentlyMappedBuffer {
+    AllocatedBuffer buffer;
+    void* mapped_ptr;
+};
+
 int main() {
     glfwInit();
 
@@ -317,17 +322,25 @@ int main() {
     auto scene_referred_framebuffer_ds = std::move(descriptor_sets[0]);
     auto geometry_ds = std::move(descriptor_sets[1]);
 
-    auto uniform_buffer = AllocatedBuffer(
-        vk::BufferCreateInfo {
-            .size = sizeof(glm::mat4),
-            .usage = vk::BufferUsageFlagBits::eUniformBuffer},
-        {
-            .flags = vma::AllocationCreateFlagBits::eMapped
-                | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
-            .usage = vma::MemoryUsage::eAuto,
-        },
-        allocator
-    );
+    auto uniform_buffer = PersistentlyMappedBuffer {
+        .buffer = AllocatedBuffer(
+            vk::BufferCreateInfo {
+                .size = sizeof(glm::mat4),
+                .usage = vk::BufferUsageFlagBits::eUniformBuffer},
+            {
+                .flags = vma::AllocationCreateFlagBits::eMapped
+                    | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+                .usage = vma::MemoryUsage::eAuto,
+            },
+            allocator
+        )};
+
+    {
+        auto uniform_buffer_info =
+            allocator.getAllocationInfo(uniform_buffer.buffer.allocation);
+        assert(uniform_buffer_info.pMappedData);
+        uniform_buffer.mapped_ptr = uniform_buffer_info.pMappedData;
+    }
 
     auto sampler = device.createSampler({
         .magFilter = vk::Filter::eLinear,
@@ -403,7 +416,7 @@ int main() {
         .range = VK_WHOLE_SIZE};
 
     auto uniform_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = uniform_buffer.buffer,
+        .buffer = uniform_buffer.buffer.buffer,
         .offset = 0,
         .range = VK_WHOLE_SIZE};
 
@@ -547,7 +560,8 @@ int main() {
         check_vk_result(device.waitForFences({*render_fence}, true, u64_max));
         device.resetFences({*render_fence});
 
-        // Important! This needs to happen after waiting on the fence because otherwise we get race conditions.
+        // Important! This needs to happen after waiting on the fence because otherwise we get race conditions
+        // due to writing to a value that the previous frame is reading from.
         {
             auto view = glm::lookAt(
                 glm::vec3(sin(time) * 100, 100, cos(time) * 100),
@@ -564,16 +578,7 @@ int main() {
 
             auto matrix = perspective * view;
 
-            auto uniform_buffer_info =
-                allocator.getAllocationInfo(uniform_buffer.allocation);
-
-            assert(uniform_buffer_info.pMappedData);
-
-            std::memcpy(
-                uniform_buffer_info.pMappedData,
-                &matrix,
-                sizeof(matrix)
-            );
+            std::memcpy(uniform_buffer.mapped_ptr, &matrix, sizeof(matrix));
         }
 
         // Reset the command pool instead of resetting the single command buffer as
