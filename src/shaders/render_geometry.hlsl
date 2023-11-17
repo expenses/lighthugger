@@ -1,40 +1,41 @@
 #include "inputs/pos.hlsl"
 
-[[vk::binding(0, 1)]] StructuredBuffer<float> positions;
-[[vk::binding(1, 1)]] StructuredBuffer<uint> indices;
-[[vk::binding(2, 1)]] cbuffer uniforms {
+#include "../shared_cpu_gpu.h"
+
+[[vk::binding(0)]] StructuredBuffer<MeshBufferAddresses> mesh_buffer_addresses;
+[[vk::binding(1)]] cbuffer uniforms {
     float4x4 combined_perspective_view_matrix;
 };
-[[vk::binding(3, 1)]] StructuredBuffer<float> normals;
 
+float3 load_float3(uint64_t address, uint offset) {
+    return float3(
+        vk::RawBufferLoad<float>(address + sizeof(float) * offset),
+        vk::RawBufferLoad<float>(address + sizeof(float) * (offset + 1)),
+        vk::RawBufferLoad<float>(address + sizeof(float) * (offset + 2))
+    );
+}
 
 [shader("vertex")]
 float4 depth_only(
     uint vId : SV_VertexID
 ): SV_Position
 {
-    uint offset = indices.Load(vId) * 3;
-    float3 position = float3(
-        positions.Load(offset),
-        positions.Load(offset + 1),
-        positions.Load(offset + 2)
-    );
+    MeshBufferAddresses addresses = mesh_buffer_addresses.Load(0);
+
+    uint offset = vk::RawBufferLoad<uint>(addresses.indices + sizeof(uint) * vId) * 3;
+    float3 position = load_float3(addresses.positions, offset);
 
     return mul(combined_perspective_view_matrix, float4(position, 1.0));
 }
 
-
 [shader("vertex")]
 V2P VSMain(uint vId : SV_VertexID)
 {
-    uint offset = indices.Load(vId) * 3;
-    float3 position = float3(
-        positions.Load(offset),
-        positions.Load(offset + 1),
-        positions.Load(offset + 2)
-    );
+    MeshBufferAddresses addresses = mesh_buffer_addresses.Load(0);
 
-    float3 normal = float3(normals.Load(offset), normals.Load(offset + 1), normals.Load(offset + 2));
+    uint offset = vk::RawBufferLoad<uint>(addresses.indices + sizeof(uint) * vId) * 3;
+    float3 position = load_float3(addresses.positions, offset);
+    float3 normal = load_float3(addresses.normals, offset);
 
     V2P vsOut;
     vsOut.world_pos = normal;

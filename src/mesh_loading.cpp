@@ -1,5 +1,30 @@
 #include "mesh_loading.h"
 
+template<class T>
+AllocatedBuffer allocate_from_vector(
+    const std::vector<T>& vector,
+    vma::Allocator allocator,
+    const std::string& name
+) {
+    AllocatedBuffer buffer(
+        vk::BufferCreateInfo {
+            .size = vector.size() * sizeof(T),
+            .usage = vk::BufferUsageFlagBits::eTransferSrc
+                | vk::BufferUsageFlagBits::eStorageBuffer
+                | vk::BufferUsageFlagBits::eShaderDeviceAddress},
+        {
+            .flags = vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+            .usage = vma::MemoryUsage::eAuto,
+        },
+        allocator,
+        name.data()
+    );
+
+    buffer.map_and_memcpy((void*)vector.data(), vector.size() * sizeof(T));
+
+    return buffer;
+}
+
 Mesh load_obj(const char* filepath, vma::Allocator allocator) {
     tinyobj::ObjReaderConfig reader_config;
     tinyobj::ObjReader reader;
@@ -23,74 +48,62 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
     }
 
     std::vector<uint32_t> indices;
+    std::vector<uint32_t> material_ids;
     for (auto& shape : shapes) {
         for (auto& index : shape.mesh.indices) {
             assert(index.vertex_index == index.normal_index);
             indices.push_back(index.vertex_index);
         }
+        for (uint32_t material_id : shape.mesh.material_ids) {
+            material_ids.push_back(material_id);
+            material_ids.push_back(material_id);
+            material_ids.push_back(material_id);
+        }
     }
+
+    std::cout << indices.size() << "; " << material_ids.size() << "; "
+              << attrib.vertices.size() << std::endl;
 
     // Todo: should use staging buffers instead of host-accessible storage buffers.
 
-    std::string index_buffer_name = std::string(filepath) + " index buffer";
-
-    AllocatedBuffer index_buffer(
-        vk::BufferCreateInfo {
-            .size = indices.size() * sizeof(uint32_t),
-            .usage = vk::BufferUsageFlagBits::eTransferSrc
-                | vk::BufferUsageFlagBits::eStorageBuffer},
-        {
-            .flags = vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
-            .usage = vma::MemoryUsage::eAuto,
-        },
+    auto index_buffer = allocate_from_vector(
+        indices,
         allocator,
-        index_buffer_name.data()
+        std::string(filepath) + " index buffer"
     );
 
-    index_buffer.map_and_memcpy(
-        (void*)indices.data(),
-        indices.size() * sizeof(uint)
-    );
-
-    std::string vertex_buffer_name = std::string(filepath) + " vertex buffer";
-    auto vertex_buffer = AllocatedBuffer(
-        {.size = attrib.vertices.size() * sizeof(float),
-         .usage = vk::BufferUsageFlagBits::eTransferSrc
-             | vk::BufferUsageFlagBits::eStorageBuffer},
-        {
-            .flags = vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
-            .usage = vma::MemoryUsage::eAuto,
-        },
+    auto vertex_buffer = allocate_from_vector(
+        attrib.vertices,
         allocator,
-        vertex_buffer_name.data()
+        std::string(filepath) + " vertex buffer"
     );
 
-    vertex_buffer.map_and_memcpy(
-        (void*)attrib.vertices.data(),
-        attrib.vertices.size() * sizeof(float)
-    );
-
-    std::string normal_buffer_name = std::string(filepath) + " normal buffer";
-    auto normal_buffer = AllocatedBuffer(
-        {.size = attrib.normals.size() * sizeof(float),
-         .usage = vk::BufferUsageFlagBits::eTransferSrc
-             | vk::BufferUsageFlagBits::eStorageBuffer},
-        {
-            .flags = vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
-            .usage = vma::MemoryUsage::eAuto,
-        },
+    auto normal_buffer = allocate_from_vector(
+        attrib.normals,
         allocator,
-        normal_buffer_name.data()
+        std::string(filepath) + " normal buffer"
     );
 
-    normal_buffer.map_and_memcpy(
-        (void*)attrib.normals.data(),
-        attrib.normals.size() * sizeof(float)
+    auto material_id_buffer = allocate_from_vector(
+        material_ids,
+        allocator,
+        std::string(filepath) + " material id buffer"
     );
 
-    return Mesh {
-        .vertices = std::move(vertex_buffer),
-        .indices = std::move(index_buffer),
-        .normals = std::move(normal_buffer),
-        .num_indices = indices.size()};
+    return Mesh(
+        std::move(vertex_buffer),
+        std::move(index_buffer),
+        std::move(normal_buffer),
+        std::move(material_id_buffer),
+        indices.size()
+    );
+}
+
+MeshBufferAddresses Mesh::get_addresses(const vk::raii::Device& device) {
+    return {
+        .positions = device.getBufferAddress({.buffer = vertices.buffer}),
+        .indices = device.getBufferAddress({.buffer = indices.buffer}),
+        .normals = device.getBufferAddress({.buffer = normals.buffer}),
+        .material_ids =
+            device.getBufferAddress({.buffer = material_ids.buffer})};
 }

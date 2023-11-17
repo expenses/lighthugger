@@ -1,6 +1,5 @@
 struct DescriptorSetLayouts {
-    vk::raii::DescriptorSetLayout display_transform;
-    vk::raii::DescriptorSetLayout geometry;
+    vk::raii::DescriptorSetLayout everything;
 };
 
 struct Pipelines {

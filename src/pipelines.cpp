@@ -88,68 +88,47 @@ create_shader_from_file(const vk::raii::Device& device, const char* filepath) {
 
 DescriptorSetLayouts
 create_descriptor_set_layouts(const vk::raii::Device& device) {
-    auto geometry_bindings = std::array {
-        // Vertices
-        vk::DescriptorSetLayoutBinding {
-            .binding = 0,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eVertex,
-        },
-        // Indices
-        vk::DescriptorSetLayoutBinding {
-            .binding = 1,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eVertex,
-        },
-        // Uniforms
-        vk::DescriptorSetLayoutBinding {
-            .binding = 2,
-            .descriptorType = vk::DescriptorType::eUniformBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eVertex,
-        },
-        // normals
-        vk::DescriptorSetLayoutBinding {
-            .binding = 3,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eVertex,
-        },
-    };
-
-    auto display_transform_bindings =
-        std::array {// scene-referred framebuffer
+    auto everything_bindings =
+        std::array {// Geometry buffer
                     vk::DescriptorSetLayoutBinding {
                         .binding = 0,
+                        .descriptorType = vk::DescriptorType::eStorageBuffer,
+                        .descriptorCount = 1,
+                        .stageFlags = vk::ShaderStageFlagBits::eVertex,
+                    },
+                    // Uniforms
+                    vk::DescriptorSetLayoutBinding {
+                        .binding = 1,
+                        .descriptorType = vk::DescriptorType::eUniformBuffer,
+                        .descriptorCount = 1,
+                        .stageFlags = vk::ShaderStageFlagBits::eVertex,
+                    },
+                    // hdr framebuffer
+                    vk::DescriptorSetLayoutBinding {
+                        .binding = 2,
                         .descriptorType = vk::DescriptorType::eSampledImage,
                         .descriptorCount = 1,
                         .stageFlags = vk::ShaderStageFlagBits::eFragment,
                     },
                     // sampler
                     vk::DescriptorSetLayoutBinding {
-                        .binding = 1,
+                        .binding = 3,
                         .descriptorType = vk::DescriptorType::eSampler,
                         .descriptorCount = 1,
                         .stageFlags = vk::ShaderStageFlagBits::eFragment,
                     },
                     // display transform LUT
                     vk::DescriptorSetLayoutBinding {
-                        .binding = 2,
+                        .binding = 4,
                         .descriptorType = vk::DescriptorType::eSampledImage,
                         .descriptorCount = 1,
                         .stageFlags = vk::ShaderStageFlagBits::eFragment,
                     }};
 
     return DescriptorSetLayouts {
-        .display_transform = device.createDescriptorSetLayout({
-            .bindingCount = display_transform_bindings.size(),
-            .pBindings = display_transform_bindings.data(),
-        }),
-        .geometry = device.createDescriptorSetLayout({
-            .bindingCount = geometry_bindings.size(),
-            .pBindings = geometry_bindings.data(),
+        .everything = device.createDescriptorSetLayout({
+            .bindingCount = everything_bindings.size(),
+            .pBindings = everything_bindings.data(),
         }),
     };
 }
@@ -160,9 +139,8 @@ Pipelines Pipelines::compile_pipelines(
 ) {
     auto descriptor_set_layouts = create_descriptor_set_layouts(device);
 
-    auto descriptor_set_layout_array = std::array {
-        *descriptor_set_layouts.display_transform,
-        *descriptor_set_layouts.geometry};
+    auto descriptor_set_layout_array =
+        std::array {*descriptor_set_layouts.everything};
 
     auto pipeline_layout =
         device.createPipelineLayout(vk::PipelineLayoutCreateInfo {

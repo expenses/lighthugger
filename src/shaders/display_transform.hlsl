@@ -1,8 +1,8 @@
 #include "inputs/pos_uv.hlsl"
 
-[[vk::binding(0, 0)]] Texture2D<float3> source_tex;
-[[vk::binding(1, 0)]] SamplerState samp;
-[[vk::binding(2, 0)]] Texture3D<float3> display_transform_lut;
+[[vk::binding(2)]] Texture2D<float3> source_tex;
+[[vk::binding(3)]] SamplerState samp;
+[[vk::binding(4)]] Texture3D<float3> display_transform_lut;
 
 float3 tony_mc_mapface(float3 stimulus) {
     // Apply a non-linear transform that the LUT is encoded with.

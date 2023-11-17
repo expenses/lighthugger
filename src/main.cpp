@@ -7,6 +7,8 @@
 #include "projection.h"
 #include "sync.h"
 
+const auto u64_max = std::numeric_limits<uint64_t>::max();
+
 // Sources:
 // https://vkguide.dev
 // https://www.glfw.org/docs/latest/vulkan_guide.html
@@ -73,6 +75,14 @@ ImageWithView create_image_with_view(
 struct PersistentlyMappedBuffer {
     AllocatedBuffer buffer;
     void* mapped_ptr;
+
+    PersistentlyMappedBuffer(AllocatedBuffer buffer_) :
+        buffer(std::move(buffer_)) {
+        auto buffer_info =
+            buffer.allocator.getAllocationInfo(buffer.allocation);
+        mapped_ptr = buffer_info.pMappedData;
+        assert(mapped_ptr);
+    }
 };
 
 int main() {
@@ -153,12 +163,18 @@ int main() {
         .queueCount = 1,
         .pQueuePriorities = &queue_prio};
 
+    auto vulkan_1_2_features = vk::PhysicalDeviceVulkan12Features {
+        .bufferDeviceAddress = true,
+    };
+
     vk::PhysicalDeviceDynamicRenderingFeatures dyn_rendering_features = {
+        .pNext = &vulkan_1_2_features,
         .dynamicRendering = true};
 
-    std::vector<const char*> device_extensions = {
-        "VK_KHR_swapchain",
-        "VK_KHR_dynamic_rendering"};
+    auto vulkan_1_0_features = vk::PhysicalDeviceFeatures {.shaderInt64 = true};
+
+    auto device_extensions =
+        std::array {"VK_KHR_swapchain", "VK_KHR_dynamic_rendering"};
 
     vk::raii::Device device = phys_device.createDevice(
         {
@@ -170,6 +186,7 @@ int main() {
             .enabledExtensionCount =
                 static_cast<uint32_t>(device_extensions.size()),
             .ppEnabledExtensionNames = device_extensions.data(),
+            .pEnabledFeatures = &vulkan_1_0_features,
         },
         nullptr
     );
@@ -228,6 +245,7 @@ int main() {
     // AMD VMA allocator
 
     vma::AllocatorCreateInfo allocatorCreateInfo = {
+        .flags = vma::AllocatorCreateFlagBits::eBufferDeviceAddress,
         .physicalDevice = *phys_device,
         .device = *device,
         .instance = *instance,
@@ -310,8 +328,7 @@ int main() {
          .pPoolSizes = pool_sizes.data()}
     );
 
-    auto descriptor_set_layouts =
-        std::array {*pipelines.dsl.display_transform, *pipelines.dsl.geometry};
+    auto descriptor_set_layouts = std::array {*pipelines.dsl.everything};
 
     auto descriptor_sets =
         device.allocateDescriptorSets(vk::DescriptorSetAllocateInfo {
@@ -319,28 +336,19 @@ int main() {
             .descriptorSetCount = descriptor_set_layouts.size(),
             .pSetLayouts = descriptor_set_layouts.data()});
 
-    auto scene_referred_framebuffer_ds = std::move(descriptor_sets[0]);
-    auto geometry_ds = std::move(descriptor_sets[1]);
+    auto everything_ds = std::move(descriptor_sets[0]);
 
-    auto uniform_buffer = PersistentlyMappedBuffer {
-        .buffer = AllocatedBuffer(
-            vk::BufferCreateInfo {
-                .size = sizeof(glm::mat4),
-                .usage = vk::BufferUsageFlagBits::eUniformBuffer},
-            {
-                .flags = vma::AllocationCreateFlagBits::eMapped
-                    | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
-                .usage = vma::MemoryUsage::eAuto,
-            },
-            allocator
-        )};
-
-    {
-        auto uniform_buffer_info =
-            allocator.getAllocationInfo(uniform_buffer.buffer.allocation);
-        assert(uniform_buffer_info.pMappedData);
-        uniform_buffer.mapped_ptr = uniform_buffer_info.pMappedData;
-    }
+    auto uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
+        vk::BufferCreateInfo {
+            .size = sizeof(glm::mat4),
+            .usage = vk::BufferUsageFlagBits::eUniformBuffer},
+        {
+            .flags = vma::AllocationCreateFlagBits::eMapped
+                | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+            .usage = vma::MemoryUsage::eAuto,
+        },
+        allocator
+    ));
 
     auto sampler = device.createSampler({
         .magFilter = vk::Filter::eLinear,
@@ -368,8 +376,6 @@ int main() {
 
     command_buffer.end();
 
-    auto u64_max = std::numeric_limits<uint64_t>::max();
-
     {
         vk::PipelineStageFlags dst_stage_mask =
             vk::PipelineStageFlagBits::eTransfer;
@@ -388,6 +394,26 @@ int main() {
         temp_buffers.clear();
     }
 
+    auto buffer_addresses = std::array {powerplant.get_addresses(device)};
+
+    auto geometry_buffer = AllocatedBuffer(
+        vk::BufferCreateInfo {
+            .size = buffer_addresses.size() * sizeof(MeshBufferAddresses),
+            .usage = vk::BufferUsageFlagBits::eTransferSrc
+                | vk::BufferUsageFlagBits::eStorageBuffer},
+        {
+            .flags = vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+            .usage = vma::MemoryUsage::eAuto,
+        },
+        allocator,
+        "geometry_buffer"
+    );
+
+    geometry_buffer.map_and_memcpy(
+        (void*)buffer_addresses.data(),
+        buffer_addresses.size() * sizeof(MeshBufferAddresses)
+    );
+
     auto display_transform_view = device.createImageView(
         {.image = display_transform_lut.image,
          .viewType = vk::ImageViewType::e3D,
@@ -405,13 +431,8 @@ int main() {
 
     auto sampler_info = vk::DescriptorImageInfo {.sampler = *sampler};
 
-    auto buffer_info = vk::DescriptorBufferInfo {
-        .buffer = powerplant.vertices.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-
-    auto index_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = powerplant.indices.buffer,
+    auto geometry_buffer_info = vk::DescriptorBufferInfo {
+        .buffer = geometry_buffer.buffer,
         .offset = 0,
         .range = VK_WHOLE_SIZE};
 
@@ -420,55 +441,40 @@ int main() {
         .offset = 0,
         .range = VK_WHOLE_SIZE};
 
-    auto normal_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = powerplant.normals.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-
     // Write initial descriptor sets.
     device.updateDescriptorSets(
-        {vk::WriteDescriptorSet {
-             .dstSet = *scene_referred_framebuffer_ds,
-             .dstBinding = 0,
-             .descriptorCount = 1,
-             .descriptorType = vk::DescriptorType::eSampledImage,
-             .pImageInfo = &image_info},
-         vk::WriteDescriptorSet {
-             .dstSet = *scene_referred_framebuffer_ds,
-             .dstBinding = 1,
-             .descriptorCount = 1,
-             .descriptorType = vk::DescriptorType::eSampler,
-             .pImageInfo = &sampler_info},
-         vk::WriteDescriptorSet {
-             .dstSet = *scene_referred_framebuffer_ds,
-             .dstBinding = 2,
-             .descriptorCount = 1,
-             .descriptorType = vk::DescriptorType::eSampledImage,
-             .pImageInfo = &lut_image_info},
-         vk::WriteDescriptorSet {
-             .dstSet = *geometry_ds,
-             .dstBinding = 0,
-             .descriptorCount = 1,
-             .descriptorType = vk::DescriptorType::eStorageBuffer,
-             .pBufferInfo = &buffer_info},
-         vk::WriteDescriptorSet {
-             .dstSet = *geometry_ds,
-             .dstBinding = 1,
-             .descriptorCount = 1,
-             .descriptorType = vk::DescriptorType::eStorageBuffer,
-             .pBufferInfo = &index_buffer_info},
-         vk::WriteDescriptorSet {
-             .dstSet = *geometry_ds,
-             .dstBinding = 2,
-             .descriptorCount = 1,
-             .descriptorType = vk::DescriptorType::eUniformBuffer,
-             .pBufferInfo = &uniform_buffer_info},
-         vk::WriteDescriptorSet {
-             .dstSet = *geometry_ds,
-             .dstBinding = 3,
-             .descriptorCount = 1,
-             .descriptorType = vk::DescriptorType::eStorageBuffer,
-             .pBufferInfo = &normal_buffer_info}},
+        {
+            vk::WriteDescriptorSet {
+                .dstSet = *everything_ds,
+                .dstBinding = 0,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eStorageBuffer,
+                .pBufferInfo = &geometry_buffer_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *everything_ds,
+                .dstBinding = 1,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eUniformBuffer,
+                .pBufferInfo = &uniform_buffer_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *everything_ds,
+                .dstBinding = 2,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampledImage,
+                .pImageInfo = &image_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *everything_ds,
+                .dstBinding = 3,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampler,
+                .pImageInfo = &sampler_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *everything_ds,
+                .dstBinding = 4,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampledImage,
+                .pImageInfo = &lut_image_info},
+        },
         {}
     );
 
@@ -525,8 +531,8 @@ int main() {
 
             device.updateDescriptorSets(
                 {vk::WriteDescriptorSet {
-                    .dstSet = *scene_referred_framebuffer_ds,
-                    .dstBinding = 0,
+                    .dstSet = *everything_ds,
+                    .dstBinding = 2,
                     .descriptorCount = 1,
                     .descriptorType = vk::DescriptorType::eSampledImage,
                     .pImageInfo = &image_info}},
@@ -610,7 +616,7 @@ int main() {
             vk::PipelineBindPoint::eGraphics,
             *pipelines.pipeline_layout,
             0,
-            {*scene_referred_framebuffer_ds, *geometry_ds},
+            {*everything_ds},
             {}
         );
 
