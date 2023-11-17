@@ -46,6 +46,11 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
         index_buffer_name.data()
     );
 
+    index_buffer.map_and_memcpy(
+        (void*)indices.data(),
+        indices.size() * sizeof(uint)
+    );
+
     std::string vertex_buffer_name = std::string(filepath) + " vertex buffer";
     auto vertex_buffer = AllocatedBuffer(
         {.size = attrib.vertices.size() * sizeof(float),
