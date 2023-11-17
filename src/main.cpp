@@ -460,6 +460,8 @@ int main() {
     );
 
     while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+
         int current_width, current_height;
         glfwGetWindowSize(window, &current_width, &current_height);
         vk::Extent2D current_extent = {
@@ -538,6 +540,14 @@ int main() {
             );
         }
 
+        time += 1.0 / 60.0;
+
+        // Wait on the render fence to be signaled
+        // (it's signaled before this loop starts so that we don't just block forever on the first frame)
+        check_vk_result(device.waitForFences({*render_fence}, true, u64_max));
+        device.resetFences({*render_fence});
+
+        // Important! This needs to happen after waiting on the fence because otherwise we get race conditions.
         {
             auto view = glm::lookAt(
                 glm::vec3(sin(time) * 100, 100, cos(time) * 100),
@@ -566,14 +576,6 @@ int main() {
             );
         }
 
-        time += 1.0 / 60.0;
-
-        glfwPollEvents();
-
-        // Wait on the render fence to be signaled
-        // (it's signaled before this loop starts so that we don't just block forever on the first frame)
-        check_vk_result(device.waitForFences({*render_fence}, true, u64_max));
-        device.resetFences({*render_fence});
         // Reset the command pool instead of resetting the single command buffer as
         // it's cheaper (afaik). Obviously don't do this if multiple command buffers are used.
         command_pool.reset();
@@ -618,8 +620,7 @@ int main() {
                     .image = scene_referred_framebuffer.image.image},
                 ImageBarrier {
                     .prev_access = THSVS_ACCESS_NONE,
-                    .next_access =
-                        THSVS_ACCESS_STENCIL_ATTACHMENT_WRITE_DEPTH_READ_ONLY,
+                    .next_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
                     .discard_contents = true,
                     .queue_family = graphics_queue_family,
                     .image = depthbuffer.image.image,
@@ -649,11 +650,18 @@ int main() {
              .pColorAttachments = &framebuffer_attachment_info,
              .pDepthAttachment = &depth_attachment_info}
         );
+        // Depth pre-pass
+        {
+            command_buffer.bindPipeline(
+                vk::PipelineBindPoint::eGraphics,
+                *pipelines.geometry_depth_prepass
+            );
+            command_buffer.draw(powerplant.num_indices, 1, 0, 0);
+        }
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eGraphics,
             *pipelines.render_geometry
         );
-
         command_buffer.draw(powerplant.num_indices, 1, 0, 0);
         command_buffer.endRendering();
 

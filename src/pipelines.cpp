@@ -47,6 +47,18 @@ const auto SINGLE_REPLACE_BLEND_STATE = vk::PipelineColorBlendStateCreateInfo {
     .attachmentCount = SINGLE_REPLACE_BLEND_ATTACHMENT.size(),
     .pAttachments = SINGLE_REPLACE_BLEND_ATTACHMENT.data()};
 
+const auto DEPTH_WRITE_GREATER = vk::PipelineDepthStencilStateCreateInfo {
+    .depthTestEnable = true,
+    .depthWriteEnable = true,
+    .depthCompareOp = vk::CompareOp::eGreater,
+};
+
+const auto DEPTH_TEST_EQUAL = vk::PipelineDepthStencilStateCreateInfo {
+    .depthTestEnable = true,
+    .depthWriteEnable = false,
+    .depthCompareOp = vk::CompareOp::eEqual,
+};
+
 std::vector<uint8_t> read_file_to_bytes(const char* filepath) {
     std::ifstream file_stream(filepath, std::ios::binary);
 
@@ -193,6 +205,12 @@ Pipelines Pipelines::compile_pipelines(
             .module = *render_geometry,
             .pName = "PSMain"}};
 
+    auto depth_pre_pass_stage = std::array {vk::PipelineShaderStageCreateInfo {
+        .stage = vk::ShaderStageFlagBits::eVertex,
+        .module = *render_geometry,
+        .pName = "depth_only",
+    }};
+
     auto swapchain_format_rendering_info = vk::PipelineRenderingCreateInfoKHR {
         .colorAttachmentCount = 1,
         .pColorAttachmentFormats = &swapchain_format};
@@ -203,13 +221,6 @@ Pipelines Pipelines::compile_pipelines(
         .colorAttachmentCount = 1,
         .pColorAttachmentFormats = &rgba16f,
         .depthAttachmentFormat = vk::Format::eD32Sfloat};
-
-    auto depth = vk::PipelineDepthStencilStateCreateInfo {
-        .depthTestEnable = true,
-        .depthWriteEnable = true,
-        .depthCompareOp = vk::CompareOp::eGreater,
-
-    };
 
     auto pipeline_infos =
         std::array {// display_transform
@@ -236,7 +247,22 @@ Pipelines Pipelines::compile_pipelines(
                         .pViewportState = &DEFAULT_VIEWPORT_STATE,
                         .pRasterizationState = &FILL_RASTERIZATION,
                         .pMultisampleState = &NO_MULTISAMPLING,
-                        .pDepthStencilState = &depth,
+                        .pDepthStencilState = &DEPTH_TEST_EQUAL,
+                        .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
+                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+                        .layout = *pipeline_layout,
+                    },
+                    // geometry depth pre pass
+                    vk::GraphicsPipelineCreateInfo {
+                        .pNext = &rgba16f_format_rendering_info,
+                        .stageCount = depth_pre_pass_stage.size(),
+                        .pStages = depth_pre_pass_stage.data(),
+                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
+                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
+                        .pRasterizationState = &FILL_RASTERIZATION,
+                        .pMultisampleState = &NO_MULTISAMPLING,
+                        .pDepthStencilState = &DEPTH_WRITE_GREATER,
                         .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
                         .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
                         .layout = *pipeline_layout,
@@ -247,6 +273,7 @@ Pipelines Pipelines::compile_pipelines(
     return Pipelines {
         .display_transform = std::move(pipelines[0]),
         .render_geometry = std::move(pipelines[1]),
+        .geometry_depth_prepass = std::move(pipelines[2]),
         .pipeline_layout = std::move(pipeline_layout),
         .dsl = std::move(descriptor_set_layouts),
     };

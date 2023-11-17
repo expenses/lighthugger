@@ -6,6 +6,7 @@ struct DescriptorSetLayouts {
 struct Pipelines {
     vk::raii::Pipeline display_transform;
     vk::raii::Pipeline render_geometry;
+    vk::raii::Pipeline geometry_depth_prepass;
     vk::raii::PipelineLayout pipeline_layout;
 
     DescriptorSetLayouts dsl;
