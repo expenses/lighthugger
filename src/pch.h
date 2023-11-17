@@ -7,7 +7,13 @@
 #include <thsvs_simpler_vulkan_synchronization.h>
 #include <tiny_obj_loader.h>
 
+#include <cmath>
 #include <fstream>
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/gtc/constants.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/reciprocal.hpp>
+#include <glm/mat4x4.hpp>
 #include <iostream>
 #include <limits>
 #include <optional>

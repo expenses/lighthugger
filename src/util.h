@@ -9,3 +9,5 @@ const vk::ImageSubresourceRange COLOR_SUBRESOURCE_RANGE = {
 };
 
 void check_vk_result(vk::Result err);
+
+float deg_to_rad(float deg);

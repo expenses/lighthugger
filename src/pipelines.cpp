@@ -82,14 +82,21 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
                         .binding = 0,
                         .descriptorType = vk::DescriptorType::eStorageBuffer,
                         .descriptorCount = 1,
-                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                        .stageFlags = vk::ShaderStageFlagBits::eVertex,
                     },
                     // Indices
                     vk::DescriptorSetLayoutBinding {
                         .binding = 1,
                         .descriptorType = vk::DescriptorType::eStorageBuffer,
                         .descriptorCount = 1,
-                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                        .stageFlags = vk::ShaderStageFlagBits::eVertex,
+                    },
+                    // Uniforms
+                    vk::DescriptorSetLayoutBinding {
+                        .binding = 2,
+                        .descriptorType = vk::DescriptorType::eUniformBuffer,
+                        .descriptorCount = 1,
+                        .stageFlags = vk::ShaderStageFlagBits::eVertex,
                     }};
 
     auto display_transform_bindings =
@@ -170,7 +177,7 @@ Pipelines Pipelines::compile_pipelines(
     auto clear_pretty_stages = std::array {
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eVertex,
-            .module = *fullscreen_tri,
+            .module = *clear_pretty,
             .pName = "VSMain",
         },
         vk::PipelineShaderStageCreateInfo {

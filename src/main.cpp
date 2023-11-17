@@ -4,6 +4,7 @@
 #include "mesh_loading.h"
 #include "pch.h"
 #include "pipelines.h"
+#include "projection.h"
 #include "sync.h"
 
 // Sources:
@@ -280,9 +281,48 @@ int main() {
     auto scene_referred_framebuffer_ds = std::move(descriptor_sets[0]);
     auto geometry_ds = std::move(descriptor_sets[1]);
 
+    auto perspective = infinitePerspectiveFovReverseZLH_ZO(
+        deg_to_rad(90.0),
+        extent.width,
+        extent.height,
+        0.001
+    );
+
+    glm::mat4 View = glm::lookAt(
+        glm::vec3(4, 3, -3),
+        glm::vec3(0, 0, 0),
+        glm::vec3(0, 1, 0)
+    );
+
+    auto matrix = View * perspective;
+
+    auto uniform_buffer = AllocatedBuffer(
+        vk::BufferCreateInfo {
+            .size = sizeof(matrix),
+            .usage = vk::BufferUsageFlagBits::eUniformBuffer},
+        {
+            .flags = vma::AllocationCreateFlagBits::eMapped
+                | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+            .usage = vma::MemoryUsage::eAuto,
+        },
+        allocator
+    );
+
+    {
+        auto uniform_buffer_info =
+            allocator.getAllocationInfo(uniform_buffer.allocation);
+
+        assert(uniform_buffer_info.pMappedData);
+
+        std::memcpy(uniform_buffer_info.pMappedData, &matrix, sizeof(matrix));
+    }
+
     auto sampler = device.createSampler({
         .magFilter = vk::Filter::eLinear,
         .minFilter = vk::Filter::eLinear,
+        .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+        .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+        .addressModeW = vk::SamplerAddressMode::eClampToEdge,
     });
 
     std::vector<AllocatedBuffer> temp_buffers;
@@ -303,23 +343,25 @@ int main() {
 
     command_buffer.end();
 
-    vk::PipelineStageFlags dst_stage_mask =
-        vk::PipelineStageFlagBits::eTransfer;
-
-    vk::SubmitInfo submit_info = {
-        .pWaitDstStageMask = &dst_stage_mask,
-        .commandBufferCount = 1,
-        .pCommandBuffers = &*command_buffer,
-    };
-    auto init_fence = device.createFence({});
-    graphics_queue.submit(submit_info, *init_fence);
-
     auto u64_max = std::numeric_limits<uint64_t>::max();
 
-    check_vk_result(device.waitForFences({*init_fence}, true, u64_max));
+    {
+        vk::PipelineStageFlags dst_stage_mask =
+            vk::PipelineStageFlagBits::eTransfer;
 
-    // Drop temp buffers.
-    temp_buffers.clear();
+        vk::SubmitInfo submit_info = {
+            .pWaitDstStageMask = &dst_stage_mask,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &*command_buffer,
+        };
+        auto init_fence = device.createFence({});
+        graphics_queue.submit(submit_info, *init_fence);
+
+        check_vk_result(device.waitForFences({*init_fence}, true, u64_max));
+
+        // Drop temp buffers.
+        temp_buffers.clear();
+    }
 
     auto display_transform_view = device.createImageView(
         {.image = display_transform_lut.image,
@@ -345,6 +387,11 @@ int main() {
 
     auto index_buffer_info = vk::DescriptorBufferInfo {
         .buffer = powerplant.indices.buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE};
+
+    auto uniform_buffer_info = vk::DescriptorBufferInfo {
+        .buffer = uniform_buffer.buffer,
         .offset = 0,
         .range = VK_WHOLE_SIZE};
 
@@ -379,7 +426,13 @@ int main() {
              .dstBinding = 1,
              .descriptorCount = 1,
              .descriptorType = vk::DescriptorType::eStorageBuffer,
-             .pBufferInfo = &index_buffer_info}},
+             .pBufferInfo = &index_buffer_info},
+         vk::WriteDescriptorSet {
+             .dstSet = *geometry_ds,
+             .dstBinding = 2,
+             .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eUniformBuffer,
+             .pBufferInfo = &uniform_buffer_info}},
         {}
     );
 
@@ -503,7 +556,7 @@ int main() {
         vk::RenderingAttachmentInfoKHR framebuffer_attachment_info = {
             .imageView = *scene_referred_framebuffer_view,
             .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-            .loadOp = vk::AttachmentLoadOp::eDontCare,
+            .loadOp = vk::AttachmentLoadOp::eClear,
             .storeOp = vk::AttachmentStoreOp::eStore,
         };
         command_buffer.beginRendering(
@@ -521,7 +574,7 @@ int main() {
             *pipelines.clear_pretty
         );
 
-        command_buffer.draw(3, 1, 0, 0);
+        command_buffer.draw(powerplant.num_indices, 1, 0, 0);
         command_buffer.endRendering();
 
         insert_color_image_barriers(
