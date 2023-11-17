@@ -1,5 +1,7 @@
 #include "mesh_loading.h"
 
+#include "image_loading.h"
+
 template<class T>
 AllocatedBuffer allocate_from_vector(
     const std::vector<T>& vector,
@@ -25,7 +27,15 @@ AllocatedBuffer allocate_from_vector(
     return buffer;
 }
 
-Mesh load_obj(const char* filepath, vma::Allocator allocator) {
+Mesh load_obj(
+    const char* filepath,
+    vma::Allocator allocator,
+    const vk::raii::Device& device,
+    const vk::raii::CommandBuffer& command_buffer,
+    uint32_t graphics_queue_family,
+    std::vector<AllocatedBuffer>& temp_buffers,
+    DescriptorSet& descriptor_set
+) {
     tinyobj::ObjReader reader;
 
     assert(reader.ParseFromFile(filepath));
@@ -39,8 +49,25 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
 
     auto str_filepath = std::string(filepath);
 
-    auto m = materials[0];
-    auto material_filepath = str_filepath.substr(0, str_filepath.rfind("/") + 1) + m.diffuse_texname;
+    std::vector<ImageWithView> images;
+
+    auto base_path = str_filepath.substr(0, str_filepath.rfind("/") + 1);
+
+    for (auto& material : materials) {
+        auto albedo_texture_filepath = base_path + material.diffuse_texname;
+        auto albedo_image = load_dds(
+            albedo_texture_filepath.data(),
+            allocator,
+            device,
+            command_buffer,
+            graphics_queue_family,
+            temp_buffers
+        );
+        descriptor_set.write_image(albedo_image, *device);
+        images.push_back(std::move(albedo_image));
+    }
+
+    dbg(attrib.vertices.size(), attrib.texcoords.size());
 
     std::vector<uint32_t> indices;
     std::vector<uint32_t> material_ids;
@@ -56,7 +83,6 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
             material_ids.push_back(material_id);
         }
     }
-
 
     // Todo: should use staging buffers instead of host-accessible storage buffers.
 
@@ -78,6 +104,12 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
         std::string(filepath) + " normal buffer"
     );
 
+    auto uv_buffer = allocate_from_vector(
+        attrib.texcoords,
+        allocator,
+        std::string(filepath) + " uv buffer"
+    );
+
     auto material_id_buffer = allocate_from_vector(
         material_ids,
         allocator,
@@ -89,6 +121,8 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
         std::move(index_buffer),
         std::move(normal_buffer),
         std::move(material_id_buffer),
+        std::move(uv_buffer),
+        std::move(images),
         indices.size()
     );
 }
@@ -98,6 +132,7 @@ MeshBufferAddresses Mesh::get_addresses(const vk::raii::Device& device) {
         .positions = device.getBufferAddress({.buffer = vertices.buffer}),
         .indices = device.getBufferAddress({.buffer = indices.buffer}),
         .normals = device.getBufferAddress({.buffer = normals.buffer}),
+        .uvs = device.getBufferAddress({.buffer = uvs.buffer}),
         .material_indices =
             device.getBufferAddress({.buffer = material_ids.buffer})};
 }

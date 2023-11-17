@@ -1,6 +1,5 @@
 #pragma once
 
-
 struct AllocatedImage {
     vk::Image image;
     vma::Allocation allocation;

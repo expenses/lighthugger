@@ -42,6 +42,8 @@ const auto SINGLE_REPLACE_BLEND_ATTACHMENT =
         .blendEnable = false,
         .colorWriteMask = RGBA_MASK}};
 
+const auto EMPTY_BLEND_STATE = vk::PipelineColorBlendStateCreateInfo {};
+
 const auto SINGLE_REPLACE_BLEND_STATE = vk::PipelineColorBlendStateCreateInfo {
     .logicOpEnable = false,
     .attachmentCount = SINGLE_REPLACE_BLEND_ATTACHMENT.size(),
@@ -91,45 +93,71 @@ create_shader_from_file(const vk::raii::Device& device, const char* filepath) {
 
 DescriptorSetLayouts
 create_descriptor_set_layouts(const vk::raii::Device& device) {
-    auto everything_bindings =
-        std::array {// Geometry buffer
-                    vk::DescriptorSetLayoutBinding {
-                        .binding = 0,
-                        .descriptorType = vk::DescriptorType::eStorageBuffer,
-                        .descriptorCount = 1,
-                        .stageFlags = vk::ShaderStageFlagBits::eVertex,
-                    },
-                    // Uniforms
-                    vk::DescriptorSetLayoutBinding {
-                        .binding = 1,
-                        .descriptorType = vk::DescriptorType::eUniformBuffer,
-                        .descriptorCount = 1,
-                        .stageFlags = vk::ShaderStageFlagBits::eVertex,
-                    },
-                    // hdr framebuffer
-                    vk::DescriptorSetLayoutBinding {
-                        .binding = 2,
-                        .descriptorType = vk::DescriptorType::eSampledImage,
-                        .descriptorCount = 1,
-                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                    },
-                    // sampler
-                    vk::DescriptorSetLayoutBinding {
-                        .binding = 3,
-                        .descriptorType = vk::DescriptorType::eSampler,
-                        .descriptorCount = 1,
-                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                    },
-                    // display transform LUT
-                    vk::DescriptorSetLayoutBinding {
-                        .binding = 4,
-                        .descriptorType = vk::DescriptorType::eSampledImage,
-                        .descriptorCount = 1,
-                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                    }};
+    auto everything_bindings = std::array {
+        // Geometry buffer
+        vk::DescriptorSetLayoutBinding {
+            .binding = 0,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eVertex,
+        },
+        // Uniforms
+        vk::DescriptorSetLayoutBinding {
+            .binding = 1,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eVertex,
+        },
+        // hdr framebuffer
+        vk::DescriptorSetLayoutBinding {
+            .binding = 2,
+            .descriptorType = vk::DescriptorType::eSampledImage,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+        },
+        // sampler
+        vk::DescriptorSetLayoutBinding {
+            .binding = 3,
+            .descriptorType = vk::DescriptorType::eSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+        },
+        // display transform LUT
+        vk::DescriptorSetLayoutBinding {
+            .binding = 4,
+            .descriptorType = vk::DescriptorType::eSampledImage,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+        },
+        vk::DescriptorSetLayoutBinding {
+            .binding = 5,
+            .descriptorType = vk::DescriptorType::eSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+        },
+        // Bindless images
+        vk::DescriptorSetLayoutBinding {
+            .binding = 6,
+            .descriptorType = vk::DescriptorType::eSampledImage,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .descriptorCount = 512,
+        },
+    };
+
+    std::array<vk::DescriptorBindingFlags, 7> flags;
+    // Set the images as being partially bound, so not all slots have to be used.
+    flags[6] = vk::DescriptorBindingFlagBits::ePartiallyBound;
+
+    assert(flags.size() == everything_bindings.size());
+
+    auto flags_create_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo {
+        .bindingCount = flags.size(),
+        .pBindingFlags = flags.data()};
 
     return DescriptorSetLayouts {
         .everything = device.createDescriptorSetLayout({
+            .pNext = &flags_create_info,
             .bindingCount = everything_bindings.size(),
             .pBindings = everything_bindings.data(),
         }),
@@ -203,6 +231,9 @@ Pipelines Pipelines::compile_pipelines(
         .pColorAttachmentFormats = &rgba16f,
         .depthAttachmentFormat = vk::Format::eD32Sfloat};
 
+    auto depth_only_rendering_info = vk::PipelineRenderingCreateInfoKHR {
+        .depthAttachmentFormat = vk::Format::eD32Sfloat};
+
     auto pipeline_infos =
         std::array {// display_transform
                     vk::GraphicsPipelineCreateInfo {
@@ -235,7 +266,7 @@ Pipelines Pipelines::compile_pipelines(
                     },
                     // geometry depth pre pass
                     vk::GraphicsPipelineCreateInfo {
-                        .pNext = &rgba16f_format_rendering_info,
+                        .pNext = &depth_only_rendering_info,
                         .stageCount = depth_pre_pass_stage.size(),
                         .pStages = depth_pre_pass_stage.data(),
                         .pVertexInputState = &EMPTY_VERTEX_INPUT,
@@ -244,7 +275,7 @@ Pipelines Pipelines::compile_pipelines(
                         .pRasterizationState = &FILL_RASTERIZATION,
                         .pMultisampleState = &NO_MULTISAMPLING,
                         .pDepthStencilState = &DEPTH_WRITE_GREATER,
-                        .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
+                        .pColorBlendState = &EMPTY_BLEND_STATE,
                         .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
                         .layout = *pipeline_layout,
                     }};

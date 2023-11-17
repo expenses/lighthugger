@@ -4,9 +4,9 @@
 #include <vulkan/vulkan_raii.hpp>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <dbg.h>
 #include <thsvs_simpler_vulkan_synchronization.h>
 #include <tiny_obj_loader.h>
-#include <dbg.h>
 
 #include <cmath>
 #include <fstream>

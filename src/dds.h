@@ -171,12 +171,3 @@ struct DDS_HEADER_DXT10 {
     UINT arraySize;
     UINT miscFlags2;
 };
-
-vk::Format translate_dxgi_to_vulkan(DXGI_FORMAT dxgi_format) {
-    switch (dxgi_format) {
-        case DXGI_FORMAT_R9G9B9E5_SHAREDEXP:
-            return vk::Format::eE5B9G9R9UfloatPack32;
-        default:
-            assert(false);
-    }
-}

@@ -1,8 +1,10 @@
 #include "allocations.h"
+#include "util.h"
 
-AllocatedImage load_dds(
+ImageWithView load_dds(
     const char* filepath,
     vma::Allocator allocator,
+    const vk::raii::Device& device,
     const vk::raii::CommandBuffer& command_buffer,
     uint32_t graphics_queue_family,
     std::vector<AllocatedBuffer>& temp_buffers

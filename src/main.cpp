@@ -1,5 +1,6 @@
 #include "allocations.h"
 #include "debugging.h"
+#include "descriptor_set.h"
 #include "image_loading.h"
 #include "mesh_loading.h"
 #include "pch.h"
@@ -28,29 +29,6 @@ static void key_callback(
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
-}
-
-struct ImageWithView {
-    AllocatedImage image;
-    vk::raii::ImageView view;
-};
-
-ImageWithView create_image_with_view(
-    vk::ImageCreateInfo create_info,
-    vma::Allocator allocator,
-    const vk::raii::Device& device,
-    const char* name,
-    vk::ImageViewType view_type = vk::ImageViewType::e2D,
-    vk::ImageSubresourceRange subresource_range = COLOR_SUBRESOURCE_RANGE
-) {
-    auto image = AllocatedImage(create_info, allocator, name);
-    auto view = device.createImageView(
-        {.image = image.image,
-         .viewType = view_type,
-         .format = create_info.format,
-         .subresourceRange = subresource_range}
-    );
-    return {.image = std::move(image), .view = std::move(view)};
 }
 
 int main() {
@@ -132,6 +110,8 @@ int main() {
         .pQueuePriorities = &queue_prio};
 
     auto vulkan_1_2_features = vk::PhysicalDeviceVulkan12Features {
+        .descriptorBindingPartiallyBound = true,
+        .runtimeDescriptorArray = true,
         .bufferDeviceAddress = true,
     };
 
@@ -304,7 +284,7 @@ int main() {
             .descriptorSetCount = descriptor_set_layouts.size(),
             .pSetLayouts = descriptor_set_layouts.data()});
 
-    auto everything_ds = std::move(descriptor_sets[0]);
+    auto descriptor_set = DescriptorSet(std::move(descriptor_sets[0]));
 
     auto uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
         vk::BufferCreateInfo {
@@ -318,7 +298,7 @@ int main() {
         allocator
     ));
 
-    auto sampler = device.createSampler({
+    auto clamp_sampler = device.createSampler({
         .magFilter = vk::Filter::eLinear,
         .minFilter = vk::Filter::eLinear,
         .addressModeU = vk::SamplerAddressMode::eClampToEdge,
@@ -326,8 +306,15 @@ int main() {
         .addressModeW = vk::SamplerAddressMode::eClampToEdge,
     });
 
+    auto repeat_sampler = device.createSampler({
+        .magFilter = vk::Filter::eLinear,
+        .minFilter = vk::Filter::eLinear,
+        .addressModeU = vk::SamplerAddressMode::eRepeat,
+        .addressModeV = vk::SamplerAddressMode::eRepeat,
+        .addressModeW = vk::SamplerAddressMode::eRepeat,
+    });
+
     std::vector<AllocatedBuffer> temp_buffers;
-    auto powerplant = load_obj("powerplant/Powerplant.obj", allocator);
 
     command_buffer.begin(
         {.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit}
@@ -337,9 +324,20 @@ int main() {
     auto display_transform_lut = load_dds(
         "external/tony-mc-mapface/shader/tony_mc_mapface.dds",
         allocator,
+        device,
         command_buffer,
         graphics_queue_family,
         temp_buffers
+    );
+
+    auto powerplant = load_obj(
+        "powerplant/Powerplant.obj",
+        allocator,
+        device,
+        command_buffer,
+        graphics_queue_family,
+        temp_buffers,
+        descriptor_set
     );
 
     command_buffer.end();
@@ -382,22 +380,18 @@ int main() {
         buffer_addresses.size() * sizeof(MeshBufferAddresses)
     );
 
-    auto display_transform_view = device.createImageView(
-        {.image = display_transform_lut.image,
-         .viewType = vk::ImageViewType::e3D,
-         .format = vk::Format::eE5B9G9R9UfloatPack32,
-         .subresourceRange = COLOR_SUBRESOURCE_RANGE}
-    );
-
     auto image_info = vk::DescriptorImageInfo {
         .imageView = *scene_referred_framebuffer.view,
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
 
     auto lut_image_info = vk::DescriptorImageInfo {
-        .imageView = *display_transform_view,
+        .imageView = *display_transform_lut.view,
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
 
-    auto sampler_info = vk::DescriptorImageInfo {.sampler = *sampler};
+    auto clamp_sampler_info =
+        vk::DescriptorImageInfo {.sampler = *clamp_sampler};
+    auto repeat_sampler_info =
+        vk::DescriptorImageInfo {.sampler = *repeat_sampler};
 
     auto geometry_buffer_info = vk::DescriptorBufferInfo {
         .buffer = geometry_buffer.buffer,
@@ -413,35 +407,41 @@ int main() {
     device.updateDescriptorSets(
         {
             vk::WriteDescriptorSet {
-                .dstSet = *everything_ds,
+                .dstSet = *descriptor_set.set,
                 .dstBinding = 0,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eStorageBuffer,
                 .pBufferInfo = &geometry_buffer_info},
             vk::WriteDescriptorSet {
-                .dstSet = *everything_ds,
+                .dstSet = *descriptor_set.set,
                 .dstBinding = 1,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eUniformBuffer,
                 .pBufferInfo = &uniform_buffer_info},
             vk::WriteDescriptorSet {
-                .dstSet = *everything_ds,
+                .dstSet = *descriptor_set.set,
                 .dstBinding = 2,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampledImage,
                 .pImageInfo = &image_info},
             vk::WriteDescriptorSet {
-                .dstSet = *everything_ds,
+                .dstSet = *descriptor_set.set,
                 .dstBinding = 3,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampler,
-                .pImageInfo = &sampler_info},
+                .pImageInfo = &clamp_sampler_info},
             vk::WriteDescriptorSet {
-                .dstSet = *everything_ds,
+                .dstSet = *descriptor_set.set,
                 .dstBinding = 4,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampledImage,
                 .pImageInfo = &lut_image_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *descriptor_set.set,
+                .dstBinding = 5,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampler,
+                .pImageInfo = &repeat_sampler_info},
         },
         {}
     );
@@ -499,7 +499,7 @@ int main() {
 
             device.updateDescriptorSets(
                 {vk::WriteDescriptorSet {
-                    .dstSet = *everything_ds,
+                    .dstSet = *descriptor_set.set,
                     .dstBinding = 2,
                     .descriptorCount = 1,
                     .descriptorType = vk::DescriptorType::eSampledImage,
@@ -538,7 +538,7 @@ int main() {
         // due to writing to a value that the previous frame is reading from.
         {
             auto view = glm::lookAt(
-                glm::vec3(sin(time) * 100, 100, cos(time) * 100),
+                glm::vec3(sin(time / 2.0) * 100, 100, cos(time / 2.0) * 100),
                 glm::vec3(0, 0, 0),
                 glm::vec3(0, 1, 0)
             );
@@ -584,7 +584,7 @@ int main() {
             vk::PipelineBindPoint::eGraphics,
             *pipelines.pipeline_layout,
             0,
-            {*everything_ds},
+            {*descriptor_set.set},
             {}
         );
 

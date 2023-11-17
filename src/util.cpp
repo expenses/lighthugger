@@ -28,3 +28,21 @@ std::vector<vk::raii::ImageView> create_swapchain_image_views(
 
     return views;
 }
+
+ImageWithView create_image_with_view(
+    vk::ImageCreateInfo create_info,
+    vma::Allocator allocator,
+    const vk::raii::Device& device,
+    const char* name,
+    vk::ImageViewType view_type,
+    vk::ImageSubresourceRange subresource_range
+) {
+    auto image = AllocatedImage(create_info, allocator, name);
+    auto view = device.createImageView(
+        {.image = image.image,
+         .viewType = view_type,
+         .format = create_info.format,
+         .subresourceRange = subresource_range}
+    );
+    return {.image = std::move(image), .view = std::move(view)};
+}
