@@ -24,5 +24,5 @@ void PSMain(
 ) {
     psIn.Uv.y = 1.0 - psIn.Uv.y;
     float3 stimulus = source_tex.Sample(samp, psIn.Uv);
-    target_0 = float4(tony_mc_mapface(stimulus), 1.0);
+    target_0 = float4(stimulus, 1.0);
 }

@@ -76,28 +76,36 @@ create_shader_from_file(const vk::raii::Device& device, const char* filepath) {
 
 DescriptorSetLayouts
 create_descriptor_set_layouts(const vk::raii::Device& device) {
-    auto geometry_bindings =
-        std::array {// Vertices
-                    vk::DescriptorSetLayoutBinding {
-                        .binding = 0,
-                        .descriptorType = vk::DescriptorType::eStorageBuffer,
-                        .descriptorCount = 1,
-                        .stageFlags = vk::ShaderStageFlagBits::eVertex,
-                    },
-                    // Indices
-                    vk::DescriptorSetLayoutBinding {
-                        .binding = 1,
-                        .descriptorType = vk::DescriptorType::eStorageBuffer,
-                        .descriptorCount = 1,
-                        .stageFlags = vk::ShaderStageFlagBits::eVertex,
-                    },
-                    // Uniforms
-                    vk::DescriptorSetLayoutBinding {
-                        .binding = 2,
-                        .descriptorType = vk::DescriptorType::eUniformBuffer,
-                        .descriptorCount = 1,
-                        .stageFlags = vk::ShaderStageFlagBits::eVertex,
-                    }};
+    auto geometry_bindings = std::array {
+        // Vertices
+        vk::DescriptorSetLayoutBinding {
+            .binding = 0,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eVertex,
+        },
+        // Indices
+        vk::DescriptorSetLayoutBinding {
+            .binding = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eVertex,
+        },
+        // Uniforms
+        vk::DescriptorSetLayoutBinding {
+            .binding = 2,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eVertex,
+        },
+        // normals
+        vk::DescriptorSetLayoutBinding {
+            .binding = 3,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eVertex,
+        },
+    };
 
     auto display_transform_bindings =
         std::array {// scene-referred framebuffer
@@ -152,8 +160,8 @@ Pipelines Pipelines::compile_pipelines(
             .pPushConstantRanges = nullptr,
         });
 
-    auto clear_pretty =
-        create_shader_from_file(device, "compiled_shaders/clear_pretty.spv");
+    auto render_geometry =
+        create_shader_from_file(device, "compiled_shaders/render_geometry.spv");
 
     auto fullscreen_tri =
         create_shader_from_file(device, "compiled_shaders/fullscreen_tri.spv");
@@ -174,15 +182,15 @@ Pipelines Pipelines::compile_pipelines(
             .module = *display_transform,
             .pName = "PSMain"}};
 
-    auto clear_pretty_stages = std::array {
+    auto render_geometry_stages = std::array {
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eVertex,
-            .module = *clear_pretty,
+            .module = *render_geometry,
             .pName = "VSMain",
         },
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eFragment,
-            .module = *clear_pretty,
+            .module = *render_geometry,
             .pName = "PSMain"}};
 
     auto swapchain_format_rendering_info = vk::PipelineRenderingCreateInfoKHR {
@@ -193,7 +201,15 @@ Pipelines Pipelines::compile_pipelines(
 
     auto rgba16f_format_rendering_info = vk::PipelineRenderingCreateInfoKHR {
         .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &rgba16f};
+        .pColorAttachmentFormats = &rgba16f,
+        .depthAttachmentFormat = vk::Format::eD32Sfloat};
+
+    auto depth = vk::PipelineDepthStencilStateCreateInfo {
+        .depthTestEnable = true,
+        .depthWriteEnable = true,
+        .depthCompareOp = vk::CompareOp::eGreater,
+
+    };
 
     auto pipeline_infos =
         std::array {// display_transform
@@ -210,16 +226,17 @@ Pipelines Pipelines::compile_pipelines(
                         .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
                         .layout = *pipeline_layout,
                     },
-                    // display_transform
+                    // render_geometry
                     vk::GraphicsPipelineCreateInfo {
                         .pNext = &rgba16f_format_rendering_info,
-                        .stageCount = clear_pretty_stages.size(),
-                        .pStages = clear_pretty_stages.data(),
+                        .stageCount = render_geometry_stages.size(),
+                        .pStages = render_geometry_stages.data(),
                         .pVertexInputState = &EMPTY_VERTEX_INPUT,
                         .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
                         .pViewportState = &DEFAULT_VIEWPORT_STATE,
                         .pRasterizationState = &FILL_RASTERIZATION,
                         .pMultisampleState = &NO_MULTISAMPLING,
+                        .pDepthStencilState = &depth,
                         .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
                         .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
                         .layout = *pipeline_layout,
@@ -229,7 +246,7 @@ Pipelines Pipelines::compile_pipelines(
 
     return Pipelines {
         .display_transform = std::move(pipelines[0]),
-        .clear_pretty = std::move(pipelines[1]),
+        .render_geometry = std::move(pipelines[1]),
         .pipeline_layout = std::move(pipeline_layout),
         .dsl = std::move(descriptor_set_layouts),
     };

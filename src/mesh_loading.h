@@ -3,6 +3,7 @@
 struct Mesh {
     AllocatedBuffer vertices;
     AllocatedBuffer indices;
+    AllocatedBuffer normals;
     uint32_t num_indices;
 };
 

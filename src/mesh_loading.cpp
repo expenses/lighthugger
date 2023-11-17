@@ -22,11 +22,12 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
         }
     }
 
-    auto& shape = shapes[0];
-
-    std::vector<uint32_t> indices(shape.mesh.indices.size());
-    for (auto& index : shape.mesh.indices) {
-        indices.push_back(index.vertex_index);
+    std::vector<uint32_t> indices;
+    for (auto& shape : shapes) {
+        for (auto& index : shape.mesh.indices) {
+            assert(index.vertex_index == index.normal_index);
+            indices.push_back(index.vertex_index);
+        }
     }
 
     // Todo: should use staging buffers instead of host-accessible storage buffers.
@@ -69,8 +70,27 @@ Mesh load_obj(const char* filepath, vma::Allocator allocator) {
         attrib.vertices.size() * sizeof(float)
     );
 
+    std::string normal_buffer_name = std::string(filepath) + " normal buffer";
+    auto normal_buffer = AllocatedBuffer(
+        {.size = attrib.normals.size() * sizeof(float),
+         .usage = vk::BufferUsageFlagBits::eTransferSrc
+             | vk::BufferUsageFlagBits::eStorageBuffer},
+        {
+            .flags = vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+            .usage = vma::MemoryUsage::eAuto,
+        },
+        allocator,
+        normal_buffer_name.data()
+    );
+
+    normal_buffer.map_and_memcpy(
+        (void*)attrib.normals.data(),
+        attrib.normals.size() * sizeof(float)
+    );
+
     return Mesh {
         .vertices = std::move(vertex_buffer),
         .indices = std::move(index_buffer),
+        .normals = std::move(normal_buffer),
         .num_indices = indices.size()};
 }

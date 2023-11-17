@@ -47,6 +47,29 @@ std::vector<vk::raii::ImageView> create_swapchain_image_views(
     return views;
 }
 
+struct ImageWithView {
+    AllocatedImage image;
+    vk::raii::ImageView view;
+};
+
+ImageWithView create_image_with_view(
+    vk::ImageCreateInfo create_info,
+    vma::Allocator allocator,
+    const vk::raii::Device& device,
+    const char* name,
+    vk::ImageViewType view_type = vk::ImageViewType::e2D,
+    vk::ImageSubresourceRange subresource_range = COLOR_SUBRESOURCE_RANGE
+) {
+    auto image = AllocatedImage(create_info, allocator, name);
+    auto view = device.createImageView(
+        {.image = image.image,
+         .viewType = view_type,
+         .format = create_info.format,
+         .subresourceRange = subresource_range}
+    );
+    return {.image = std::move(image), .view = std::move(view)};
+}
+
 int main() {
     glfwInit();
 
@@ -209,7 +232,7 @@ int main() {
     vma::Allocator allocator;
     check_vk_result(vma::createAllocator(&allocatorCreateInfo, &allocator));
 
-    auto scene_referred_framebuffer = AllocatedImage(
+    auto scene_referred_framebuffer = create_image_with_view(
         {
             .imageType = vk::ImageType::e2D,
             .format = vk::Format::eR16G16B16A16Sfloat,
@@ -225,14 +248,27 @@ int main() {
                 | vk::ImageUsageFlagBits::eSampled,
         },
         allocator,
+        device,
         "scene_referred_framebuffer"
     );
 
-    auto scene_referred_framebuffer_view = device.createImageView(
-        {.image = scene_referred_framebuffer.image,
-         .viewType = vk::ImageViewType::e2D,
-         .format = vk::Format::eR16G16B16A16Sfloat,
-         .subresourceRange = COLOR_SUBRESOURCE_RANGE}
+    auto depthbuffer = create_image_with_view(
+        {.imageType = vk::ImageType::e2D,
+         .format = vk::Format::eD32Sfloat,
+         .extent =
+             vk::Extent3D {
+                 .width = extent.width,
+                 .height = extent.height,
+                 .depth = 1,
+             },
+         .mipLevels = 1,
+         .arrayLayers = 1,
+         .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment},
+        allocator,
+        device,
+        "depthbuffer",
+        vk::ImageViewType::e2D,
+        DEPTH_SUBRESOURCE_RANGE
     );
 
     auto command_buffers =
@@ -281,24 +317,9 @@ int main() {
     auto scene_referred_framebuffer_ds = std::move(descriptor_sets[0]);
     auto geometry_ds = std::move(descriptor_sets[1]);
 
-    auto perspective = infinitePerspectiveFovReverseZLH_ZO(
-        deg_to_rad(90.0),
-        extent.width,
-        extent.height,
-        0.001
-    );
-
-    glm::mat4 View = glm::lookAt(
-        glm::vec3(4, 3, -3),
-        glm::vec3(0, 0, 0),
-        glm::vec3(0, 1, 0)
-    );
-
-    auto matrix = View * perspective;
-
     auto uniform_buffer = AllocatedBuffer(
         vk::BufferCreateInfo {
-            .size = sizeof(matrix),
+            .size = sizeof(glm::mat4),
             .usage = vk::BufferUsageFlagBits::eUniformBuffer},
         {
             .flags = vma::AllocationCreateFlagBits::eMapped
@@ -307,15 +328,6 @@ int main() {
         },
         allocator
     );
-
-    {
-        auto uniform_buffer_info =
-            allocator.getAllocationInfo(uniform_buffer.allocation);
-
-        assert(uniform_buffer_info.pMappedData);
-
-        std::memcpy(uniform_buffer_info.pMappedData, &matrix, sizeof(matrix));
-    }
 
     auto sampler = device.createSampler({
         .magFilter = vk::Filter::eLinear,
@@ -371,7 +383,7 @@ int main() {
     );
 
     auto image_info = vk::DescriptorImageInfo {
-        .imageView = *scene_referred_framebuffer_view,
+        .imageView = *scene_referred_framebuffer.view,
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
 
     auto lut_image_info = vk::DescriptorImageInfo {
@@ -392,6 +404,11 @@ int main() {
 
     auto uniform_buffer_info = vk::DescriptorBufferInfo {
         .buffer = uniform_buffer.buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE};
+
+    auto normal_buffer_info = vk::DescriptorBufferInfo {
+        .buffer = powerplant.normals.buffer,
         .offset = 0,
         .range = VK_WHOLE_SIZE};
 
@@ -432,7 +449,13 @@ int main() {
              .dstBinding = 2,
              .descriptorCount = 1,
              .descriptorType = vk::DescriptorType::eUniformBuffer,
-             .pBufferInfo = &uniform_buffer_info}},
+             .pBufferInfo = &uniform_buffer_info},
+         vk::WriteDescriptorSet {
+             .dstSet = *geometry_ds,
+             .dstBinding = 3,
+             .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eStorageBuffer,
+             .pBufferInfo = &normal_buffer_info}},
         {}
     );
 
@@ -461,7 +484,7 @@ int main() {
                 swapchain_create_info.imageFormat
             );
 
-            scene_referred_framebuffer = AllocatedImage(
+            scene_referred_framebuffer = create_image_with_view(
                 {
                     .imageType = vk::ImageType::e2D,
                     .format = vk::Format::eR16G16B16A16Sfloat,
@@ -477,18 +500,12 @@ int main() {
                         | vk::ImageUsageFlagBits::eSampled,
                 },
                 allocator,
+                device,
                 "scene_referred_framebuffer"
             );
 
-            scene_referred_framebuffer_view = device.createImageView(
-                {.image = scene_referred_framebuffer.image,
-                 .viewType = vk::ImageViewType::e2D,
-                 .format = vk::Format::eR16G16B16A16Sfloat,
-                 .subresourceRange = COLOR_SUBRESOURCE_RANGE}
-            );
-
             image_info = vk::DescriptorImageInfo {
-                .imageView = *scene_referred_framebuffer_view,
+                .imageView = *scene_referred_framebuffer.view,
                 .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
 
             device.updateDescriptorSets(
@@ -499,6 +516,53 @@ int main() {
                     .descriptorType = vk::DescriptorType::eSampledImage,
                     .pImageInfo = &image_info}},
                 {}
+            );
+
+            depthbuffer = create_image_with_view(
+                {.imageType = vk::ImageType::e2D,
+                 .format = vk::Format::eD32Sfloat,
+                 .extent =
+                     vk::Extent3D {
+                         .width = extent.width,
+                         .height = extent.height,
+                         .depth = 1,
+                     },
+                 .mipLevels = 1,
+                 .arrayLayers = 1,
+                 .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment},
+                allocator,
+                device,
+                "depthbuffer",
+                vk::ImageViewType::e2D,
+                DEPTH_SUBRESOURCE_RANGE
+            );
+        }
+
+        {
+            auto view = glm::lookAt(
+                glm::vec3(sin(time) * 100, 100, cos(time) * 100),
+                glm::vec3(0, 0, 0),
+                glm::vec3(0, 1, 0)
+            );
+
+            auto perspective = infinite_reverse_z_perspective(
+                glm::radians(45.0f),
+                float(extent.width),
+                float(extent.height),
+                0.01
+            );
+
+            auto matrix = perspective * view;
+
+            auto uniform_buffer_info =
+                allocator.getAllocationInfo(uniform_buffer.allocation);
+
+            assert(uniform_buffer_info.pMappedData);
+
+            std::memcpy(
+                uniform_buffer_info.pMappedData,
+                &matrix,
+                sizeof(matrix)
             );
         }
 
@@ -545,17 +609,32 @@ int main() {
 
         insert_color_image_barriers(
             command_buffer,
-            std::array {ImageBarrier {
-                .prev_access = THSVS_ACCESS_NONE,
-                .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-                .discard_contents = true,
-                .queue_family = graphics_queue_family,
-                .image = scene_referred_framebuffer.image}}
+            std::array {
+                ImageBarrier {
+                    .prev_access = THSVS_ACCESS_NONE,
+                    .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
+                    .discard_contents = true,
+                    .queue_family = graphics_queue_family,
+                    .image = scene_referred_framebuffer.image.image},
+                ImageBarrier {
+                    .prev_access = THSVS_ACCESS_NONE,
+                    .next_access =
+                        THSVS_ACCESS_STENCIL_ATTACHMENT_WRITE_DEPTH_READ_ONLY,
+                    .discard_contents = true,
+                    .queue_family = graphics_queue_family,
+                    .image = depthbuffer.image.image,
+                    .subresource_range = DEPTH_SUBRESOURCE_RANGE}}
         );
 
         vk::RenderingAttachmentInfoKHR framebuffer_attachment_info = {
-            .imageView = *scene_referred_framebuffer_view,
+            .imageView = *scene_referred_framebuffer.view,
             .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+            .loadOp = vk::AttachmentLoadOp::eClear,
+            .storeOp = vk::AttachmentStoreOp::eStore,
+        };
+        vk::RenderingAttachmentInfoKHR depth_attachment_info = {
+            .imageView = *depthbuffer.view,
+            .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
             .loadOp = vk::AttachmentLoadOp::eClear,
             .storeOp = vk::AttachmentStoreOp::eStore,
         };
@@ -567,11 +646,12 @@ int main() {
                  },
              .layerCount = 1,
              .colorAttachmentCount = 1,
-             .pColorAttachments = &framebuffer_attachment_info}
+             .pColorAttachments = &framebuffer_attachment_info,
+             .pDepthAttachment = &depth_attachment_info}
         );
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eGraphics,
-            *pipelines.clear_pretty
+            *pipelines.render_geometry
         );
 
         command_buffer.draw(powerplant.num_indices, 1, 0, 0);
@@ -586,7 +666,7 @@ int main() {
                         THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
                     .discard_contents = false,
                     .queue_family = graphics_queue_family,
-                    .image = scene_referred_framebuffer.image},
+                    .image = scene_referred_framebuffer.image.image},
                 ImageBarrier {
                     .prev_access = THSVS_ACCESS_NONE,
                     .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,

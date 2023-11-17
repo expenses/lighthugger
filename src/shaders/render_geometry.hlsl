@@ -5,16 +5,20 @@
 [[vk::binding(2, 1)]] cbuffer m {
     float4x4 mm;
 };
+[[vk::binding(3, 1)]] StructuredBuffer<float> normals;
+
 
 [shader("vertex")]
 V2P VSMain(uint vId : SV_VertexID)
 {
-    uint index = indices.Load(vId);
+    uint offset = indices.Load(vId) * 3;
+    float3 vertex = float3(vertices.Load(offset), vertices.Load(offset + 1), vertices.Load(offset + 2));
+
+    float3 normal = float3(normals.Load(offset), normals.Load(offset + 1), normals.Load(offset + 2));
 
     V2P vsOut;
-    float3 vertex = float3(vertices.Load(index * 3), vertices.Load(index * 3 + 1), vertices.Load(index * 3 + 2));
-    vsOut.world_pos = vertex;
-    vsOut.Pos = float4((vertex + float3(-115.0, 0.0, 0.0)).xy * 0.1, 0.0, 1.0);//mul(mm, float4(vertex, 1.0));
+    vsOut.world_pos = normal;
+    vsOut.Pos = mul(mm, float4(vertex, 1.0));
     return vsOut;
 }
 

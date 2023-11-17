@@ -8,6 +8,12 @@ const vk::ImageSubresourceRange COLOR_SUBRESOURCE_RANGE = {
     .layerCount = 1,
 };
 
-void check_vk_result(vk::Result err);
+const vk::ImageSubresourceRange DEPTH_SUBRESOURCE_RANGE = {
+    .aspectMask = vk::ImageAspectFlagBits::eDepth,
+    .baseMipLevel = 0,
+    .levelCount = 1,
+    .baseArrayLayer = 0,
+    .layerCount = 1,
+};
 
-float deg_to_rad(float deg);
+void check_vk_result(vk::Result err);

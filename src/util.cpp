@@ -7,7 +7,3 @@ void check_vk_result(vk::Result err) {
         }
     }
 }
-
-float deg_to_rad(float deg) {
-    return deg * std::numbers::pi / 180.0;
-}
