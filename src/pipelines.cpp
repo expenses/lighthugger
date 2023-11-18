@@ -170,7 +170,8 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute
-                | vk::ShaderStageFlagBits::eVertex,
+                | vk::ShaderStageFlagBits::eVertex
+                | vk::ShaderStageFlagBits::eFragment,
         },
         // shadow map
         vk::DescriptorSetLayoutBinding {

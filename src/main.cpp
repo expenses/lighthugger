@@ -785,7 +785,7 @@ int main() {
                 );
             }
             {
-                TracyVkZone(tracy_ctx, *command_buffer, "depth reduction")
+                TracyVkZone(tracy_ctx, *command_buffer, "generate_matrices")
                     command_buffer.bindPipeline(
                         vk::PipelineBindPoint::eCompute,
                         *pipelines.generate_matrices
@@ -819,12 +819,25 @@ int main() {
                 command_buffer.draw(powerplant.num_indices, 1, 0, 0);
                 command_buffer.endRendering();
             }
+            insert_color_image_barriers(
+                command_buffer,
+                std::array {ImageBarrier {
+                    .prev_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
+                    .next_access =
+                        THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+                    .discard_contents = false,
+                    .queue_family = graphics_queue_family,
+                    .image = resources.shadowmap.image.image,
+                    .subresource_range = DEPTH_SUBRESOURCE_RANGE}
+
+                }
+            );
+
             set_scissor_and_viewport(
                 command_buffer,
                 extent.width,
                 extent.height
             );
-
             depth_attachment_info = {
                 .imageView = *resources.resizing.depthbuffer.view,
                 .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
@@ -870,17 +883,6 @@ int main() {
                         .discard_contents = true,
                         .queue_family = graphics_queue_family,
                         .image = swapchain_images[swapchain_image_index]},
-
-                    ImageBarrier {
-                        .prev_access =
-                            THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
-                        .next_access =
-                            THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
-                        .discard_contents = false,
-                        .queue_family = graphics_queue_family,
-                        .image = resources.shadowmap.image.image,
-                        .subresource_range = DEPTH_SUBRESOURCE_RANGE}
-
                 }
             );
 
