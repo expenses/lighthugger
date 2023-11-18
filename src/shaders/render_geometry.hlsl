@@ -50,19 +50,6 @@ V2P VSMain(uint vId : SV_VertexID)
     return vsOut;
 }
 
-const float3 c[10] = {
-    float3(   0.0f/255.0f,   2.0f/255.0f,  91.0f/255.0f ),
-    float3(   0.0f/255.0f, 108.0f/255.0f, 251.0f/255.0f ),
-    float3(   0.0f/255.0f, 221.0f/255.0f, 221.0f/255.0f ),
-    float3(  51.0f/255.0f, 221.0f/255.0f,   0.0f/255.0f ),
-    float3( 255.0f/255.0f, 252.0f/255.0f,   0.0f/255.0f ),
-    float3( 255.0f/255.0f, 180.0f/255.0f,   0.0f/255.0f ),
-    float3( 255.0f/255.0f, 104.0f/255.0f,   0.0f/255.0f ),
-    float3( 226.0f/255.0f,  22.0f/255.0f,   0.0f/255.0f ),
-    float3( 191.0f/255.0f,   0.0f/255.0f,  83.0f/255.0f ),
-    float3( 145.0f/255.0f,   0.0f/255.0f,  65.0f/255.0f )
-};
-
 [shader("pixel")]
 void PSMain(
     V2P input,
@@ -75,6 +62,5 @@ void PSMain(
     float sun_factor = max(dot(sun_dir, normal), 0.0);
     float3 albedo = textures[input.material_index].Sample(samp, input.uv).rgb;
 
-
-    target_0 = float4(albedo * sun_factor + albedo * 0.025, 1.0);
+    target_0 = float4(albedo * (sun_factor + 0.025), 1.0);
 }

@@ -1,6 +1,6 @@
-#include "allocations.h"
-#include "descriptor_set.h"
-#include "shared_cpu_gpu.h"
+#include "../allocations.h"
+#include "../descriptor_set.h"
+#include "../shared_cpu_gpu.h"
 
 struct Mesh {
     AllocatedBuffer vertices;

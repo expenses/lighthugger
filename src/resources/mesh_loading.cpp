@@ -1,5 +1,4 @@
 #include "mesh_loading.h"
-
 #include "image_loading.h"
 
 template<class T>

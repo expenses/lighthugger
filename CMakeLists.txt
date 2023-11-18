@@ -7,7 +7,7 @@ find_package(Vulkan REQUIRED)
 find_package(VulkanMemoryAllocator REQUIRED)
 add_subdirectory(external/VulkanMemoryAllocator-Hpp)
 
-file(GLOB SRC_FILES src/*.cpp)
+file(GLOB_RECURSE SRC_FILES src/**.cpp)
 add_executable(vkcpptest ${SRC_FILES})
 
 target_include_directories(vkcpptest PRIVATE src external/simple_vulkan_synchronization external/VulkanMemoryAllocator-Hpp/include external/tinyobjloader external/dbg-macro)

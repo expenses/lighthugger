@@ -1,11 +1,11 @@
 #include "allocations.h"
 #include "debugging.h"
 #include "descriptor_set.h"
-#include "image_loading.h"
-#include "mesh_loading.h"
 #include "pch.h"
 #include "pipelines.h"
 #include "projection.h"
+#include "resources/image_loading.h"
+#include "resources/mesh_loading.h"
 #include "sync.h"
 
 const auto u64_max = std::numeric_limits<uint64_t>::max();
@@ -203,7 +203,7 @@ int main() {
     vma::Allocator allocator;
     check_vk_result(vma::createAllocator(&allocatorCreateInfo, &allocator));
 
-    auto scene_referred_framebuffer = create_image_with_view(
+    auto scene_referred_framebuffer = ImageWithView(
         {
             .imageType = vk::ImageType::e2D,
             .format = vk::Format::eR16G16B16A16Sfloat,
@@ -224,7 +224,7 @@ int main() {
         COLOR_SUBRESOURCE_RANGE
     );
 
-    auto depthbuffer = create_image_with_view(
+    auto depthbuffer = ImageWithView(
         {.imageType = vk::ImageType::e2D,
          .format = vk::Format::eD32Sfloat,
          .extent =
@@ -474,7 +474,7 @@ int main() {
                 swapchain_create_info.imageFormat
             );
 
-            scene_referred_framebuffer = create_image_with_view(
+            scene_referred_framebuffer = ImageWithView(
                 {
                     .imageType = vk::ImageType::e2D,
                     .format = vk::Format::eR16G16B16A16Sfloat,
@@ -509,7 +509,7 @@ int main() {
                 {}
             );
 
-            depthbuffer = create_image_with_view(
+            depthbuffer = ImageWithView(
                 {.imageType = vk::ImageType::e2D,
                  .format = vk::Format::eD32Sfloat,
                  .extent =

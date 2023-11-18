@@ -29,7 +29,7 @@ std::vector<vk::raii::ImageView> create_swapchain_image_views(
     return views;
 }
 
-ImageWithView create_image_with_view(
+ImageWithView ImageWithView::create_image_with_view(
     vk::ImageCreateInfo create_info,
     vma::Allocator allocator,
     const vk::raii::Device& device,
@@ -44,5 +44,5 @@ ImageWithView create_image_with_view(
          .format = create_info.format,
          .subresourceRange = subresource_range}
     );
-    return {.image = std::move(image), .view = std::move(view)};
+    return ImageWithView(std::move(image), std::move(view));
 }

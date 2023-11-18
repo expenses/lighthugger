@@ -139,9 +139,8 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
         vk::DescriptorSetLayoutBinding {
             .binding = 6,
             .descriptorType = vk::DescriptorType::eSampledImage,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
             .descriptorCount = 512,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
         },
     };
 

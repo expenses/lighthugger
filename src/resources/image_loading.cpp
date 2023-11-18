@@ -1,7 +1,7 @@
 #include "image_loading.h"
 
 #include "dds.h"
-#include "sync.h"
+#include "../sync.h"
 
 vk::Format translate_dxgi_to_vulkan(DXGI_FORMAT dxgi_format) {
     switch (dxgi_format) {
@@ -71,7 +71,7 @@ ImageWithView load_dds(
 
     auto format = translate_dxgi_to_vulkan(header10.dxgiFormat);
 
-    auto offset = sizeof dwMagic + sizeof header + sizeof header10;
+    auto data_offset = sizeof dwMagic + sizeof header + sizeof header10;
 
     auto image_type = translate_resource_dimension(header10.resourceDimension);
     auto image_view_type =
@@ -84,10 +84,9 @@ ImageWithView load_dds(
     // Todo: actually implement this properly based on image format.
     auto bits_per_pixel = depth > 1 ? 32 : 4;
 
-    auto current_pos = stream.tellg();
     stream.seekg(0, stream.end);
-    auto bytes_remaining = uint32_t(stream.tellg() - current_pos);
-    stream.seekg(current_pos, stream.beg);
+    auto bytes_remaining = uint32_t(stream.tellg()) - data_offset;
+    stream.seekg(data_offset, stream.beg);
 
     auto mip_levels = header.dwMipMapCount;
 
@@ -101,7 +100,7 @@ ImageWithView load_dds(
 
     auto image_name = std::string(filepath) + " image";
 
-    auto image = create_image_with_view(
+    auto image = ImageWithView(
         vk::ImageCreateInfo {
             .imageType = image_type,
             .format = format,
