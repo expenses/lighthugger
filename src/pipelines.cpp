@@ -55,6 +55,12 @@ const auto DEPTH_WRITE_GREATER = vk::PipelineDepthStencilStateCreateInfo {
     .depthCompareOp = vk::CompareOp::eGreater,
 };
 
+const auto DEPTH_WRITE_LESS = vk::PipelineDepthStencilStateCreateInfo {
+    .depthTestEnable = true,
+    .depthWriteEnable = true,
+    .depthCompareOp = vk::CompareOp::eLess,
+};
+
 const auto DEPTH_TEST_EQUAL = vk::PipelineDepthStencilStateCreateInfo {
     .depthTestEnable = true,
     .depthWriteEnable = false,
@@ -91,6 +97,19 @@ create_shader_from_file(const vk::raii::Device& device, const char* filepath) {
     return shader;
 }
 
+vk::raii::Pipeline name_pipeline(
+    vk::raii::Pipeline pipeline,
+    const vk::raii::Device& device,
+    const char* name
+) {
+    VkPipeline c_pipeline = *pipeline;
+    device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+        .objectType = vk::ObjectType::ePipeline,
+        .objectHandle = reinterpret_cast<uint64_t>(c_pipeline),
+        .pObjectName = name});
+    return pipeline;
+}
+
 DescriptorSetLayouts
 create_descriptor_set_layouts(const vk::raii::Device& device) {
     auto everything_bindings = std::array {
@@ -106,7 +125,8 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .binding = 1,
             .descriptorType = vk::DescriptorType::eUniformBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eVertex,
+            .stageFlags = vk::ShaderStageFlagBits::eVertex
+                | vk::ShaderStageFlagBits::eCompute,
         },
         // hdr framebuffer
         vk::DescriptorSetLayoutBinding {
@@ -115,12 +135,13 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eFragment,
         },
-        // sampler
+        // clamp sampler
         vk::DescriptorSetLayoutBinding {
             .binding = 3,
             .descriptorType = vk::DescriptorType::eSampler,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment
+                | vk::ShaderStageFlagBits::eCompute,
         },
         // display transform LUT
         vk::DescriptorSetLayoutBinding {
@@ -129,24 +150,47 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eFragment,
         },
+        // repeat sampler
         vk::DescriptorSetLayoutBinding {
             .binding = 5,
             .descriptorType = vk::DescriptorType::eSampler,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eFragment,
         },
-        // Bindless images
+        // depthbuffer
         vk::DescriptorSetLayoutBinding {
             .binding = 6,
+            .descriptorType = vk::DescriptorType::eSampledImage,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        },
+        // depth info buffer
+        vk::DescriptorSetLayoutBinding {
+            .binding = 7,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute
+                | vk::ShaderStageFlagBits::eVertex,
+        },
+        // shadow map
+        vk::DescriptorSetLayoutBinding {
+            .binding = 8,
+            .descriptorType = vk::DescriptorType::eSampledImage,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+        },
+        // Bindless images
+        vk::DescriptorSetLayoutBinding {
+            .binding = 9,
             .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 512,
             .stageFlags = vk::ShaderStageFlagBits::eFragment,
         },
     };
 
-    std::array<vk::DescriptorBindingFlags, 7> flags;
+    std::array<vk::DescriptorBindingFlags, 10> flags;
     // Set the images as being partially bound, so not all slots have to be used.
-    flags[6] = vk::DescriptorBindingFlagBits::ePartiallyBound;
+    flags[9] = vk::DescriptorBindingFlagBits::ePartiallyBound;
 
     assert(flags.size() == everything_bindings.size());
 
@@ -191,6 +235,9 @@ Pipelines Pipelines::compile_pipelines(
         "compiled_shaders/display_transform.spv"
     );
 
+    auto read_depth =
+        create_shader_from_file(device, "compiled_shaders/read_depth.spv");
+
     auto blit_stages = std::array {
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eVertex,
@@ -219,6 +266,12 @@ Pipelines Pipelines::compile_pipelines(
         .pName = "depth_only",
     }};
 
+    auto shadow_pass_stage = std::array {vk::PipelineShaderStageCreateInfo {
+        .stage = vk::ShaderStageFlagBits::eVertex,
+        .module = *render_geometry,
+        .pName = "shadow_pass",
+    }};
+
     auto swapchain_format_rendering_info = vk::PipelineRenderingCreateInfoKHR {
         .colorAttachmentCount = 1,
         .pColorAttachmentFormats = &swapchain_format};
@@ -233,7 +286,7 @@ Pipelines Pipelines::compile_pipelines(
     auto depth_only_rendering_info = vk::PipelineRenderingCreateInfoKHR {
         .depthAttachmentFormat = vk::Format::eD32Sfloat};
 
-    auto pipeline_infos =
+    auto graphics_pipeline_infos =
         std::array {// display_transform
                     vk::GraphicsPipelineCreateInfo {
                         .pNext = &swapchain_format_rendering_info,
@@ -277,14 +330,65 @@ Pipelines Pipelines::compile_pipelines(
                         .pColorBlendState = &EMPTY_BLEND_STATE,
                         .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
                         .layout = *pipeline_layout,
+                    },
+                    vk::GraphicsPipelineCreateInfo {
+                        .pNext = &depth_only_rendering_info,
+                        .stageCount = shadow_pass_stage.size(),
+                        .pStages = shadow_pass_stage.data(),
+                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
+                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
+                        .pRasterizationState = &FILL_RASTERIZATION,
+                        .pMultisampleState = &NO_MULTISAMPLING,
+                        .pDepthStencilState = &DEPTH_WRITE_LESS,
+                        .pColorBlendState = &EMPTY_BLEND_STATE,
+                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+                        .layout = *pipeline_layout,
                     }};
 
-    auto pipelines = device.createGraphicsPipelines(nullptr, pipeline_infos);
+    auto compute_pipeline_infos = std::array {
+        vk::ComputePipelineCreateInfo {
+            .stage =
+                vk::PipelineShaderStageCreateInfo {
+                    .stage = vk::ShaderStageFlagBits::eCompute,
+                    .module = *read_depth,
+                    .pName = "read_depth",
+                },
+            .layout = *pipeline_layout},
+        vk::ComputePipelineCreateInfo {
+            .stage =
+                vk::PipelineShaderStageCreateInfo {
+                    .stage = vk::ShaderStageFlagBits::eCompute,
+                    .module = *read_depth,
+                    .pName = "generate_matrices",
+                },
+            .layout = *pipeline_layout}};
+
+    auto graphics_pipelines =
+        device.createGraphicsPipelines(nullptr, graphics_pipeline_infos);
+
+    auto compute_pipelines =
+        device.createComputePipelines(nullptr, compute_pipeline_infos);
 
     return Pipelines {
-        .display_transform = std::move(pipelines[0]),
-        .render_geometry = std::move(pipelines[1]),
-        .geometry_depth_prepass = std::move(pipelines[2]),
+        .display_transform = std::move(graphics_pipelines[0]),
+        .render_geometry = std::move(graphics_pipelines[1]),
+        .geometry_depth_prepass = std::move(graphics_pipelines[2]),
+        .shadow_pass = name_pipeline(
+            std::move(graphics_pipelines[3]),
+            device,
+            "shadow_pass"
+        ),
+        .read_depth = name_pipeline(
+            std::move(compute_pipelines[0]),
+            device,
+            "read_depth"
+        ),
+        .generate_matrices = name_pipeline(
+            std::move(compute_pipelines[1]),
+            device,
+            "generate_matrices"
+        ),
         .pipeline_layout = std::move(pipeline_layout),
         .dsl = std::move(descriptor_set_layouts),
     };

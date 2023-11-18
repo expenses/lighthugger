@@ -9,6 +9,7 @@
 #include "sync.h"
 
 const auto u64_max = std::numeric_limits<uint64_t>::max();
+const auto u32_max = std::numeric_limits<uint32_t>::max();
 
 // Sources:
 // https://vkguide.dev
@@ -29,6 +30,86 @@ static void key_callback(
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
+}
+
+struct ResizingResources {
+    ImageWithView scene_referred_framebuffer;
+    ImageWithView depthbuffer;
+
+    ResizingResources(
+        const vk::raii::Device& device,
+        vma::Allocator allocator,
+        vk::Extent2D extent
+    ) :
+        scene_referred_framebuffer(ImageWithView(
+            {
+                .imageType = vk::ImageType::e2D,
+                .format = vk::Format::eR16G16B16A16Sfloat,
+                .extent =
+                    vk::Extent3D {
+                        .width = extent.width,
+                        .height = extent.height,
+                        .depth = 1,
+                    },
+                .mipLevels = 1,
+                .arrayLayers = 1,
+                .usage = vk::ImageUsageFlagBits::eColorAttachment
+                    | vk::ImageUsageFlagBits::eSampled,
+            },
+            allocator,
+            device,
+            "scene_referred_framebuffer",
+            COLOR_SUBRESOURCE_RANGE
+        )),
+        depthbuffer(ImageWithView(
+            {.imageType = vk::ImageType::e2D,
+             .format = vk::Format::eD32Sfloat,
+             .extent =
+                 vk::Extent3D {
+                     .width = extent.width,
+                     .height = extent.height,
+                     .depth = 1,
+                 },
+             .mipLevels = 1,
+             .arrayLayers = 1,
+             .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment
+                 | vk::ImageUsageFlagBits::eSampled},
+            allocator,
+            device,
+            "depthbuffer",
+            DEPTH_SUBRESOURCE_RANGE
+        )) {}
+};
+
+struct Resources {
+    ResizingResources resizing;
+    PersistentlyMappedBuffer uniform_buffer;
+    ImageWithView shadowmap;
+};
+
+uint32_t dispatch_size(uint32_t width, uint32_t workgroup_size) {
+    return uint32_t(std::ceil(float(width) / float(workgroup_size)));
+}
+
+void set_scissor_and_viewport(
+    const vk::raii::CommandBuffer& command_buffer,
+    uint32_t width,
+    uint32_t height
+) {
+    command_buffer.setScissor(
+        0,
+        {vk::Rect2D {
+            .offset = {},
+            .extent = vk::Extent2D {.width = width, .height = height}}}
+    );
+    command_buffer.setViewport(
+        0,
+        {vk::Viewport {
+            .width = static_cast<float>(width),
+            .height = static_cast<float>(height),
+            .minDepth = 0.0,
+            .maxDepth = 1.0}}
+    );
 }
 
 int main() {
@@ -204,45 +285,6 @@ int main() {
     vma::Allocator allocator;
     check_vk_result(vma::createAllocator(&allocatorCreateInfo, &allocator));
 
-    auto scene_referred_framebuffer = ImageWithView(
-        {
-            .imageType = vk::ImageType::e2D,
-            .format = vk::Format::eR16G16B16A16Sfloat,
-            .extent =
-                vk::Extent3D {
-                    .width = extent.width,
-                    .height = extent.height,
-                    .depth = 1,
-                },
-            .mipLevels = 1,
-            .arrayLayers = 1,
-            .usage = vk::ImageUsageFlagBits::eColorAttachment
-                | vk::ImageUsageFlagBits::eSampled,
-        },
-        allocator,
-        device,
-        "scene_referred_framebuffer",
-        COLOR_SUBRESOURCE_RANGE
-    );
-
-    auto depthbuffer = ImageWithView(
-        {.imageType = vk::ImageType::e2D,
-         .format = vk::Format::eD32Sfloat,
-         .extent =
-             vk::Extent3D {
-                 .width = extent.width,
-                 .height = extent.height,
-                 .depth = 1,
-             },
-         .mipLevels = 1,
-         .arrayLayers = 1,
-         .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment},
-        allocator,
-        device,
-        "depthbuffer",
-        DEPTH_SUBRESOURCE_RANGE
-    );
-
     auto command_buffers =
         device.allocateCommandBuffers(vk::CommandBufferAllocateInfo {
             .commandPool = *command_pool,
@@ -287,17 +329,37 @@ int main() {
 
     auto descriptor_set = DescriptorSet(std::move(descriptor_sets[0]));
 
-    auto uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
-        vk::BufferCreateInfo {
-            .size = sizeof(glm::mat4),
-            .usage = vk::BufferUsageFlagBits::eUniformBuffer},
-        {
-            .flags = vma::AllocationCreateFlagBits::eMapped
-                | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
-            .usage = vma::MemoryUsage::eAuto,
-        },
-        allocator
-    ));
+    auto resources = Resources {
+        .resizing = ResizingResources(device, allocator, extent),
+        .uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
+            vk::BufferCreateInfo {
+                .size = sizeof(Uniforms),
+                .usage = vk::BufferUsageFlagBits::eUniformBuffer},
+            {
+                .flags = vma::AllocationCreateFlagBits::eMapped
+                    | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+                .usage = vma::MemoryUsage::eAuto,
+            },
+            allocator
+        )),
+        .shadowmap = ImageWithView(
+            {.imageType = vk::ImageType::e2D,
+             .format = vk::Format::eD32Sfloat,
+             .extent =
+                 vk::Extent3D {
+                     .width = 1024,
+                     .height = 1024,
+                     .depth = 1,
+                 },
+             .mipLevels = 1,
+             .arrayLayers = 1,
+             .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment
+                 | vk::ImageUsageFlagBits::eSampled},
+            allocator,
+            device,
+            "shadowmap",
+            DEPTH_SUBRESOURCE_RANGE
+        )};
 
     auto clamp_sampler = device.createSampler({
         .magFilter = vk::Filter::eLinear,
@@ -382,12 +444,32 @@ int main() {
         buffer_addresses.size() * sizeof(MeshBufferAddresses)
     );
 
+    auto depth_info_buffer = AllocatedBuffer(
+        vk::BufferCreateInfo {
+            .size = sizeof(DepthInfoBuffer) * 2,
+            .usage = vk::BufferUsageFlagBits::eStorageBuffer
+                | vk::BufferUsageFlagBits::eTransferDst},
+        {
+            .usage = vma::MemoryUsage::eAuto,
+        },
+        allocator,
+        "depth_info_buffer"
+    );
+
     auto image_info = vk::DescriptorImageInfo {
-        .imageView = *scene_referred_framebuffer.view,
+        .imageView = *resources.resizing.scene_referred_framebuffer.view,
+        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
+
+    auto depthbuffer_image_info = vk::DescriptorImageInfo {
+        .imageView = *resources.resizing.depthbuffer.view,
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
 
     auto lut_image_info = vk::DescriptorImageInfo {
         .imageView = *display_transform_lut.view,
+        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
+
+    auto shadowmap_image_info = vk::DescriptorImageInfo {
+        .imageView = *resources.shadowmap.view,
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
 
     auto clamp_sampler_info =
@@ -401,7 +483,12 @@ int main() {
         .range = VK_WHOLE_SIZE};
 
     auto uniform_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = uniform_buffer.buffer.buffer,
+        .buffer = resources.uniform_buffer.buffer.buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE};
+
+    auto depth_info_buffer_info = vk::DescriptorBufferInfo {
+        .buffer = depth_info_buffer.buffer,
         .offset = 0,
         .range = VK_WHOLE_SIZE};
 
@@ -444,6 +531,24 @@ int main() {
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampler,
                 .pImageInfo = &repeat_sampler_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *descriptor_set.set,
+                .dstBinding = 6,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampledImage,
+                .pImageInfo = &depthbuffer_image_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *descriptor_set.set,
+                .dstBinding = 7,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eStorageBuffer,
+                .pBufferInfo = &depth_info_buffer_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *descriptor_set.set,
+                .dstBinding = 8,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampledImage,
+                .pImageInfo = &shadowmap_image_info},
         },
         {}
     );
@@ -478,57 +583,33 @@ int main() {
                 swapchain_create_info.imageFormat
             );
 
-            scene_referred_framebuffer = ImageWithView(
-                {
-                    .imageType = vk::ImageType::e2D,
-                    .format = vk::Format::eR16G16B16A16Sfloat,
-                    .extent =
-                        vk::Extent3D {
-                            .width = extent.width,
-                            .height = extent.height,
-                            .depth = 1,
-                        },
-                    .mipLevels = 1,
-                    .arrayLayers = 1,
-                    .usage = vk::ImageUsageFlagBits::eColorAttachment
-                        | vk::ImageUsageFlagBits::eSampled,
-                },
-                allocator,
-                device,
-                "scene_referred_framebuffer",
-                COLOR_SUBRESOURCE_RANGE
-            );
+            resources.resizing = ResizingResources(device, allocator, extent);
 
             image_info = vk::DescriptorImageInfo {
-                .imageView = *scene_referred_framebuffer.view,
+                .imageView =
+                    *resources.resizing.scene_referred_framebuffer.view,
+                .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
+
+            depthbuffer_image_info = vk::DescriptorImageInfo {
+                .imageView = *resources.resizing.depthbuffer.view,
                 .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
 
             device.updateDescriptorSets(
-                {vk::WriteDescriptorSet {
-                    .dstSet = *descriptor_set.set,
-                    .dstBinding = 2,
-                    .descriptorCount = 1,
-                    .descriptorType = vk::DescriptorType::eSampledImage,
-                    .pImageInfo = &image_info}},
+                {
+                    vk::WriteDescriptorSet {
+                        .dstSet = *descriptor_set.set,
+                        .dstBinding = 2,
+                        .descriptorCount = 1,
+                        .descriptorType = vk::DescriptorType::eSampledImage,
+                        .pImageInfo = &image_info},
+                    vk::WriteDescriptorSet {
+                        .dstSet = *descriptor_set.set,
+                        .dstBinding = 6,
+                        .descriptorCount = 1,
+                        .descriptorType = vk::DescriptorType::eSampledImage,
+                        .pImageInfo = &depthbuffer_image_info},
+                },
                 {}
-            );
-
-            depthbuffer = ImageWithView(
-                {.imageType = vk::ImageType::e2D,
-                 .format = vk::Format::eD32Sfloat,
-                 .extent =
-                     vk::Extent3D {
-                         .width = extent.width,
-                         .height = extent.height,
-                         .depth = 1,
-                     },
-                 .mipLevels = 1,
-                 .arrayLayers = 1,
-                 .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment},
-                allocator,
-                device,
-                "depthbuffer",
-                DEPTH_SUBRESOURCE_RANGE
             );
         }
 
@@ -555,9 +636,24 @@ int main() {
                 0.01
             );
 
-            auto matrix = perspective * view;
+            auto perspective_finite = reverse_z_perspective(
+                glm::radians(45.0f),
+                float(extent.width),
+                float(extent.height),
+                0.01,
+                1000.0
+            );
 
-            std::memcpy(uniform_buffer.mapped_ptr, &matrix, sizeof(matrix));
+            auto uniforms = Uniforms {
+                .combined_perspective_view = perspective * view,
+                .inv_perspective_view =
+                    glm::inverse(perspective_finite * view)};
+
+            std::memcpy(
+                resources.uniform_buffer.mapped_ptr,
+                &uniforms,
+                sizeof(uniforms)
+            );
         }
 
         // Reset the command pool instead of resetting the single command buffer as
@@ -574,22 +670,25 @@ int main() {
         );
 
         {
+            command_buffer.fillBuffer(depth_info_buffer.buffer, 0, 4, u32_max);
+            command_buffer.fillBuffer(depth_info_buffer.buffer, 4, 4, 0);
+
             TracyVkZone(tracy_ctx, *command_buffer, "main")
 
-                command_buffer.setScissor(
-                    0,
-                    {vk::Rect2D {.offset = {}, .extent = extent}}
+                set_scissor_and_viewport(
+                    command_buffer,
+                    extent.width,
+                    extent.height
                 );
-            command_buffer.setViewport(
-                0,
-                {vk::Viewport {
-                    .width = static_cast<float>(extent.width),
-                    .height = static_cast<float>(extent.height),
-                    .minDepth = 0.0,
-                    .maxDepth = 1.0}}
-            );
             command_buffer.bindDescriptorSets(
                 vk::PipelineBindPoint::eGraphics,
+                *pipelines.pipeline_layout,
+                0,
+                {*descriptor_set.set},
+                {}
+            );
+            command_buffer.bindDescriptorSets(
+                vk::PipelineBindPoint::eCompute,
                 *pipelines.pipeline_layout,
                 0,
                 {*descriptor_set.set},
@@ -604,27 +703,132 @@ int main() {
                         .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
                         .discard_contents = true,
                         .queue_family = graphics_queue_family,
-                        .image = scene_referred_framebuffer.image.image},
+                        .image = resources.resizing.scene_referred_framebuffer
+                                     .image.image},
                     ImageBarrier {
                         .prev_access = THSVS_ACCESS_NONE,
                         .next_access =
                             THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
                         .discard_contents = true,
                         .queue_family = graphics_queue_family,
-                        .image = depthbuffer.image.image,
-                        .subresource_range = DEPTH_SUBRESOURCE_RANGE}}
+                        .image = resources.resizing.depthbuffer.image.image,
+                        .subresource_range = DEPTH_SUBRESOURCE_RANGE},
+
+                    ImageBarrier {
+                        .prev_access = THSVS_ACCESS_NONE,
+                        .next_access =
+                            THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
+                        .discard_contents = true,
+                        .queue_family = graphics_queue_family,
+                        .image = resources.shadowmap.image.image,
+                        .subresource_range = DEPTH_SUBRESOURCE_RANGE}
+
+                }
             );
 
             vk::RenderingAttachmentInfoKHR framebuffer_attachment_info = {
-                .imageView = *scene_referred_framebuffer.view,
+                .imageView =
+                    *resources.resizing.scene_referred_framebuffer.view,
                 .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
                 .loadOp = vk::AttachmentLoadOp::eClear,
                 .storeOp = vk::AttachmentStoreOp::eStore,
             };
             vk::RenderingAttachmentInfoKHR depth_attachment_info = {
-                .imageView = *depthbuffer.view,
+                .imageView = *resources.resizing.depthbuffer.view,
                 .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
                 .loadOp = vk::AttachmentLoadOp::eClear,
+                .storeOp = vk::AttachmentStoreOp::eStore,
+            };
+            command_buffer.beginRendering(
+                {.renderArea =
+                     {
+                         .offset = {},
+                         .extent = extent,
+                     },
+                 .layerCount = 1,
+                 .pDepthAttachment = &depth_attachment_info}
+            );
+            // Depth pre-pass
+            {
+                TracyVkZone(tracy_ctx, *command_buffer, "depth pre pass")
+
+                    command_buffer.bindPipeline(
+                        vk::PipelineBindPoint::eGraphics,
+                        *pipelines.geometry_depth_prepass
+                    );
+                command_buffer.draw(powerplant.num_indices, 1, 0, 0);
+            }
+            command_buffer.endRendering();
+
+            insert_color_image_barriers(
+                command_buffer,
+                std::array {ImageBarrier {
+                    .prev_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
+                    .next_access =
+                        THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+                    .discard_contents = false,
+                    .queue_family = graphics_queue_family,
+                    .image = resources.resizing.depthbuffer.image.image,
+                    .subresource_range = DEPTH_SUBRESOURCE_RANGE}}
+            );
+
+            {
+                TracyVkZone(tracy_ctx, *command_buffer, "depth reduction")
+                    command_buffer.bindPipeline(
+                        vk::PipelineBindPoint::eCompute,
+                        *pipelines.read_depth
+                    );
+                command_buffer.dispatch(
+                    dispatch_size(extent.width, 8),
+                    dispatch_size(extent.height, 8),
+                    1
+                );
+            }
+            {
+                TracyVkZone(tracy_ctx, *command_buffer, "depth reduction")
+                    command_buffer.bindPipeline(
+                        vk::PipelineBindPoint::eCompute,
+                        *pipelines.generate_matrices
+                    );
+                command_buffer.dispatch(1, 1, 1);
+            }
+
+            set_scissor_and_viewport(command_buffer, 1024, 1024);
+            {
+                vk::RenderingAttachmentInfoKHR depth_attachment_info = {
+                    .imageView = *resources.shadowmap.view,
+                    .imageLayout =
+                        vk::ImageLayout::eDepthStencilAttachmentOptimal,
+                    .loadOp = vk::AttachmentLoadOp::eClear,
+                    .storeOp = vk::AttachmentStoreOp::eStore,
+                    .clearValue = {.depthStencil = 1.0}};
+                command_buffer.beginRendering(
+                    {.renderArea =
+                         {
+                             .offset = {},
+                             .extent =
+                                 vk::Extent2D {.width = 1024, .height = 1024},
+                         },
+                     .layerCount = 1,
+                     .pDepthAttachment = &depth_attachment_info}
+                );
+                command_buffer.bindPipeline(
+                    vk::PipelineBindPoint::eGraphics,
+                    *pipelines.shadow_pass
+                );
+                command_buffer.draw(powerplant.num_indices, 1, 0, 0);
+                command_buffer.endRendering();
+            }
+            set_scissor_and_viewport(
+                command_buffer,
+                extent.width,
+                extent.height
+            );
+
+            depth_attachment_info = {
+                .imageView = *resources.resizing.depthbuffer.view,
+                .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+                .loadOp = vk::AttachmentLoadOp::eLoad,
                 .storeOp = vk::AttachmentStoreOp::eStore,
             };
             command_buffer.beginRendering(
@@ -638,16 +842,6 @@ int main() {
                  .pColorAttachments = &framebuffer_attachment_info,
                  .pDepthAttachment = &depth_attachment_info}
             );
-            // Depth pre-pass
-            {
-                TracyVkZone(tracy_ctx, *command_buffer, "depth pre pass")
-
-                    command_buffer.bindPipeline(
-                        vk::PipelineBindPoint::eGraphics,
-                        *pipelines.geometry_depth_prepass
-                    );
-                command_buffer.draw(powerplant.num_indices, 1, 0, 0);
-            }
             {
                 TracyVkZone(tracy_ctx, *command_buffer, "main pass")
 
@@ -668,13 +862,26 @@ int main() {
                             THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
                         .discard_contents = false,
                         .queue_family = graphics_queue_family,
-                        .image = scene_referred_framebuffer.image.image},
+                        .image = resources.resizing.scene_referred_framebuffer
+                                     .image.image},
                     ImageBarrier {
                         .prev_access = THSVS_ACCESS_NONE,
                         .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
                         .discard_contents = true,
                         .queue_family = graphics_queue_family,
-                        .image = swapchain_images[swapchain_image_index]}}
+                        .image = swapchain_images[swapchain_image_index]},
+
+                    ImageBarrier {
+                        .prev_access =
+                            THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
+                        .next_access =
+                            THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+                        .discard_contents = false,
+                        .queue_family = graphics_queue_family,
+                        .image = resources.shadowmap.image.image,
+                        .subresource_range = DEPTH_SUBRESOURCE_RANGE}
+
+                }
             );
 
             vk::RenderingAttachmentInfoKHR color_attachment_info = {

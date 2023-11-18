@@ -31,24 +31,5 @@ struct DescriptorSet {
 
     DescriptorSet(vk::raii::DescriptorSet set_) : set(std::move(set_)) {}
 
-    uint32_t write_image(const ImageWithView& image, vk::Device device) {
-        auto index = tracker.push();
-
-        auto image_info = vk::DescriptorImageInfo {
-            .imageView = *image.view,
-            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
-
-        device.updateDescriptorSets(
-            {vk::WriteDescriptorSet {
-                .dstSet = *set,
-                .dstBinding = 6,
-                .dstArrayElement = index,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampledImage,
-                .pImageInfo = &image_info}},
-            {}
-        );
-
-        return index;
-    }
+    uint32_t write_image(const ImageWithView& image, vk::Device device);
 };

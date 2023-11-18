@@ -6,6 +6,9 @@ struct Pipelines {
     vk::raii::Pipeline display_transform;
     vk::raii::Pipeline render_geometry;
     vk::raii::Pipeline geometry_depth_prepass;
+    vk::raii::Pipeline shadow_pass;
+    vk::raii::Pipeline read_depth;
+    vk::raii::Pipeline generate_matrices;
     vk::raii::PipelineLayout pipeline_layout;
 
     DescriptorSetLayouts dsl;
