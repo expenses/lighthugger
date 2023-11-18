@@ -67,7 +67,7 @@ Mesh load_obj(
         images.push_back(std::move(albedo_image));
     }
 
-    dbg(attrib.vertices.size(), attrib.texcoords.size());
+    //dbg(attrib.vertices.size(), attrib.texcoords.size());
 
     std::vector<uint32_t> indices;
     std::vector<uint32_t> material_ids;

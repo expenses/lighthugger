@@ -40,6 +40,10 @@ resource_dimension_to_view_type(D3D10_RESOURCE_DIMENSION dimension) {
     }
 }
 
+uint32_t round_up(uint32_t value, uint32_t round_to) {
+    return uint32_t(std::ceil(float(value) / float(round_to))) * round_to;
+}
+
 ImageWithView load_dds(
     const char* filepath,
     vma::Allocator allocator,
@@ -77,15 +81,13 @@ ImageWithView load_dds(
     auto height = header.dwHeight;
     auto depth = std::max(header.dwDepth, 1u);
 
-    auto bytes_per_pixel = 4;
+    // Todo: actually implement this properly based on image format.
+    auto bits_per_pixel = depth > 1 ? 32 : 4;
 
     auto current_pos = stream.tellg();
     stream.seekg(0, stream.end);
     auto bytes_remaining = uint32_t(stream.tellg() - current_pos);
     stream.seekg(current_pos, stream.beg);
-
-    dbg(header.dwMipMapCount, bytes_remaining);
-    //dbg(offset, vk::to_string(format), header.dwWidth, header.dwHeight, header10.resourceDimension);
 
     auto extent = vk::Extent3D {
         .width = width,
@@ -109,6 +111,13 @@ ImageWithView load_dds(
         allocator,
         device,
         image_name.data(),
+        {
+            .aspectMask = vk::ImageAspectFlagBits::eColor,
+            .baseMipLevel = 0,
+            .levelCount = mip_levels,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        },
         image_view_type
     );
 
@@ -140,26 +149,25 @@ ImageWithView load_dds(
             .discard_contents = true,
             .queue_family = graphics_queue_family,
             .image = image.image.image,
-            .subresource_range = {
-    .aspectMask = vk::ImageAspectFlagBits::eColor,
-    .baseMipLevel = 0,
-    .levelCount = mip_levels,
-    .baseArrayLayer = 0,
-    .layerCount = 1,
-}}}
+            .subresource_range =
+                {
+                    .aspectMask = vk::ImageAspectFlagBits::eColor,
+                    .baseMipLevel = 0,
+                    .levelCount = mip_levels,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                }}}
     );
 
     uint64_t buffer_offset = 0;
 
-    for (uint32_t i = 0; i < std::max(int(mip_levels) - 3, 0); i++) {
+    std::vector<vk::BufferImageCopy> regions(mip_levels);
 
+    for (uint32_t i = 0; i < mip_levels; i++) {
+        auto level_width = std::max(width >> i, 1u);
+        auto level_height = std::max(height >> i, 1u);
 
-
-    command_buffer.copyBufferToImage(
-        staging_buffer.buffer,
-        image.image.image,
-        vk::ImageLayout::eTransferDstOptimal,
-        {vk::BufferImageCopy {
+        regions[i] = vk::BufferImageCopy {
             .bufferOffset = buffer_offset,
             .imageSubresource =
                 {
@@ -168,14 +176,29 @@ ImageWithView load_dds(
                     .baseArrayLayer = 0,
                     .layerCount = 1,
                 },
-            .imageOffset = {},
-            .imageExtent = extent}}
-    );
+            .imageExtent = vk::Extent3D {
+                .width = level_width,
+                .height = level_height,
+                .depth = depth}};
 
-    buffer_offset += (extent.width * extent.height) / 2;
-    extent.width = std::max(extent.width >> 1, 1u);
-    extent.height = std::max(extent.height >> 1, 1u);
+        // We need to round up the width and heights here because for block
+        // compressed textures, the minimum amount of data a miplevel can use
+        // is the equivalent of 4x4 pixels, even when the actual mip size is smaller.
+        buffer_offset +=
+            (round_up(level_width, 4) * round_up(level_height, 4) * depth)
+            * bits_per_pixel / 8;
     }
+
+    // Make sure we use every byte of the dds file, because otherwise we're probably doing something wrong.
+    //dbg(buffer_offset, bytes_remaining, filepath, bits_per_pixel);
+    assert(buffer_offset == bytes_remaining);
+
+    command_buffer.copyBufferToImage(
+        staging_buffer.buffer,
+        image.image.image,
+        vk::ImageLayout::eTransferDstOptimal,
+        regions
+    );
 
     insert_color_image_barriers(
         command_buffer,

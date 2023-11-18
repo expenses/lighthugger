@@ -49,6 +49,6 @@ ImageWithView create_image_with_view(
     vma::Allocator allocator,
     const vk::raii::Device& device,
     const char* name,
-    vk::ImageViewType view_type = vk::ImageViewType::e2D,
-    vk::ImageSubresourceRange subresource_range = COLOR_SUBRESOURCE_RANGE
+    vk::ImageSubresourceRange subresource_range,
+    vk::ImageViewType view_type = vk::ImageViewType::e2D
 );

@@ -34,13 +34,9 @@ ImageWithView create_image_with_view(
     vma::Allocator allocator,
     const vk::raii::Device& device,
     const char* name,
-    vk::ImageViewType view_type,
-    vk::ImageSubresourceRange subresource_range
+    vk::ImageSubresourceRange subresource_range,
+    vk::ImageViewType view_type
 ) {
-    // TODO: handle subres ranges better
-    subresource_range.levelCount = create_info.mipLevels;
-    dbg(subresource_range.levelCount);
-
     auto image = AllocatedImage(create_info, allocator, name);
     auto view = device.createImageView(
         {.image = image.image,

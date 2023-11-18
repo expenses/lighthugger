@@ -7,7 +7,6 @@ AllocatedImage::AllocatedImage(
     vma::Allocator allocator_,
     const char* name
 ) {
-    //dbg(create_info.extent.depth);
     allocator = allocator_;
     vma::AllocationCreateInfo alloc_info = {.usage = vma::MemoryUsage::eAuto};
     check_vk_result(allocator.createImage(

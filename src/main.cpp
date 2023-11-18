@@ -220,7 +220,8 @@ int main() {
         },
         allocator,
         device,
-        "scene_referred_framebuffer"
+        "scene_referred_framebuffer",
+        COLOR_SUBRESOURCE_RANGE
     );
 
     auto depthbuffer = create_image_with_view(
@@ -238,7 +239,6 @@ int main() {
         allocator,
         device,
         "depthbuffer",
-        vk::ImageViewType::e2D,
         DEPTH_SUBRESOURCE_RANGE
     );
 
@@ -491,7 +491,8 @@ int main() {
                 },
                 allocator,
                 device,
-                "scene_referred_framebuffer"
+                "scene_referred_framebuffer",
+                COLOR_SUBRESOURCE_RANGE
             );
 
             image_info = vk::DescriptorImageInfo {
@@ -523,7 +524,6 @@ int main() {
                 allocator,
                 device,
                 "depthbuffer",
-                vk::ImageViewType::e2D,
                 DEPTH_SUBRESOURCE_RANGE
             );
         }
