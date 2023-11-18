@@ -89,13 +89,15 @@ ImageWithView load_dds(
     auto bytes_remaining = uint32_t(stream.tellg() - current_pos);
     stream.seekg(current_pos, stream.beg);
 
-    auto extent = vk::Extent3D {
-        .width = width,
-        .height = height,
-        .depth = depth,
-    };
-
     auto mip_levels = header.dwMipMapCount;
+
+    auto subresource_range = vk::ImageSubresourceRange {
+        .aspectMask = vk::ImageAspectFlagBits::eColor,
+        .baseMipLevel = 0,
+        .levelCount = mip_levels,
+        .baseArrayLayer = 0,
+        .layerCount = 1,
+    };
 
     auto image_name = std::string(filepath) + " image";
 
@@ -103,7 +105,12 @@ ImageWithView load_dds(
         vk::ImageCreateInfo {
             .imageType = image_type,
             .format = format,
-            .extent = extent,
+            .extent =
+                vk::Extent3D {
+                    .width = width,
+                    .height = height,
+                    .depth = depth,
+                },
             .mipLevels = mip_levels,
             .arrayLayers = 1,
             .usage = vk::ImageUsageFlagBits::eSampled
@@ -111,13 +118,7 @@ ImageWithView load_dds(
         allocator,
         device,
         image_name.data(),
-        {
-            .aspectMask = vk::ImageAspectFlagBits::eColor,
-            .baseMipLevel = 0,
-            .levelCount = mip_levels,
-            .baseArrayLayer = 0,
-            .layerCount = 1,
-        },
+        subresource_range,
         image_view_type
     );
 
@@ -149,14 +150,7 @@ ImageWithView load_dds(
             .discard_contents = true,
             .queue_family = graphics_queue_family,
             .image = image.image.image,
-            .subresource_range =
-                {
-                    .aspectMask = vk::ImageAspectFlagBits::eColor,
-                    .baseMipLevel = 0,
-                    .levelCount = mip_levels,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1,
-                }}}
+            .subresource_range = subresource_range}}
     );
 
     uint64_t buffer_offset = 0;
