@@ -187,6 +187,7 @@ int main() {
     );
 
     vk::raii::CommandPool command_pool = device.createCommandPool({
+        .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
         .queueFamilyIndex = graphics_queue_family,
     });
 
@@ -447,6 +448,9 @@ int main() {
         {}
     );
 
+    auto tracy_ctx =
+        TracyVkContext(*phys_device, *device, *graphics_queue, *command_buffer);
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
@@ -569,139 +573,151 @@ int main() {
             {.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit}
         );
 
-        command_buffer.setScissor(
-            0,
-            {vk::Rect2D {.offset = {}, .extent = extent}}
-        );
-        command_buffer.setViewport(
-            0,
-            {vk::Viewport {
-                .width = static_cast<float>(extent.width),
-                .height = static_cast<float>(extent.height),
-                .minDepth = 0.0,
-                .maxDepth = 1.0}}
-        );
-        command_buffer.bindDescriptorSets(
-            vk::PipelineBindPoint::eGraphics,
-            *pipelines.pipeline_layout,
-            0,
-            {*descriptor_set.set},
-            {}
-        );
-
-        insert_color_image_barriers(
-            command_buffer,
-            std::array {
-                ImageBarrier {
-                    .prev_access = THSVS_ACCESS_NONE,
-                    .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-                    .discard_contents = true,
-                    .queue_family = graphics_queue_family,
-                    .image = scene_referred_framebuffer.image.image},
-                ImageBarrier {
-                    .prev_access = THSVS_ACCESS_NONE,
-                    .next_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
-                    .discard_contents = true,
-                    .queue_family = graphics_queue_family,
-                    .image = depthbuffer.image.image,
-                    .subresource_range = DEPTH_SUBRESOURCE_RANGE}}
-        );
-
-        vk::RenderingAttachmentInfoKHR framebuffer_attachment_info = {
-            .imageView = *scene_referred_framebuffer.view,
-            .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-            .loadOp = vk::AttachmentLoadOp::eClear,
-            .storeOp = vk::AttachmentStoreOp::eStore,
-        };
-        vk::RenderingAttachmentInfoKHR depth_attachment_info = {
-            .imageView = *depthbuffer.view,
-            .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-            .loadOp = vk::AttachmentLoadOp::eClear,
-            .storeOp = vk::AttachmentStoreOp::eStore,
-        };
-        command_buffer.beginRendering(
-            {.renderArea =
-                 {
-                     .offset = {},
-                     .extent = extent,
-                 },
-             .layerCount = 1,
-             .colorAttachmentCount = 1,
-             .pColorAttachments = &framebuffer_attachment_info,
-             .pDepthAttachment = &depth_attachment_info}
-        );
-        // Depth pre-pass
         {
+            TracyVkZone(tracy_ctx, *command_buffer, "main")
+
+                command_buffer.setScissor(
+                    0,
+                    {vk::Rect2D {.offset = {}, .extent = extent}}
+                );
+            command_buffer.setViewport(
+                0,
+                {vk::Viewport {
+                    .width = static_cast<float>(extent.width),
+                    .height = static_cast<float>(extent.height),
+                    .minDepth = 0.0,
+                    .maxDepth = 1.0}}
+            );
+            command_buffer.bindDescriptorSets(
+                vk::PipelineBindPoint::eGraphics,
+                *pipelines.pipeline_layout,
+                0,
+                {*descriptor_set.set},
+                {}
+            );
+
+            insert_color_image_barriers(
+                command_buffer,
+                std::array {
+                    ImageBarrier {
+                        .prev_access = THSVS_ACCESS_NONE,
+                        .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
+                        .discard_contents = true,
+                        .queue_family = graphics_queue_family,
+                        .image = scene_referred_framebuffer.image.image},
+                    ImageBarrier {
+                        .prev_access = THSVS_ACCESS_NONE,
+                        .next_access =
+                            THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
+                        .discard_contents = true,
+                        .queue_family = graphics_queue_family,
+                        .image = depthbuffer.image.image,
+                        .subresource_range = DEPTH_SUBRESOURCE_RANGE}}
+            );
+
+            vk::RenderingAttachmentInfoKHR framebuffer_attachment_info = {
+                .imageView = *scene_referred_framebuffer.view,
+                .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+                .loadOp = vk::AttachmentLoadOp::eClear,
+                .storeOp = vk::AttachmentStoreOp::eStore,
+            };
+            vk::RenderingAttachmentInfoKHR depth_attachment_info = {
+                .imageView = *depthbuffer.view,
+                .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+                .loadOp = vk::AttachmentLoadOp::eClear,
+                .storeOp = vk::AttachmentStoreOp::eStore,
+            };
+            command_buffer.beginRendering(
+                {.renderArea =
+                     {
+                         .offset = {},
+                         .extent = extent,
+                     },
+                 .layerCount = 1,
+                 .colorAttachmentCount = 1,
+                 .pColorAttachments = &framebuffer_attachment_info,
+                 .pDepthAttachment = &depth_attachment_info}
+            );
+            // Depth pre-pass
+            {
+                TracyVkZone(tracy_ctx, *command_buffer, "depth pre pass")
+
+                    command_buffer.bindPipeline(
+                        vk::PipelineBindPoint::eGraphics,
+                        *pipelines.geometry_depth_prepass
+                    );
+                command_buffer.draw(powerplant.num_indices, 1, 0, 0);
+            }
+            {
+                TracyVkZone(tracy_ctx, *command_buffer, "main pass")
+
+                    command_buffer.bindPipeline(
+                        vk::PipelineBindPoint::eGraphics,
+                        *pipelines.render_geometry
+                    );
+                command_buffer.draw(powerplant.num_indices, 1, 0, 0);
+            }
+            command_buffer.endRendering();
+
+            insert_color_image_barriers(
+                command_buffer,
+                std::array {
+                    ImageBarrier {
+                        .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
+                        .next_access =
+                            THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+                        .discard_contents = false,
+                        .queue_family = graphics_queue_family,
+                        .image = scene_referred_framebuffer.image.image},
+                    ImageBarrier {
+                        .prev_access = THSVS_ACCESS_NONE,
+                        .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
+                        .discard_contents = true,
+                        .queue_family = graphics_queue_family,
+                        .image = swapchain_images[swapchain_image_index]}}
+            );
+
+            vk::RenderingAttachmentInfoKHR color_attachment_info = {
+                .imageView = *swapchain_image_views[swapchain_image_index],
+                .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+                .loadOp = vk::AttachmentLoadOp::eDontCare,
+                .storeOp = vk::AttachmentStoreOp::eStore,
+                .clearValue = {}};
+            // This just clears the swapchain image with the clear color.
+            // Wraps vkCmdBeginRendering
+            command_buffer.beginRendering(
+                {.renderArea =
+                     {
+                         .offset = {},
+                         .extent = extent,
+                     },
+                 .layerCount = 1,
+                 .colorAttachmentCount = 1,
+                 .pColorAttachments = &color_attachment_info}
+            );
+
             command_buffer.bindPipeline(
                 vk::PipelineBindPoint::eGraphics,
-                *pipelines.geometry_depth_prepass
+                *pipelines.display_transform
             );
-            command_buffer.draw(powerplant.num_indices, 1, 0, 0);
-        }
-        command_buffer.bindPipeline(
-            vk::PipelineBindPoint::eGraphics,
-            *pipelines.render_geometry
-        );
-        command_buffer.draw(powerplant.num_indices, 1, 0, 0);
-        command_buffer.endRendering();
 
-        insert_color_image_barriers(
-            command_buffer,
-            std::array {
-                ImageBarrier {
+            command_buffer.draw(3, 1, 0, 0);
+
+            command_buffer.endRendering();
+
+            // Transition the swapchain image from being used as a color attachment
+            // to presenting. Don't discard contents!!
+            insert_color_image_barriers(
+                command_buffer,
+                std::array {ImageBarrier {
                     .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-                    .next_access =
-                        THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+                    .next_access = THSVS_ACCESS_PRESENT,
                     .discard_contents = false,
                     .queue_family = graphics_queue_family,
-                    .image = scene_referred_framebuffer.image.image},
-                ImageBarrier {
-                    .prev_access = THSVS_ACCESS_NONE,
-                    .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-                    .discard_contents = true,
-                    .queue_family = graphics_queue_family,
                     .image = swapchain_images[swapchain_image_index]}}
-        );
-
-        vk::RenderingAttachmentInfoKHR color_attachment_info = {
-            .imageView = *swapchain_image_views[swapchain_image_index],
-            .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-            .loadOp = vk::AttachmentLoadOp::eDontCare,
-            .storeOp = vk::AttachmentStoreOp::eStore,
-            .clearValue = {}};
-        // This just clears the swapchain image with the clear color.
-        // Wraps vkCmdBeginRendering
-        command_buffer.beginRendering(
-            {.renderArea =
-                 {
-                     .offset = {},
-                     .extent = extent,
-                 },
-             .layerCount = 1,
-             .colorAttachmentCount = 1,
-             .pColorAttachments = &color_attachment_info}
-        );
-
-        command_buffer.bindPipeline(
-            vk::PipelineBindPoint::eGraphics,
-            *pipelines.display_transform
-        );
-
-        command_buffer.draw(3, 1, 0, 0);
-
-        command_buffer.endRendering();
-
-        // Transition the swapchain image from being used as a color attachment
-        // to presenting. Don't discard contents!!
-        insert_color_image_barriers(
-            command_buffer,
-            std::array {ImageBarrier {
-                .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-                .next_access = THSVS_ACCESS_PRESENT,
-                .discard_contents = false,
-                .queue_family = graphics_queue_family,
-                .image = swapchain_images[swapchain_image_index]}}
-        );
+            );
+        }
+        TracyVkCollect(tracy_ctx, *command_buffer);
 
         command_buffer.end();
 
@@ -730,6 +746,8 @@ int main() {
             .pSwapchains = &*swapchain,
             .pImageIndices = &swapchain_image_index,
         }));
+
+        FrameMark;
     }
 
     // Wait until the device is idle so that we don't get destructor warnings about currently in-use resources.

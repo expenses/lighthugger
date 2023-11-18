@@ -10,6 +10,8 @@
 
 #include <cmath>
 #include <fstream>
+#include <tracy/Tracy.hpp>
+#include <tracy/TracyVulkan.hpp>
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/ext/matrix_clip_space.hpp>

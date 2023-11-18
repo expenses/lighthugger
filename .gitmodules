@@ -13,3 +13,6 @@
 [submodule "external/dbg-macro"]
 	path = external/dbg-macro
 	url = https://github.com/sharkdp/dbg-macro
+[submodule "external/tracy"]
+	path = external/tracy
+	url = https://github.com/wolfpld/tracy
