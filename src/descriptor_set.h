@@ -1,5 +1,5 @@
 #pragma once
-#include "util.h"
+#include "allocations/image_with_view.h"
 
 struct BindlessImageTracker {
     uint32_t next_image_index = 0;

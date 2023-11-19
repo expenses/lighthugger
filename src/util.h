@@ -1,6 +1,6 @@
 #pragma once
 
-#include "allocations.h"
+#include "allocations/base.h"
 
 const vk::ImageSubresourceRange COLOR_SUBRESOURCE_RANGE = {
     .aspectMask = vk::ImageAspectFlagBits::eColor,
@@ -25,51 +25,3 @@ std::vector<vk::raii::ImageView> create_swapchain_image_views(
     const std::vector<vk::Image>& swapchain_images,
     vk::Format swapchain_format
 );
-
-struct PersistentlyMappedBuffer {
-    AllocatedBuffer buffer;
-    void* mapped_ptr;
-
-    PersistentlyMappedBuffer(AllocatedBuffer buffer_) :
-        buffer(std::move(buffer_)) {
-        auto buffer_info =
-            buffer.allocator.getAllocationInfo(buffer.allocation);
-        mapped_ptr = buffer_info.pMappedData;
-        assert(mapped_ptr);
-    }
-};
-
-struct ImageWithView {
-    AllocatedImage image;
-    vk::raii::ImageView view;
-
-    ImageWithView(AllocatedImage image_, vk::raii::ImageView view_) :
-        image(std::move(image_)),
-        view(std::move(view_)) {}
-
-    static ImageWithView create_image_with_view(
-        vk::ImageCreateInfo create_info,
-        vma::Allocator allocator,
-        const vk::raii::Device& device,
-        const char* name,
-        vk::ImageSubresourceRange subresource_range,
-        vk::ImageViewType view_type
-    );
-
-    ImageWithView(
-        vk::ImageCreateInfo create_info,
-        vma::Allocator allocator,
-        const vk::raii::Device& device,
-        const char* name,
-        vk::ImageSubresourceRange subresource_range,
-        vk::ImageViewType view_type = vk::ImageViewType::e2D
-    ) :
-        ImageWithView(ImageWithView::create_image_with_view(
-            create_info,
-            allocator,
-            device,
-            name,
-            subresource_range,
-            view_type
-        )) {}
-};

@@ -1,7 +1,8 @@
 #include "image_loading.h"
 
-#include "dds.h"
+#include "../allocations/persistently_mapped.h"
 #include "../sync.h"
+#include "dds.h"
 
 struct FormatInfo {
     vk::Format format;
@@ -12,9 +13,14 @@ struct FormatInfo {
 FormatInfo translate_format(DXGI_FORMAT dxgi_format) {
     switch (dxgi_format) {
         case DXGI_FORMAT_R9G9B9E5_SHAREDEXP:
-            return {.format = vk::Format::eE5B9G9R9UfloatPack32, .bits_per_pixel = 32};
+            return {
+                .format = vk::Format::eE5B9G9R9UfloatPack32,
+                .bits_per_pixel = 32};
         case DXGI_FORMAT_BC1_UNORM:
-            return {.format = vk::Format::eBc1RgbSrgbBlock, .bits_per_pixel = 4, .is_block_compressed = true};
+            return {
+                .format = vk::Format::eBc1RgbSrgbBlock,
+                .bits_per_pixel = 4,
+                .is_block_compressed = true};
         default:
             dbg(dxgi_format);
             abort();
@@ -29,9 +35,13 @@ struct Dimension {
 Dimension translate_dimension(D3D10_RESOURCE_DIMENSION dimension) {
     switch (dimension) {
         case D3D10_RESOURCE_DIMENSION_TEXTURE3D:
-            return {.type = vk::ImageType::e3D, .view_type = vk::ImageViewType::e3D};
+            return {
+                .type = vk::ImageType::e3D,
+                .view_type = vk::ImageViewType::e3D};
         case D3D10_RESOURCE_DIMENSION_TEXTURE2D:
-             return {.type = vk::ImageType::e2D, .view_type = vk::ImageViewType::e2D};
+            return {
+                .type = vk::ImageType::e2D,
+                .view_type = vk::ImageViewType::e2D};
         default:
             dbg(dimension);
             assert(false);
@@ -116,7 +126,7 @@ ImageWithView load_dds(
 
     auto staging_buffer_name = std::string(filepath) + " staging buffer";
 
-    auto staging_buffer = AllocatedBuffer(
+    auto staging_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
         vk::BufferCreateInfo {
             .size = bytes_remaining,
             .usage = vk::BufferUsageFlagBits::eTransferSrc},
@@ -126,13 +136,9 @@ ImageWithView load_dds(
             .usage = vma::MemoryUsage::eAuto,
         },
         allocator
-    );
+    ));
 
-    auto info = allocator.getAllocationInfo(staging_buffer.allocation);
-
-    assert(info.pMappedData);
-
-    stream.read((char*)info.pMappedData, bytes_remaining);
+    stream.read((char*)staging_buffer.mapped_ptr, bytes_remaining);
 
     insert_color_image_barriers(
         command_buffer,
@@ -170,11 +176,13 @@ ImageWithView load_dds(
         // We need to round up the width and heights here because for block
         // compressed textures, the minimum amount of data a miplevel can use
         // is the equivalent of 4x4 pixels, even when the actual mip size is smaller.
-        auto rounded_width = format.is_block_compressed ? round_up(level_width, 4) : level_width;
-        auto rounded_height = format.is_block_compressed ? round_up(level_height, 4) : level_height;
+        auto rounded_width =
+            format.is_block_compressed ? round_up(level_width, 4) : level_width;
+        auto rounded_height = format.is_block_compressed
+            ? round_up(level_height, 4)
+            : level_height;
 
-        buffer_offset +=
-            (rounded_width * rounded_height * depth)
+        buffer_offset += (rounded_width * rounded_height * depth)
             * format.bits_per_pixel / 8;
     }
 
@@ -184,7 +192,7 @@ ImageWithView load_dds(
     }
 
     command_buffer.copyBufferToImage(
-        staging_buffer.buffer,
+        staging_buffer.buffer.buffer,
         image.image.image,
         vk::ImageLayout::eTransferDstOptimal,
         regions
@@ -201,7 +209,7 @@ ImageWithView load_dds(
             .image = image.image.image}}
     );
 
-    temp_buffers.push_back(std::move(staging_buffer));
+    temp_buffers.push_back(std::move(staging_buffer.buffer));
 
     return image;
 }

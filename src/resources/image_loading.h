@@ -1,5 +1,5 @@
-#include "../allocations.h"
-#include "../util.h"
+#include "../allocations/base.h"
+#include "../allocations/image_with_view.h"
 
 ImageWithView load_dds(
     const char* filepath,
