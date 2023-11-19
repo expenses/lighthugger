@@ -138,6 +138,7 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .descriptorType = vk::DescriptorType::eUniformBuffer,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eVertex
+                | vk::ShaderStageFlagBits::eFragment
                 | vk::ShaderStageFlagBits::eCompute,
         },
         // hdr framebuffer

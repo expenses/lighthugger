@@ -100,11 +100,7 @@ struct CameraParams {
     }
 
     glm::vec3 right() {
-        return glm::vec3(
-            sin(yaw),
-            0.0,
-            cos(yaw)
-        );
+        return glm::vec3(-sin(yaw), 0.0, cos(yaw));
     }
 
     glm::vec3 sun_dir() {
@@ -649,55 +645,72 @@ int main() {
     KeyboardState keyboard_state = {};
 
     glfwSetWindowUserPointer(window, &keyboard_state);
-    glfwSetKeyCallback(window, [](
-        GLFWwindow* window,
-        int key,
-        int /*scancode*/,
-        int action,
-        int /*mods*/
-    ) {
-        KeyboardState& keyboard_state = *static_cast<KeyboardState*>(glfwGetWindowUserPointer(window));
-        // With apologies to anyone with a non-US keyboard.
-        switch(key) {
-            case GLFW_KEY_LEFT:
-                keyboard_state.left = action != GLFW_RELEASE;
-                break;
-            case GLFW_KEY_RIGHT:
-                keyboard_state.right = action != GLFW_RELEASE;
-                break;
-            case GLFW_KEY_UP:
-                keyboard_state.up = action != GLFW_RELEASE;
-                break;
-            case GLFW_KEY_DOWN:
-                keyboard_state.down = action != GLFW_RELEASE;
-                break;
-            case GLFW_KEY_W:
-                keyboard_state.w = action != GLFW_RELEASE;
-                break;
-            case GLFW_KEY_A:
-                keyboard_state.a = action != GLFW_RELEASE;
-                break;
-            case GLFW_KEY_S:
-                keyboard_state.s = action != GLFW_RELEASE;
-                break;
-            case GLFW_KEY_D:
-                keyboard_state.d = action != GLFW_RELEASE;
-                break;
-            case GLFW_KEY_LEFT_SHIFT:
-                keyboard_state.shift = action != GLFW_RELEASE;
-                break;
-            case GLFW_KEY_LEFT_CONTROL:
-                keyboard_state.control = action != GLFW_RELEASE;
-                break;
-            case GLFW_KEY_G:
-                keyboard_state.grab_toggled ^= (action == GLFW_PRESS);
-                break;
+    glfwSetKeyCallback(
+        window,
+        [](GLFWwindow* window,
+           int key,
+           int /*scancode*/,
+           int action,
+           int /*mods*/
+        ) {
+            KeyboardState& keyboard_state =
+                *static_cast<KeyboardState*>(glfwGetWindowUserPointer(window));
+            switch (key) {
+                case GLFW_KEY_LEFT:
+                    keyboard_state.left = action != GLFW_RELEASE;
+                    break;
+                case GLFW_KEY_RIGHT:
+                    keyboard_state.right = action != GLFW_RELEASE;
+                    break;
+                case GLFW_KEY_UP:
+                    keyboard_state.up = action != GLFW_RELEASE;
+                    break;
+                case GLFW_KEY_DOWN:
+                    keyboard_state.down = action != GLFW_RELEASE;
+                    break;
+                case GLFW_KEY_W:
+                    keyboard_state.w = action != GLFW_RELEASE;
+                    break;
+                case GLFW_KEY_A:
+                    keyboard_state.a = action != GLFW_RELEASE;
+                    break;
+                case GLFW_KEY_S:
+                    keyboard_state.s = action != GLFW_RELEASE;
+                    break;
+                case GLFW_KEY_D:
+                    keyboard_state.d = action != GLFW_RELEASE;
+                    break;
+                case GLFW_KEY_LEFT_SHIFT:
+                    keyboard_state.shift = action != GLFW_RELEASE;
+                    break;
+                case GLFW_KEY_LEFT_CONTROL:
+                    keyboard_state.control = action != GLFW_RELEASE;
+                    break;
+                case GLFW_KEY_G:
+                    keyboard_state.grab_toggled ^= (action == GLFW_PRESS);
+                    if (keyboard_state.grab_toggled) {
+                        glfwSetInputMode(
+                            window,
+                            GLFW_CURSOR,
+                            GLFW_CURSOR_DISABLED
+                        );
+                    } else {
+                        glfwSetInputMode(
+                            window,
+                            GLFW_CURSOR,
+                            GLFW_CURSOR_NORMAL
+                        );
+                    }
+                    break;
+            }
+            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+                glfwSetWindowShouldClose(window, GLFW_TRUE);
+            }
+        }
+    );
 
-        }
-        if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-            glfwSetWindowShouldClose(window, GLFW_TRUE);
-        }
-    });
+    auto prev_mouse = glm::dvec2(0.0, 0.0);
+    glfwGetCursorPos(window, &prev_mouse.x, &prev_mouse.y);
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -758,17 +771,41 @@ int main() {
 
         {
             int left_right = int(keyboard_state.d) - int(keyboard_state.a);
-            int forwards_backwards = int(keyboard_state.w) - int(keyboard_state.s);
-            int up_down = int(keyboard_state.shift) - int(keyboard_state.control);
-            int sun_left_right = int(keyboard_state.right) - int(keyboard_state.left);
+            int forwards_backwards =
+                int(keyboard_state.w) - int(keyboard_state.s);
+            int up_down =
+                int(keyboard_state.shift) - int(keyboard_state.control);
+            int sun_left_right =
+                int(keyboard_state.right) - int(keyboard_state.left);
             int sun_up_down = int(keyboard_state.up) - int(keyboard_state.down);
 
-            camera_params.position += float(left_right) * 0.5f * camera_params.right();
-            camera_params.position += float(forwards_backwards) * 0.5f * camera_params.facing();
+            camera_params.position +=
+                float(left_right) * 0.5f * camera_params.right();
+            camera_params.position +=
+                float(forwards_backwards) * 0.5f * camera_params.facing();
             camera_params.position.y += float(up_down) * 0.5f;
             camera_params.sun_latitude += sun_left_right * 0.025f;
             camera_params.sun_longitude += sun_up_down * 0.025f;
-            camera_params.sun_longitude = std::clamp(camera_params.sun_longitude, 0.0f, std::numbers::pi_v<float> / 2.0f);
+            camera_params.sun_longitude = std::clamp(
+                camera_params.sun_longitude,
+                0.0f,
+                std::numbers::pi_v<float> / 2.0f
+            );
+
+            auto mouse = glm::dvec2(0.0, 0.0);
+            glfwGetCursorPos(window, &mouse.x, &mouse.y);
+            auto mouse_delta = mouse - prev_mouse;
+            prev_mouse = mouse;
+
+            if (keyboard_state.grab_toggled) {
+                camera_params.pitch -= mouse_delta.y / 1024.0;
+                camera_params.yaw += mouse_delta.x / 1024.0;
+                camera_params.pitch = std::clamp(
+                    camera_params.pitch,
+                    -std::numbers::pi_v<float> / 2.0f + 0.0001f,
+                    std::numbers::pi_v<float> / 2.0f
+                );
+            }
         }
 
         ImGui_ImplVulkan_NewFrame();
@@ -776,7 +813,12 @@ int main() {
         ImGui::NewFrame();
         {
             ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
-            ImGui::Text("camera pos: (%f, %f, %f", camera_params.position.x, camera_params.position.y, camera_params.position.z);
+            ImGui::Text(
+                "camera pos: (%f, %f, %f",
+                camera_params.position.x,
+                camera_params.position.y,
+                camera_params.position.z
+            );
             ImGui::Text("yaw: %f", camera_params.yaw);
             ImGui::Text("pitch: %f", camera_params.pitch);
             ImGui::Text("sun_latitude: %f", camera_params.sun_latitude);
