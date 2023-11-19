@@ -85,32 +85,10 @@ struct Resources {
     ResizingResources resizing;
     PersistentlyMappedBuffer uniform_buffer;
     ImageWithView shadowmap;
+    AllocatedBuffer depth_info_buffer;
 };
 
-uint32_t dispatch_size(uint32_t width, uint32_t workgroup_size) {
-    return uint32_t(std::ceil(float(width) / float(workgroup_size)));
-}
-
-void set_scissor_and_viewport(
-    const vk::raii::CommandBuffer& command_buffer,
-    uint32_t width,
-    uint32_t height
-) {
-    command_buffer.setScissor(
-        0,
-        {vk::Rect2D {
-            .offset = {},
-            .extent = vk::Extent2D {.width = width, .height = height}}}
-    );
-    command_buffer.setViewport(
-        0,
-        {vk::Viewport {
-            .width = static_cast<float>(width),
-            .height = static_cast<float>(height),
-            .minDepth = 0.0,
-            .maxDepth = 1.0}}
-    );
-}
+#include "rendering.h"
 
 int main() {
     glfwInit();
@@ -202,8 +180,10 @@ int main() {
 
     auto vulkan_1_0_features = vk::PhysicalDeviceFeatures {.shaderInt64 = true};
 
-    auto device_extensions =
-        std::array {"VK_KHR_swapchain", "VK_KHR_dynamic_rendering"};
+    auto device_extensions = std::array {
+        "VK_KHR_swapchain",
+        "VK_KHR_dynamic_rendering",
+        "VK_KHR_shader_non_semantic_info"};
 
     vk::raii::Device device = phys_device.createDevice(
         {
@@ -359,6 +339,17 @@ int main() {
             device,
             "shadowmap",
             DEPTH_SUBRESOURCE_RANGE
+        ),
+        .depth_info_buffer = AllocatedBuffer(
+            vk::BufferCreateInfo {
+                .size = sizeof(DepthInfoBuffer),
+                .usage = vk::BufferUsageFlagBits::eStorageBuffer
+                    | vk::BufferUsageFlagBits::eTransferDst},
+            {
+                .usage = vma::MemoryUsage::eAuto,
+            },
+            allocator,
+            "depth_info_buffer"
         )};
 
     auto clamp_sampler = device.createSampler({
@@ -367,6 +358,7 @@ int main() {
         .addressModeU = vk::SamplerAddressMode::eClampToEdge,
         .addressModeV = vk::SamplerAddressMode::eClampToEdge,
         .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+        .maxLod = VK_LOD_CLAMP_NONE
     });
 
     auto repeat_sampler = device.createSampler(
@@ -377,6 +369,17 @@ int main() {
          .addressModeW = vk::SamplerAddressMode::eRepeat,
          .maxLod = VK_LOD_CLAMP_NONE}
     );
+
+    auto shadowmap_comparison_sampler = device.createSampler({
+        .magFilter = vk::Filter::eLinear,
+        .minFilter = vk::Filter::eLinear,
+        .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+        .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+        .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+        .compareEnable = true,
+        .compareOp = vk::CompareOp::eLess,
+        .maxLod = VK_LOD_CLAMP_NONE
+    });
 
     std::vector<AllocatedBuffer> temp_buffers;
 
@@ -444,18 +447,6 @@ int main() {
         buffer_addresses.size() * sizeof(MeshBufferAddresses)
     );
 
-    auto depth_info_buffer = AllocatedBuffer(
-        vk::BufferCreateInfo {
-            .size = sizeof(DepthInfoBuffer) * 2,
-            .usage = vk::BufferUsageFlagBits::eStorageBuffer
-                | vk::BufferUsageFlagBits::eTransferDst},
-        {
-            .usage = vma::MemoryUsage::eAuto,
-        },
-        allocator,
-        "depth_info_buffer"
-    );
-
     auto image_info = vk::DescriptorImageInfo {
         .imageView = *resources.resizing.scene_referred_framebuffer.view,
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
@@ -476,6 +467,8 @@ int main() {
         vk::DescriptorImageInfo {.sampler = *clamp_sampler};
     auto repeat_sampler_info =
         vk::DescriptorImageInfo {.sampler = *repeat_sampler};
+    auto shadowmap_comparison_sampler_info =
+        vk::DescriptorImageInfo {.sampler = *shadowmap_comparison_sampler};
 
     auto geometry_buffer_info = vk::DescriptorBufferInfo {
         .buffer = geometry_buffer.buffer,
@@ -488,7 +481,7 @@ int main() {
         .range = VK_WHOLE_SIZE};
 
     auto depth_info_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = depth_info_buffer.buffer,
+        .buffer = resources.depth_info_buffer.buffer,
         .offset = 0,
         .range = VK_WHOLE_SIZE};
 
@@ -497,64 +490,88 @@ int main() {
         {
             vk::WriteDescriptorSet {
                 .dstSet = *descriptor_set.set,
-                .dstBinding = 0,
+                .dstBinding = 1,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eStorageBuffer,
                 .pBufferInfo = &geometry_buffer_info},
             vk::WriteDescriptorSet {
                 .dstSet = *descriptor_set.set,
-                .dstBinding = 1,
+                .dstBinding = 2,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eUniformBuffer,
                 .pBufferInfo = &uniform_buffer_info},
             vk::WriteDescriptorSet {
                 .dstSet = *descriptor_set.set,
-                .dstBinding = 2,
+                .dstBinding = 3,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampledImage,
                 .pImageInfo = &image_info},
             vk::WriteDescriptorSet {
                 .dstSet = *descriptor_set.set,
-                .dstBinding = 3,
+                .dstBinding = 4,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampler,
                 .pImageInfo = &clamp_sampler_info},
             vk::WriteDescriptorSet {
                 .dstSet = *descriptor_set.set,
-                .dstBinding = 4,
+                .dstBinding = 5,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampledImage,
                 .pImageInfo = &lut_image_info},
             vk::WriteDescriptorSet {
                 .dstSet = *descriptor_set.set,
-                .dstBinding = 5,
+                .dstBinding = 6,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampler,
                 .pImageInfo = &repeat_sampler_info},
             vk::WriteDescriptorSet {
                 .dstSet = *descriptor_set.set,
-                .dstBinding = 6,
+                .dstBinding = 7,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampledImage,
                 .pImageInfo = &depthbuffer_image_info},
             vk::WriteDescriptorSet {
                 .dstSet = *descriptor_set.set,
-                .dstBinding = 7,
+                .dstBinding = 8,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eStorageBuffer,
                 .pBufferInfo = &depth_info_buffer_info},
             vk::WriteDescriptorSet {
                 .dstSet = *descriptor_set.set,
-                .dstBinding = 8,
+                .dstBinding = 9,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampledImage,
                 .pImageInfo = &shadowmap_image_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *descriptor_set.set,
+                .dstBinding = 10,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampler,
+                .pImageInfo = &shadowmap_comparison_sampler_info},
         },
         {}
     );
 
+    float fov = 45.0;
+
     auto tracy_ctx =
         TracyVkContext(*phys_device, *device, *graphics_queue, *command_buffer);
+
+    ImGui::CreateContext();
+    ImGui_ImplGlfw_InitForVulkan(window, true);
+    auto imgui_init_info = ImGui_ImplVulkan_InitInfo {
+        .Instance = *instance,
+        .PhysicalDevice = *phys_device,
+        .Device = *device,
+        .Queue = *graphics_queue,
+        .DescriptorPool = *descriptor_pool,
+        .MinImageCount = uint32_t(swapchain_images.size()),
+        .ImageCount = uint32_t(swapchain_images.size()),
+        .UseDynamicRendering = true,
+        .ColorAttachmentFormat = VkFormat(swapchain_create_info.imageFormat)};
+    assert(ImGui_ImplVulkan_Init(&imgui_init_info, nullptr));
+
+    ImGui_ImplVulkan_CreateFontsTexture();
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -598,13 +615,13 @@ int main() {
                 {
                     vk::WriteDescriptorSet {
                         .dstSet = *descriptor_set.set,
-                        .dstBinding = 2,
+                        .dstBinding = 3,
                         .descriptorCount = 1,
                         .descriptorType = vk::DescriptorType::eSampledImage,
                         .pImageInfo = &image_info},
                     vk::WriteDescriptorSet {
                         .dstSet = *descriptor_set.set,
-                        .dstBinding = 6,
+                        .dstBinding = 7,
                         .descriptorCount = 1,
                         .descriptorType = vk::DescriptorType::eSampledImage,
                         .pImageInfo = &depthbuffer_image_info},
@@ -612,6 +629,17 @@ int main() {
                 {}
             );
         }
+
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        {
+            Uniforms* uniforms = (Uniforms*)resources.uniform_buffer.mapped_ptr;
+            ImGui::SliderFloat("fov", &fov, 0.0f, 90.0f);
+            ImGui::Checkbox("checkbox", &uniforms->checkbox);
+            ImGui::Checkbox("stab", &uniforms->stabilize_cascades);
+        }
+        ImGui::Render();
 
         time += 1.0 / 60.0;
 
@@ -630,30 +658,23 @@ int main() {
             );
 
             auto perspective = infinite_reverse_z_perspective(
-                glm::radians(45.0f),
+                glm::radians(fov),
                 float(extent.width),
                 float(extent.height),
                 0.01
             );
 
             auto perspective_finite = reverse_z_perspective(
-                glm::radians(45.0f),
+                glm::radians(fov),
                 float(extent.width),
                 float(extent.height),
                 0.01,
                 1000.0
             );
 
-            auto uniforms = Uniforms {
-                .combined_perspective_view = perspective * view,
-                .inv_perspective_view =
-                    glm::inverse(perspective_finite * view)};
-
-            std::memcpy(
-                resources.uniform_buffer.mapped_ptr,
-                &uniforms,
-                sizeof(uniforms)
-            );
+            Uniforms* uniforms = (Uniforms*)resources.uniform_buffer.mapped_ptr;
+            uniforms->combined_perspective_view = perspective * view;
+            uniforms->inv_perspective_view = glm::inverse(perspective * view);
         }
 
         // Reset the command pool instead of resetting the single command buffer as
@@ -669,263 +690,18 @@ int main() {
             {.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit}
         );
 
-        {
-            command_buffer.fillBuffer(depth_info_buffer.buffer, 0, 4, u32_max);
-            command_buffer.fillBuffer(depth_info_buffer.buffer, 4, 4, 0);
-
-            TracyVkZone(tracy_ctx, *command_buffer, "main")
-
-                set_scissor_and_viewport(
-                    command_buffer,
-                    extent.width,
-                    extent.height
-                );
-            command_buffer.bindDescriptorSets(
-                vk::PipelineBindPoint::eGraphics,
-                *pipelines.pipeline_layout,
-                0,
-                {*descriptor_set.set},
-                {}
-            );
-            command_buffer.bindDescriptorSets(
-                vk::PipelineBindPoint::eCompute,
-                *pipelines.pipeline_layout,
-                0,
-                {*descriptor_set.set},
-                {}
-            );
-
-            insert_color_image_barriers(
-                command_buffer,
-                std::array {
-                    ImageBarrier {
-                        .prev_access = THSVS_ACCESS_NONE,
-                        .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-                        .discard_contents = true,
-                        .queue_family = graphics_queue_family,
-                        .image = resources.resizing.scene_referred_framebuffer
-                                     .image.image},
-                    ImageBarrier {
-                        .prev_access = THSVS_ACCESS_NONE,
-                        .next_access =
-                            THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
-                        .discard_contents = true,
-                        .queue_family = graphics_queue_family,
-                        .image = resources.resizing.depthbuffer.image.image,
-                        .subresource_range = DEPTH_SUBRESOURCE_RANGE},
-
-                    ImageBarrier {
-                        .prev_access = THSVS_ACCESS_NONE,
-                        .next_access =
-                            THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
-                        .discard_contents = true,
-                        .queue_family = graphics_queue_family,
-                        .image = resources.shadowmap.image.image,
-                        .subresource_range = DEPTH_SUBRESOURCE_RANGE}
-
-                }
-            );
-
-            vk::RenderingAttachmentInfoKHR framebuffer_attachment_info = {
-                .imageView =
-                    *resources.resizing.scene_referred_framebuffer.view,
-                .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-                .loadOp = vk::AttachmentLoadOp::eClear,
-                .storeOp = vk::AttachmentStoreOp::eStore,
-            };
-            vk::RenderingAttachmentInfoKHR depth_attachment_info = {
-                .imageView = *resources.resizing.depthbuffer.view,
-                .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                .loadOp = vk::AttachmentLoadOp::eClear,
-                .storeOp = vk::AttachmentStoreOp::eStore,
-            };
-            command_buffer.beginRendering(
-                {.renderArea =
-                     {
-                         .offset = {},
-                         .extent = extent,
-                     },
-                 .layerCount = 1,
-                 .pDepthAttachment = &depth_attachment_info}
-            );
-            // Depth pre-pass
-            {
-                TracyVkZone(tracy_ctx, *command_buffer, "depth pre pass")
-
-                    command_buffer.bindPipeline(
-                        vk::PipelineBindPoint::eGraphics,
-                        *pipelines.geometry_depth_prepass
-                    );
-                command_buffer.draw(powerplant.num_indices, 1, 0, 0);
-            }
-            command_buffer.endRendering();
-
-            insert_color_image_barriers(
-                command_buffer,
-                std::array {ImageBarrier {
-                    .prev_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
-                    .next_access =
-                        THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
-                    .discard_contents = false,
-                    .queue_family = graphics_queue_family,
-                    .image = resources.resizing.depthbuffer.image.image,
-                    .subresource_range = DEPTH_SUBRESOURCE_RANGE}}
-            );
-
-            {
-                TracyVkZone(tracy_ctx, *command_buffer, "depth reduction")
-                    command_buffer.bindPipeline(
-                        vk::PipelineBindPoint::eCompute,
-                        *pipelines.read_depth
-                    );
-                command_buffer.dispatch(
-                    dispatch_size(extent.width, 8),
-                    dispatch_size(extent.height, 8),
-                    1
-                );
-            }
-            {
-                TracyVkZone(tracy_ctx, *command_buffer, "generate_matrices")
-                    command_buffer.bindPipeline(
-                        vk::PipelineBindPoint::eCompute,
-                        *pipelines.generate_matrices
-                    );
-                command_buffer.dispatch(1, 1, 1);
-            }
-
-            set_scissor_and_viewport(command_buffer, 1024, 1024);
-            {
-                vk::RenderingAttachmentInfoKHR depth_attachment_info = {
-                    .imageView = *resources.shadowmap.view,
-                    .imageLayout =
-                        vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                    .loadOp = vk::AttachmentLoadOp::eClear,
-                    .storeOp = vk::AttachmentStoreOp::eStore,
-                    .clearValue = {.depthStencil = 1.0}};
-                command_buffer.beginRendering(
-                    {.renderArea =
-                         {
-                             .offset = {},
-                             .extent =
-                                 vk::Extent2D {.width = 1024, .height = 1024},
-                         },
-                     .layerCount = 1,
-                     .pDepthAttachment = &depth_attachment_info}
-                );
-                command_buffer.bindPipeline(
-                    vk::PipelineBindPoint::eGraphics,
-                    *pipelines.shadow_pass
-                );
-                command_buffer.draw(powerplant.num_indices, 1, 0, 0);
-                command_buffer.endRendering();
-            }
-            insert_color_image_barriers(
-                command_buffer,
-                std::array {ImageBarrier {
-                    .prev_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
-                    .next_access =
-                        THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
-                    .discard_contents = false,
-                    .queue_family = graphics_queue_family,
-                    .image = resources.shadowmap.image.image,
-                    .subresource_range = DEPTH_SUBRESOURCE_RANGE}
-
-                }
-            );
-
-            set_scissor_and_viewport(
-                command_buffer,
-                extent.width,
-                extent.height
-            );
-            depth_attachment_info = {
-                .imageView = *resources.resizing.depthbuffer.view,
-                .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                .loadOp = vk::AttachmentLoadOp::eLoad,
-                .storeOp = vk::AttachmentStoreOp::eStore,
-            };
-            command_buffer.beginRendering(
-                {.renderArea =
-                     {
-                         .offset = {},
-                         .extent = extent,
-                     },
-                 .layerCount = 1,
-                 .colorAttachmentCount = 1,
-                 .pColorAttachments = &framebuffer_attachment_info,
-                 .pDepthAttachment = &depth_attachment_info}
-            );
-            {
-                TracyVkZone(tracy_ctx, *command_buffer, "main pass")
-
-                    command_buffer.bindPipeline(
-                        vk::PipelineBindPoint::eGraphics,
-                        *pipelines.render_geometry
-                    );
-                command_buffer.draw(powerplant.num_indices, 1, 0, 0);
-            }
-            command_buffer.endRendering();
-
-            insert_color_image_barriers(
-                command_buffer,
-                std::array {
-                    ImageBarrier {
-                        .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-                        .next_access =
-                            THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
-                        .discard_contents = false,
-                        .queue_family = graphics_queue_family,
-                        .image = resources.resizing.scene_referred_framebuffer
-                                     .image.image},
-                    ImageBarrier {
-                        .prev_access = THSVS_ACCESS_NONE,
-                        .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-                        .discard_contents = true,
-                        .queue_family = graphics_queue_family,
-                        .image = swapchain_images[swapchain_image_index]},
-                }
-            );
-
-            vk::RenderingAttachmentInfoKHR color_attachment_info = {
-                .imageView = *swapchain_image_views[swapchain_image_index],
-                .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-                .loadOp = vk::AttachmentLoadOp::eDontCare,
-                .storeOp = vk::AttachmentStoreOp::eStore,
-                .clearValue = {}};
-            // This just clears the swapchain image with the clear color.
-            // Wraps vkCmdBeginRendering
-            command_buffer.beginRendering(
-                {.renderArea =
-                     {
-                         .offset = {},
-                         .extent = extent,
-                     },
-                 .layerCount = 1,
-                 .colorAttachmentCount = 1,
-                 .pColorAttachments = &color_attachment_info}
-            );
-
-            command_buffer.bindPipeline(
-                vk::PipelineBindPoint::eGraphics,
-                *pipelines.display_transform
-            );
-
-            command_buffer.draw(3, 1, 0, 0);
-
-            command_buffer.endRendering();
-
-            // Transition the swapchain image from being used as a color attachment
-            // to presenting. Don't discard contents!!
-            insert_color_image_barriers(
-                command_buffer,
-                std::array {ImageBarrier {
-                    .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-                    .next_access = THSVS_ACCESS_PRESENT,
-                    .discard_contents = false,
-                    .queue_family = graphics_queue_family,
-                    .image = swapchain_images[swapchain_image_index]}}
-            );
-        }
+        render(
+            command_buffer,
+            pipelines,
+            descriptor_set,
+            resources,
+            powerplant,
+            swapchain_images[swapchain_image_index],
+            swapchain_image_views[swapchain_image_index],
+            extent,
+            graphics_queue_family,
+            tracy_ctx
+        );
         TracyVkCollect(tracy_ctx, *command_buffer);
 
         command_buffer.end();

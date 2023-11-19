@@ -25,4 +25,8 @@ struct DepthInfoBuffer {
 struct Uniforms {
     MATRIX_TYPE combined_perspective_view;
     MATRIX_TYPE inv_perspective_view;
+    VEC3_TYPE _padding0;
+    bool checkbox;
+    VEC3_TYPE _padding1;
+    bool stabilize_cascades;
 };

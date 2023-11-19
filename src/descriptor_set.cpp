@@ -11,7 +11,7 @@ DescriptorSet::write_image(const ImageWithView& image, vk::Device device) {
     device.updateDescriptorSets(
         {vk::WriteDescriptorSet {
             .dstSet = *set,
-            .dstBinding = 9,
+            .dstBinding = 0,
             .dstArrayElement = index,
             .descriptorCount = 1,
             .descriptorType = vk::DescriptorType::eSampledImage,

@@ -18,8 +18,15 @@ void read_depth(uint3 global_id: SV_DispatchThreadID){
         return;
     }
 
-    InterlockedMin(depth_info[0].min_depth, depth_reinterpreted);
-    InterlockedMax(depth_info[0].max_depth, depth_reinterpreted);
+    uint subgroup_min = WaveActiveMin(depth_reinterpreted);
+    uint subgroup_max = WaveActiveMax(depth_reinterpreted);
+
+    // https://www.khronos.org/assets/uploads/developers/library/2018-vulkan-devday/06-subgroups.pdf
+    // equiv of subgroup elect
+    if (WaveIsFirstLane()) {
+        InterlockedMin(depth_info[0].min_depth, subgroup_min);
+        InterlockedMax(depth_info[0].max_depth, subgroup_max);
+    }
 }
 
 float4x4 InverseRotationTranslation(in float3x3 r, in float3 t)
@@ -128,16 +135,23 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
 {
     // https://github.com/SaschaWillems/Vulkan/blob/master/examples/shadowmappingcascade/shadowmappingcascade.cpp#L650-L663
 
+    DepthInfoBuffer info = depth_info[0];
+
+
+    float min_depth = asfloat(info.min_depth);
+    float max_depth = asfloat(info.max_depth);
+
+
     uint cascade_index = global_id.x;
 
     float cascadeSplits[4];
 
     float nearClip = 0.01;
-    float farClip = 1000.0;
+    float farClip = 100000.0;
     float clipRange = farClip - nearClip;
 
-    float minZ = nearClip;
-    float maxZ = nearClip + clipRange;
+    float minZ = nearClip + min_depth * clipRange;
+    float maxZ = nearClip + max_depth * clipRange;
 
     float range = maxZ - minZ;
     float ratio = maxZ / minZ;
@@ -156,31 +170,52 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
             cascadeSplits[i] = (d - nearClip) / clipRange;
     }
 
+    if (global_id.x == 0 && false) printf(
+        "\n%f, %f, %f, %f\n",
+        cascadeSplits[0],
+        cascadeSplits[1],
+        cascadeSplits[2],
+        cascadeSplits[3]
+    );
+
     // Calculate orthographic projection matrix for each cascade
     // 1.0 - because we're using reverse z.
-    float lastSplitDist = (cascade_index > 0 ? cascadeSplits[cascade_index - 1] : 0.0);
+    float lastSplitDist = (cascade_index > 0 ? cascadeSplits[cascade_index - 1] : min_depth);
     float splitDist = cascadeSplits[cascade_index];
 
+    float frustum_min = lastSplitDist;
+    float frustum_max = splitDist;
+
+    if (uniforms.checkbox) {
+        frustum_min = 0.00005f;
+        frustum_max = 1.0f;
+    }
+
     float3 frustumCorners[8] = {
-        float3(-1.0f,  1.0f, 0.0f),
-        float3( 1.0f,  1.0f, 0.0f),
-        float3( 1.0f, -1.0f, 0.0f),
-        float3(-1.0f, -1.0f, 0.0f),
-        float3(-1.0f,  1.0f,  1.0f),
-        float3( 1.0f,  1.0f,  1.0f),
-        float3( 1.0f, -1.0f,  1.0f),
-        float3(-1.0f, -1.0f,  1.0f),
-    };
+            // We can't use a far value of 0 here as that
+            // goes infinite.
+            float3(-1.0f,  1.0f, frustum_min),//0.00005f),
+            float3( 1.0f,  1.0f, frustum_min),//0.00005f),
+            float3( 1.0f, -1.0f, frustum_min),//0.00005f),
+            float3(-1.0f, -1.0f, frustum_min),//0.00005f),
+            float3(-1.0f,  1.0f, frustum_max),// 1.0f),
+            float3( 1.0f,  1.0f, frustum_max),// 1.0f),
+            float3( 1.0f, -1.0f, frustum_max),// 1.0f),
+            float3(-1.0f, -1.0f, frustum_max),// 1.0f),
+        };
 
     for (uint32_t i = 0; i < 8; i++) {
         float4 invCorner = mul(invCam, float4(frustumCorners[i], 1.0f));
         frustumCorners[i] = (invCorner / invCorner.w).xyz;
     }
 
-    for (uint32_t i = 0; i < 4; i++) {
-        float3 dist = frustumCorners[i + 4] - frustumCorners[i];
-        frustumCorners[i + 4] = frustumCorners[i] + (dist * splitDist);
-        frustumCorners[i] = frustumCorners[i] + (dist * lastSplitDist);
+    if (uniforms.checkbox) {
+        for (uint32_t i = 0; i < 4; i++) {
+            float3 dist = frustumCorners[i + 4] - frustumCorners[i];
+            if (global_id.x == 0) printf("\n%v3f\n", dist);
+            frustumCorners[i + 4] = frustumCorners[i] + (dist * splitDist);
+            frustumCorners[i] = frustumCorners[i] + (dist * lastSplitDist);
+        }
     }
 
     // Get frustum center
@@ -190,20 +225,39 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
     }
     frustumCenter /= 8.0f;
 
-    float radius = 0.0f;
+    float sphere_radius = 0.0f;
     for (uint32_t i = 0; i < 8; i++) {
         float distance = length(frustumCorners[i] - frustumCenter);
-        radius = max(radius, distance);
+        sphere_radius = max(sphere_radius, distance);
     }
-    radius = ceil(radius * 16.0f) / 16.0f;
+    sphere_radius = ceil(sphere_radius * 16.0f) / 16.0f;
 
-    float3 maxExtents = radius;
+    float3 maxExtents = sphere_radius;
     float3 minExtents = -maxExtents;
 
     float3 lightDir = normalize(-SUN_DIR);
 
-    float4x4 lightViewMatrix = lookAt(lightDir * minExtents.z + frustumCenter, frustumCenter, float3(0,1,0));
-	float4x4 lightOrthoMatrix = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, maxExtents.z - minExtents.z);
+    float4x4 shadowView = lookAt(lightDir * minExtents.z + frustumCenter, frustumCenter, float3(0,1,0));
+	float4x4 shadowProj = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, maxExtents.z - minExtents.z);
 
-    depth_info[0].shadow_rendering_matrices[cascade_index] = mul(lightOrthoMatrix, lightViewMatrix);
+    uint sMapSize = 1024;
+
+    if (uniforms.stabilize_cascades) {
+        // Create the rounding matrix, by projecting the world-space origin and determining
+        // the fractional offset in texel space
+        float4x4 shadowMatrix = mul(shadowView, shadowProj);
+        float3 shadowOrigin = 0.0f;
+        shadowOrigin = mul(float4(shadowOrigin, 1.0f), shadowMatrix).xyz;
+        shadowOrigin *= (sMapSize / 2.0f);
+
+        float3 roundedOrigin = round(shadowOrigin);
+        float3 roundOffset = roundedOrigin - shadowOrigin;
+        roundOffset = roundOffset * (2.0f / sMapSize);
+        roundOffset.z = 0.0f;
+
+        shadowProj[3][0] += roundOffset.x;
+        shadowProj[3][1] += roundOffset.y;
+    }
+
+    depth_info[0].shadow_rendering_matrices[cascade_index] = mul(shadowProj, shadowView);
 }

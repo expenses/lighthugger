@@ -32,7 +32,7 @@ float4 shadow_pass(
     uint offset = vk::RawBufferLoad<uint>(addresses.indices + sizeof(uint) * vId);
     float3 position = load_float3(addresses.positions, offset);
 
-    return mul(depth_info[0].shadow_rendering_matrices[3], float4(position, 1.0));
+    return mul(depth_info[0].shadow_rendering_matrices[0], float4(position, 1.0));
 }
 
 [shader("vertex")]
@@ -83,15 +83,29 @@ void PSMain(
     V2P input,
     [[vk::location(0)]] out float4 target_0: SV_Target0
 ) {
-    float4 shadowCoord = mul(biasMat, mul(depth_info[0].shadow_rendering_matrices[3], float4(input.world_pos, 1.0)));
-    float shadow = textureProj(shadowCoord / shadowCoord.w, float2(0.0, 0.0), 2);
+    float4 shadowCoord = mul(biasMat, mul(depth_info[0].shadow_rendering_matrices[0], float4(input.world_pos, 1.0)));
+    shadowCoord /= shadowCoord.w;
+    float bias = 0.05;
+    float shadow_sum = 0.0;
+    for (int x = -1; x <= 1; x++) {
+        for (int y = -1; y <= 1; y++) {
+            float2 offset = float2(x, y) / 1024.0;
+            shadow_sum += shadowmap.SampleCmpLevelZero(shadowmap_comparison_sampler, float2(shadowCoord.xy) + offset, shadowCoord.z - bias);
+        }
+    }
+    shadow_sum /= 9.0;
+
 
     float3 normal = normalize(input.normal);
 
-    float sun_factor = max(dot(SUN_DIR, normal), 0.0) * shadow;
+    float n_dot_l = max(dot(SUN_DIR, normal), 0.0);
     float3 albedo = textures[input.material_index].Sample(repeat_sampler, input.uv).rgb;
 
-    float ambient = 0.0;
+    float ambient = 0.05;
 
-    target_0 = float4(albedo * (sun_factor + ambient), 1.0);
+    float3 lighting = max(n_dot_l * shadow_sum, ambient);
+
+    float3 diffuse = albedo * lighting;
+
+    target_0 = float4(diffuse, 1.0);
 }

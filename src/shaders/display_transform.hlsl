@@ -21,7 +21,7 @@ void PSMain(
 ) {
     psIn.Uv.y = 1.0 - psIn.Uv.y;
 
-    float3 stimulus = source_tex.Sample(clamp_sampler, psIn.Uv);
+    float3 stimulus = scene_referred_framebuffer.Sample(clamp_sampler, psIn.Uv);
     target_0 = float4(stimulus, 1.0);
 
     float shadow_screen_percentage = 0.3;
