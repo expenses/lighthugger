@@ -182,6 +182,14 @@ void glfw_key_callback(
     }
 }
 
+struct RaiiAllocator {
+    vma::Allocator allocator;
+
+    ~RaiiAllocator() {
+        allocator.destroy();
+    }
+};
+
 int main() {
     glfwInit();
 
@@ -354,6 +362,10 @@ int main() {
 
     vma::Allocator allocator;
     check_vk_result(vma::createAllocator(&allocatorCreateInfo, &allocator));
+    // Push a raii container for the allocator onto the stack,
+    // just to make sure it's destructor gets called
+    // after all allocated objects are destroyed.
+    RaiiAllocator raii_allocator = {.allocator = allocator};
 
     auto command_buffers =
         device.allocateCommandBuffers(vk::CommandBufferAllocateInfo {
@@ -383,6 +395,7 @@ int main() {
 
     auto descriptor_pool = device.createDescriptorPool(
         {.maxSets = 128,
+         .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
          .poolSizeCount = pool_sizes.size(),
          .pPoolSizes = pool_sizes.data()}
     );
@@ -804,6 +817,10 @@ int main() {
             ImGui::Text("sun_latitude: %f", camera_params.sun_latitude);
             ImGui::Text("sun_longitude: %f", camera_params.sun_longitude);
             ImGui::Text("grab_toggled: %u", keyboard_state.grab_toggled);
+            ImGui::Text(
+                "powerplant bounding sphere rad: %f",
+                powerplant.bounding_sphere_radius
+            );
         }
         ImGui::Render();
 
@@ -896,9 +913,8 @@ int main() {
     // Wait until the device is idle so that we don't get destructor warnings about currently in-use resources.
     device.waitIdle();
 
-    // Todo: this needs to happen after all the allocated memory is destructed.
-    // The allocator should be placed in a raii wrapper before any allocations are made.
-    allocator.destroy();
+    ImGui_ImplVulkan_Shutdown();
+    TracyVkDestroy(tracy_ctx);
 
     return 0;
 }

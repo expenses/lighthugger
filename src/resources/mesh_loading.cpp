@@ -70,6 +70,7 @@ Mesh load_obj(
         bounding_sphere_radius =
             std::max(bounding_sphere_radius, glm::length2(position));
     }
+    bounding_sphere_radius = sqrtf(bounding_sphere_radius);
 
     // Todo: should use staging buffers instead of host-accessible storage buffers.
 
