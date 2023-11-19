@@ -4,6 +4,7 @@
 #include <vulkan/vulkan_raii.hpp>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#define DBG_MACRO_NO_WARNING
 #include <dbg.h>
 #include <thsvs_simpler_vulkan_synchronization.h>
 #include <tiny_obj_loader.h>

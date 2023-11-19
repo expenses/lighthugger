@@ -16,18 +16,16 @@ float3 tony_mc_mapface(float3 stimulus) {
 
 [shader("pixel")]
 void PSMain(
-    V2P psIn,
+    V2P inputs,
     [[vk::location(0)]] out float4 target_0: SV_Target0
 ) {
-    psIn.Uv.y = 1.0 - psIn.Uv.y;
+    float3 stimulus = scene_referred_framebuffer.Sample(clamp_sampler, inputs.uv);
 
-    float3 stimulus = scene_referred_framebuffer.Sample(clamp_sampler, psIn.Uv);
-    target_0 = float4(stimulus, 1.0);
+    target_0 = float4(tony_mc_mapface(stimulus), 1.0);
 
     float shadow_screen_percentage = 0.3;
 
-    if (psIn.Uv.x < shadow_screen_percentage && psIn.Uv.y < shadow_screen_percentage) {
-        psIn.Uv /= shadow_screen_percentage;
-        target_0 = float4(shadowmap.Sample(clamp_sampler, psIn.Uv).xxx, 1.0);
+    if (inputs.uv.x < shadow_screen_percentage && inputs.uv.y < shadow_screen_percentage) {
+        target_0 = float4(shadowmap.Sample(clamp_sampler, inputs.uv / shadow_screen_percentage).xxx, 1.0);
     }
 }

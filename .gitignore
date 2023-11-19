@@ -1,2 +1,4 @@
 build
 compiled_shaders/*.spv
+*.tracy
+imgui.ini

@@ -170,52 +170,27 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
             cascadeSplits[i] = (d - nearClip) / clipRange;
     }
 
-    if (global_id.x == 0 && false) printf(
-        "\n%f, %f, %f, %f\n",
-        cascadeSplits[0],
-        cascadeSplits[1],
-        cascadeSplits[2],
-        cascadeSplits[3]
-    );
-
     // Calculate orthographic projection matrix for each cascade
     // 1.0 - because we're using reverse z.
-    float lastSplitDist = (cascade_index > 0 ? cascadeSplits[cascade_index - 1] : min_depth);
-    float splitDist = cascadeSplits[cascade_index];
+    float lastSplitDist = min_depth;//(cascade_index > 0 ? cascadeSplits[cascade_index - 1] : min_depth);
+    float splitDist = max_depth;//cascadeSplits[cascade_index];
 
-    float frustum_min = lastSplitDist;
-    float frustum_max = splitDist;
-
-    if (uniforms.checkbox) {
-        frustum_min = 0.00005f;
-        frustum_max = 1.0f;
-    }
-
+    // Get the corners of the visible depth slice in view space
     float3 frustumCorners[8] = {
-            // We can't use a far value of 0 here as that
-            // goes infinite.
-            float3(-1.0f,  1.0f, frustum_min),//0.00005f),
-            float3( 1.0f,  1.0f, frustum_min),//0.00005f),
-            float3( 1.0f, -1.0f, frustum_min),//0.00005f),
-            float3(-1.0f, -1.0f, frustum_min),//0.00005f),
-            float3(-1.0f,  1.0f, frustum_max),// 1.0f),
-            float3( 1.0f,  1.0f, frustum_max),// 1.0f),
-            float3( 1.0f, -1.0f, frustum_max),// 1.0f),
-            float3(-1.0f, -1.0f, frustum_max),// 1.0f),
-        };
+        float3(-1.0f,  1.0f, lastSplitDist),
+        float3( 1.0f,  1.0f, lastSplitDist),
+        float3( 1.0f, -1.0f, lastSplitDist),
+        float3(-1.0f, -1.0f, lastSplitDist),
+        float3(-1.0f,  1.0f, splitDist),
+        float3( 1.0f,  1.0f, splitDist),
+        float3( 1.0f, -1.0f, splitDist),
+        float3(-1.0f, -1.0f, splitDist),
+    };
 
+    // Convert the corners to world space
     for (uint32_t i = 0; i < 8; i++) {
         float4 invCorner = mul(invCam, float4(frustumCorners[i], 1.0f));
         frustumCorners[i] = (invCorner / invCorner.w).xyz;
-    }
-
-    if (uniforms.checkbox) {
-        for (uint32_t i = 0; i < 4; i++) {
-            float3 dist = frustumCorners[i + 4] - frustumCorners[i];
-            if (global_id.x == 0) printf("\n%v3f\n", dist);
-            frustumCorners[i + 4] = frustumCorners[i] + (dist * splitDist);
-            frustumCorners[i] = frustumCorners[i] + (dist * lastSplitDist);
-        }
     }
 
     // Get frustum center

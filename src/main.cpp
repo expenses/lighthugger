@@ -352,14 +352,14 @@ int main() {
             "depth_info_buffer"
         )};
 
-    auto clamp_sampler = device.createSampler({
-        .magFilter = vk::Filter::eLinear,
-        .minFilter = vk::Filter::eLinear,
-        .addressModeU = vk::SamplerAddressMode::eClampToEdge,
-        .addressModeV = vk::SamplerAddressMode::eClampToEdge,
-        .addressModeW = vk::SamplerAddressMode::eClampToEdge,
-        .maxLod = VK_LOD_CLAMP_NONE
-    });
+    auto clamp_sampler = device.createSampler(
+        {.magFilter = vk::Filter::eLinear,
+         .minFilter = vk::Filter::eLinear,
+         .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+         .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+         .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+         .maxLod = VK_LOD_CLAMP_NONE}
+    );
 
     auto repeat_sampler = device.createSampler(
         {.magFilter = vk::Filter::eLinear,
@@ -370,16 +370,16 @@ int main() {
          .maxLod = VK_LOD_CLAMP_NONE}
     );
 
-    auto shadowmap_comparison_sampler = device.createSampler({
-        .magFilter = vk::Filter::eLinear,
-        .minFilter = vk::Filter::eLinear,
-        .addressModeU = vk::SamplerAddressMode::eClampToEdge,
-        .addressModeV = vk::SamplerAddressMode::eClampToEdge,
-        .addressModeW = vk::SamplerAddressMode::eClampToEdge,
-        .compareEnable = true,
-        .compareOp = vk::CompareOp::eLess,
-        .maxLod = VK_LOD_CLAMP_NONE
-    });
+    auto shadowmap_comparison_sampler = device.createSampler(
+        {.magFilter = vk::Filter::eLinear,
+         .minFilter = vk::Filter::eLinear,
+         .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+         .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+         .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+         .compareEnable = true,
+         .compareOp = vk::CompareOp::eLess,
+         .maxLod = VK_LOD_CLAMP_NONE}
+    );
 
     std::vector<AllocatedBuffer> temp_buffers;
 
@@ -563,12 +563,19 @@ int main() {
         .Instance = *instance,
         .PhysicalDevice = *phys_device,
         .Device = *device,
+        .QueueFamily = graphics_queue_family,
         .Queue = *graphics_queue,
+        .PipelineCache = nullptr,
         .DescriptorPool = *descriptor_pool,
+        .Subpass = 0,
         .MinImageCount = uint32_t(swapchain_images.size()),
         .ImageCount = uint32_t(swapchain_images.size()),
+        .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
         .UseDynamicRendering = true,
-        .ColorAttachmentFormat = VkFormat(swapchain_create_info.imageFormat)};
+        .ColorAttachmentFormat = VkFormat(swapchain_create_info.imageFormat),
+        .Allocator = nullptr,
+        .CheckVkResultFn = nullptr,
+    };
     assert(ImGui_ImplVulkan_Init(&imgui_init_info, nullptr));
 
     ImGui_ImplVulkan_CreateFontsTexture();
@@ -636,7 +643,6 @@ int main() {
         {
             Uniforms* uniforms = (Uniforms*)resources.uniform_buffer.mapped_ptr;
             ImGui::SliderFloat("fov", &fov, 0.0f, 90.0f);
-            ImGui::Checkbox("checkbox", &uniforms->checkbox);
             ImGui::Checkbox("stab", &uniforms->stabilize_cascades);
         }
         ImGui::Render();
@@ -662,14 +668,6 @@ int main() {
                 float(extent.width),
                 float(extent.height),
                 0.01
-            );
-
-            auto perspective_finite = reverse_z_perspective(
-                glm::radians(fov),
-                float(extent.width),
-                float(extent.height),
-                0.01,
-                1000.0
             );
 
             Uniforms* uniforms = (Uniforms*)resources.uniform_buffer.mapped_ptr;

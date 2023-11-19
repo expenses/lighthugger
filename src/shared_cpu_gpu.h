@@ -18,15 +18,11 @@ struct DepthInfoBuffer {
     uint32_t min_depth;
     uint32_t max_depth;
     MATRIX_TYPE shadow_rendering_matrices[4];
-    VEC3_TYPE shadow_rendering_cam_pos[4];
-    float cascade_splits[4];
+    //float cascade_splits[4];
 };
 
 struct Uniforms {
     MATRIX_TYPE combined_perspective_view;
     MATRIX_TYPE inv_perspective_view;
-    VEC3_TYPE _padding0;
-    bool checkbox;
-    VEC3_TYPE _padding1;
     bool stabilize_cascades;
 };

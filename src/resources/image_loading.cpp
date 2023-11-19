@@ -3,37 +3,35 @@
 #include "dds.h"
 #include "../sync.h"
 
-vk::Format translate_dxgi_to_vulkan(DXGI_FORMAT dxgi_format) {
+struct FormatInfo {
+    vk::Format format;
+    uint32_t bits_per_pixel;
+    bool is_block_compressed = false;
+};
+
+FormatInfo translate_format(DXGI_FORMAT dxgi_format) {
     switch (dxgi_format) {
         case DXGI_FORMAT_R9G9B9E5_SHAREDEXP:
-            return vk::Format::eE5B9G9R9UfloatPack32;
+            return {.format = vk::Format::eE5B9G9R9UfloatPack32, .bits_per_pixel = 32};
         case DXGI_FORMAT_BC1_UNORM:
-            return vk::Format::eBc1RgbSrgbBlock;
+            return {.format = vk::Format::eBc1RgbSrgbBlock, .bits_per_pixel = 4, .is_block_compressed = true};
         default:
             dbg(dxgi_format);
-            assert(false);
+            abort();
     }
 }
 
-vk::ImageType translate_resource_dimension(D3D10_RESOURCE_DIMENSION dimension) {
-    switch (dimension) {
-        case D3D10_RESOURCE_DIMENSION_TEXTURE3D:
-            return vk::ImageType::e3D;
-        case D3D10_RESOURCE_DIMENSION_TEXTURE2D:
-            return vk::ImageType::e2D;
-        default:
-            dbg(dimension);
-            assert(false);
-    }
-}
+struct Dimension {
+    vk::ImageType type;
+    vk::ImageViewType view_type;
+};
 
-vk::ImageViewType
-resource_dimension_to_view_type(D3D10_RESOURCE_DIMENSION dimension) {
+Dimension translate_dimension(D3D10_RESOURCE_DIMENSION dimension) {
     switch (dimension) {
         case D3D10_RESOURCE_DIMENSION_TEXTURE3D:
-            return vk::ImageViewType::e3D;
+            return {.type = vk::ImageType::e3D, .view_type = vk::ImageViewType::e3D};
         case D3D10_RESOURCE_DIMENSION_TEXTURE2D:
-            return vk::ImageViewType::e2D;
+             return {.type = vk::ImageType::e2D, .view_type = vk::ImageViewType::e2D};
         default:
             dbg(dimension);
             assert(false);
@@ -69,20 +67,15 @@ ImageWithView load_dds(
 
     stream.read((char*)&header10, sizeof header10);
 
-    auto format = translate_dxgi_to_vulkan(header10.dxgiFormat);
+    auto format = translate_format(header10.dxgiFormat);
 
     auto data_offset = sizeof dwMagic + sizeof header + sizeof header10;
 
-    auto image_type = translate_resource_dimension(header10.resourceDimension);
-    auto image_view_type =
-        resource_dimension_to_view_type(header10.resourceDimension);
+    auto dimension = translate_dimension(header10.resourceDimension);
 
     auto width = header.dwWidth;
     auto height = header.dwHeight;
     auto depth = std::max(header.dwDepth, 1u);
-
-    // Todo: actually implement this properly based on image format.
-    auto bits_per_pixel = depth > 1 ? 32 : 4;
 
     stream.seekg(0, stream.end);
     auto bytes_remaining = uint32_t(stream.tellg()) - data_offset;
@@ -102,8 +95,8 @@ ImageWithView load_dds(
 
     auto image = ImageWithView(
         vk::ImageCreateInfo {
-            .imageType = image_type,
-            .format = format,
+            .imageType = dimension.type,
+            .format = format.format,
             .extent =
                 vk::Extent3D {
                     .width = width,
@@ -118,7 +111,7 @@ ImageWithView load_dds(
         device,
         image_name.data(),
         subresource_range,
-        image_view_type
+        dimension.view_type
     );
 
     auto staging_buffer_name = std::string(filepath) + " staging buffer";
@@ -177,14 +170,18 @@ ImageWithView load_dds(
         // We need to round up the width and heights here because for block
         // compressed textures, the minimum amount of data a miplevel can use
         // is the equivalent of 4x4 pixels, even when the actual mip size is smaller.
+        auto rounded_width = format.is_block_compressed ? round_up(level_width, 4) : level_width;
+        auto rounded_height = format.is_block_compressed ? round_up(level_height, 4) : level_height;
+
         buffer_offset +=
-            (round_up(level_width, 4) * round_up(level_height, 4) * depth)
-            * bits_per_pixel / 8;
+            (rounded_width * rounded_height * depth)
+            * format.bits_per_pixel / 8;
     }
 
-    // Make sure we use every byte of the dds file, because otherwise we're probably doing something wrong.
-    //dbg(buffer_offset, bytes_remaining, filepath, bits_per_pixel);
-    assert(buffer_offset == bytes_remaining);
+    if (buffer_offset != bytes_remaining) {
+        dbg(buffer_offset, bytes_remaining, filepath, format.bits_per_pixel);
+        assert(buffer_offset == bytes_remaining);
+    }
 
     command_buffer.copyBufferToImage(
         staging_buffer.buffer,
