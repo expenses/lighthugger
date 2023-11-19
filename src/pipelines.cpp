@@ -107,11 +107,12 @@ vk::raii::Pipeline name_pipeline(
     const vk::raii::Device& device,
     const char* name
 ) {
+    std::string pipeline_name = std::string("pipeline ") + name;
     VkPipeline c_pipeline = *pipeline;
     device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
         .objectType = vk::ObjectType::ePipeline,
         .objectHandle = reinterpret_cast<uint64_t>(c_pipeline),
-        .pObjectName = name});
+        .pObjectName = pipeline_name.data()});
     return pipeline;
 }
 
@@ -207,7 +208,7 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
     flags[0] = vk::DescriptorBindingFlagBits::ePartiallyBound;
 
     auto flags_create_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo {
-        .bindingCount = uint32_t(flags.size()),
+        .bindingCount = static_cast<uint32_t>(flags.size()),
         .pBindingFlags = flags.data()};
 
     return DescriptorSetLayouts {

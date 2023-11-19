@@ -49,7 +49,8 @@ Dimension translate_dimension(D3D10_RESOURCE_DIMENSION dimension) {
 }
 
 uint32_t round_up(uint32_t value, uint32_t round_to) {
-    return uint32_t(std::ceil(float(value) / float(round_to))) * round_to;
+    return static_cast<uint32_t>(std::ceil(float(value) / float(round_to)))
+        * round_to;
 }
 
 ImageWithView load_dds(
@@ -73,9 +74,9 @@ ImageWithView load_dds(
 
     assert(dwMagic == expected_magic);
 
-    stream.read((char*)&header, sizeof header);
+    stream.read(reinterpret_cast<char*>(&header), sizeof header);
 
-    stream.read((char*)&header10, sizeof header10);
+    stream.read(reinterpret_cast<char*>(&header10), sizeof header10);
 
     auto format = translate_format(header10.dxgiFormat);
 
@@ -88,8 +89,8 @@ ImageWithView load_dds(
     auto depth = std::max(header.dwDepth, 1u);
 
     stream.seekg(0, stream.end);
-    auto bytes_remaining = uint32_t(stream.tellg()) - data_offset;
-    stream.seekg(data_offset, stream.beg);
+    auto bytes_remaining = static_cast<uint32_t>(stream.tellg()) - data_offset;
+    stream.seekg(static_cast<std::ifstream::off_type>(data_offset), stream.beg);
 
     auto mip_levels = header.dwMipMapCount;
 
@@ -101,7 +102,7 @@ ImageWithView load_dds(
         .layerCount = 1,
     };
 
-    auto image_name = std::string(filepath) + " image";
+    auto image_name = std::string("'") + filepath + "'";
 
     auto image = ImageWithView(
         vk::ImageCreateInfo {
@@ -138,7 +139,10 @@ ImageWithView load_dds(
         allocator
     ));
 
-    stream.read((char*)staging_buffer.mapped_ptr, bytes_remaining);
+    stream.read(
+        reinterpret_cast<char*>(staging_buffer.mapped_ptr),
+        static_cast<std::streamsize>(bytes_remaining)
+    );
 
     insert_color_image_barriers(
         command_buffer,
@@ -164,7 +168,7 @@ ImageWithView load_dds(
             .imageSubresource =
                 {
                     .aspectMask = vk::ImageAspectFlagBits::eColor,
-                    .mipLevel = uint32_t(i),
+                    .mipLevel = static_cast<uint32_t>(i),
                     .baseArrayLayer = 0,
                     .layerCount = 1,
                 },

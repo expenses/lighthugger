@@ -60,6 +60,17 @@ Mesh load_obj(
         }
     }
 
+    float bounding_sphere_radius = 0.0;
+    for (uint32_t i = 0; i < attrib.vertices.size() / 3; i++) {
+        auto position = glm::vec3(
+            attrib.vertices[i * 3],
+            attrib.vertices[i * 3 + 1],
+            attrib.vertices[i * 3 + 2]
+        );
+        bounding_sphere_radius =
+            std::max(bounding_sphere_radius, glm::length2(position));
+    }
+
     // Todo: should use staging buffers instead of host-accessible storage buffers.
 
     auto index_buffer = upload_via_staging_buffer(
@@ -117,15 +128,15 @@ Mesh load_obj(
         temp_buffers
     );
 
-    return Mesh(
-        std::move(position_buffer),
-        std::move(index_buffer),
-        std::move(normal_buffer),
-        std::move(material_id_buffer),
-        std::move(uv_buffer),
-        std::move(images),
-        indices.size()
-    );
+    return {
+        .positions = std::move(position_buffer),
+        .indices = std::move(index_buffer),
+        .normals = std::move(normal_buffer),
+        .material_ids = std::move(material_id_buffer),
+        .uvs = std::move(uv_buffer),
+        .images = std::move(images),
+        .num_indices = static_cast<uint32_t>(indices.size()),
+        .bounding_sphere_radius = bounding_sphere_radius};
 }
 
 MeshBufferAddresses Mesh::get_addresses(const vk::raii::Device& device) {

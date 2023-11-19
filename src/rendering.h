@@ -1,6 +1,7 @@
 
 uint32_t dispatch_size(uint32_t width, uint32_t workgroup_size) {
-    return uint32_t(std::ceil(float(width) / float(workgroup_size)));
+    return static_cast<uint32_t>(std::ceil(float(width) / float(workgroup_size))
+    );
 }
 
 void set_scissor_and_viewport(
@@ -164,7 +165,7 @@ void render(
             .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
             .loadOp = vk::AttachmentLoadOp::eClear,
             .storeOp = vk::AttachmentStoreOp::eStore,
-            .clearValue = {.depthStencil = 1.0}};
+            .clearValue = {.depthStencil = {.depth = 1.0f}}};
         command_buffer.beginRendering(
             {.renderArea =
                  {

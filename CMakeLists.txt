@@ -30,3 +30,10 @@ target_link_libraries(vkcpptest glfw Vulkan::Vulkan)
 target_precompile_headers(vkcpptest PRIVATE src/pch.h)
 target_compile_features(vkcpptest PUBLIC cxx_std_20)
 target_compile_options(vkcpptest PUBLIC -Wall -Wextra -Wpedantic -Wfatal-errors -fdiagnostics-color=always)
+
+# Use extra warnings when compiling with clang.
+target_compile_options(vkcpptest PRIVATE
+$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:
+    -Wall -Wextra -Wpedantic -Wfatal-errors -fdiagnostics-color=always -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-pre-c++20-compat-pedantic -Wno-extra-semi-stmt -Wno-missing-prototypes -Wno-double-promotion -Wno-switch-enum
+    >
+)

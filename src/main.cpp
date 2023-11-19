@@ -95,21 +95,21 @@ struct CameraParams {
 
     glm::vec3 facing() {
         return glm::vec3(
-            cos(yaw) * cos(pitch),
-            sin(pitch),
-            sin(yaw) * cos(pitch)
+            cosf(yaw) * cosf(pitch),
+            sinf(pitch),
+            sinf(yaw) * cosf(pitch)
         );
     }
 
     glm::vec3 right() {
-        return glm::vec3(-sin(yaw), 0.0, cos(yaw));
+        return glm::vec3(-sinf(yaw), 0.0, cosf(yaw));
     }
 
     glm::vec3 sun_dir() {
         return glm::vec3(
-            cos(sun_latitude) * cos(sun_longitude),
-            sin(sun_longitude),
-            sin(sun_latitude) * cos(sun_longitude)
+            cosf(sun_latitude) * cosf(sun_longitude),
+            sinf(sun_longitude),
+            sinf(sun_latitude) * cosf(sun_longitude)
         );
     }
 };
@@ -127,6 +127,60 @@ struct KeyboardState {
     bool control;
     bool grab_toggled;
 };
+
+void glfw_key_callback(
+    GLFWwindow* window,
+    int key,
+    int /*scancode*/,
+    int action,
+    int /*mods*/
+) {
+    KeyboardState& keyboard_state =
+        *static_cast<KeyboardState*>(glfwGetWindowUserPointer(window));
+    switch (key) {
+        case GLFW_KEY_LEFT:
+            keyboard_state.left = action != GLFW_RELEASE;
+            break;
+        case GLFW_KEY_RIGHT:
+            keyboard_state.right = action != GLFW_RELEASE;
+            break;
+        case GLFW_KEY_UP:
+            keyboard_state.up = action != GLFW_RELEASE;
+            break;
+        case GLFW_KEY_DOWN:
+            keyboard_state.down = action != GLFW_RELEASE;
+            break;
+        case GLFW_KEY_W:
+            keyboard_state.w = action != GLFW_RELEASE;
+            break;
+        case GLFW_KEY_A:
+            keyboard_state.a = action != GLFW_RELEASE;
+            break;
+        case GLFW_KEY_S:
+            keyboard_state.s = action != GLFW_RELEASE;
+            break;
+        case GLFW_KEY_D:
+            keyboard_state.d = action != GLFW_RELEASE;
+            break;
+        case GLFW_KEY_LEFT_SHIFT:
+            keyboard_state.shift = action != GLFW_RELEASE;
+            break;
+        case GLFW_KEY_LEFT_CONTROL:
+            keyboard_state.control = action != GLFW_RELEASE;
+            break;
+        case GLFW_KEY_G:
+            keyboard_state.grab_toggled ^= (action == GLFW_PRESS);
+            if (keyboard_state.grab_toggled) {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            } else {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            }
+            break;
+    }
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+    }
+}
 
 int main() {
     glfwInit();
@@ -250,8 +304,8 @@ int main() {
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     auto window = glfwCreateWindow(
-        extent.width,
-        extent.height,
+        static_cast<int>(extent.width),
+        static_cast<int>(extent.height),
         "Window Title",
         NULL,
         NULL
@@ -312,8 +366,6 @@ int main() {
     auto render_semaphore = device.createSemaphore({});
     auto render_fence =
         device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
-
-    float time = 0.0;
 
     auto pipelines =
         Pipelines::compile_pipelines(device, swapchain_create_info.imageFormat);
@@ -617,8 +669,8 @@ int main() {
         .PipelineCache = nullptr,
         .DescriptorPool = *descriptor_pool,
         .Subpass = 0,
-        .MinImageCount = uint32_t(swapchain_images.size()),
-        .ImageCount = uint32_t(swapchain_images.size()),
+        .MinImageCount = static_cast<uint32_t>(swapchain_images.size()),
+        .ImageCount = static_cast<uint32_t>(swapchain_images.size()),
         .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
         .UseDynamicRendering = true,
         .ColorAttachmentFormat = VkFormat(swapchain_create_info.imageFormat),
@@ -632,69 +684,7 @@ int main() {
     KeyboardState keyboard_state = {};
 
     glfwSetWindowUserPointer(window, &keyboard_state);
-    glfwSetKeyCallback(
-        window,
-        [](GLFWwindow* window,
-           int key,
-           int /*scancode*/,
-           int action,
-           int /*mods*/
-        ) {
-            KeyboardState& keyboard_state =
-                *static_cast<KeyboardState*>(glfwGetWindowUserPointer(window));
-            switch (key) {
-                case GLFW_KEY_LEFT:
-                    keyboard_state.left = action != GLFW_RELEASE;
-                    break;
-                case GLFW_KEY_RIGHT:
-                    keyboard_state.right = action != GLFW_RELEASE;
-                    break;
-                case GLFW_KEY_UP:
-                    keyboard_state.up = action != GLFW_RELEASE;
-                    break;
-                case GLFW_KEY_DOWN:
-                    keyboard_state.down = action != GLFW_RELEASE;
-                    break;
-                case GLFW_KEY_W:
-                    keyboard_state.w = action != GLFW_RELEASE;
-                    break;
-                case GLFW_KEY_A:
-                    keyboard_state.a = action != GLFW_RELEASE;
-                    break;
-                case GLFW_KEY_S:
-                    keyboard_state.s = action != GLFW_RELEASE;
-                    break;
-                case GLFW_KEY_D:
-                    keyboard_state.d = action != GLFW_RELEASE;
-                    break;
-                case GLFW_KEY_LEFT_SHIFT:
-                    keyboard_state.shift = action != GLFW_RELEASE;
-                    break;
-                case GLFW_KEY_LEFT_CONTROL:
-                    keyboard_state.control = action != GLFW_RELEASE;
-                    break;
-                case GLFW_KEY_G:
-                    keyboard_state.grab_toggled ^= (action == GLFW_PRESS);
-                    if (keyboard_state.grab_toggled) {
-                        glfwSetInputMode(
-                            window,
-                            GLFW_CURSOR,
-                            GLFW_CURSOR_DISABLED
-                        );
-                    } else {
-                        glfwSetInputMode(
-                            window,
-                            GLFW_CURSOR,
-                            GLFW_CURSOR_NORMAL
-                        );
-                    }
-                    break;
-            }
-            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-                glfwSetWindowShouldClose(window, GLFW_TRUE);
-            }
-        }
-    );
+    glfwSetKeyCallback(window, glfw_key_callback);
 
     auto prev_mouse = glm::dvec2(0.0, 0.0);
     glfwGetCursorPos(window, &prev_mouse.x, &prev_mouse.y);
@@ -755,7 +745,6 @@ int main() {
                 {}
             );
         }
-
         {
             int left_right = int(keyboard_state.d) - int(keyboard_state.a);
             int forwards_backwards =
@@ -767,12 +756,14 @@ int main() {
             int sun_up_down = int(keyboard_state.up) - int(keyboard_state.down);
 
             camera_params.position +=
-                float(left_right) * 0.5f * camera_params.right();
-            camera_params.position +=
-                float(forwards_backwards) * 0.5f * camera_params.facing();
-            camera_params.position.y += float(up_down) * 0.5f;
-            camera_params.sun_latitude += sun_left_right * 0.025f;
-            camera_params.sun_longitude += sun_up_down * 0.025f;
+                static_cast<float>(left_right) * 0.5f * camera_params.right();
+            camera_params.position += static_cast<float>(forwards_backwards)
+                * 0.5f * camera_params.facing();
+            camera_params.position.y += static_cast<float>(up_down) * 0.5f;
+            camera_params.sun_latitude +=
+                static_cast<float>(sun_left_right) * 0.025f;
+            camera_params.sun_longitude +=
+                static_cast<float>(sun_up_down) * 0.025f;
             camera_params.sun_longitude = std::clamp(
                 camera_params.sun_longitude,
                 0.0f,
@@ -785,8 +776,10 @@ int main() {
             prev_mouse = mouse;
 
             if (keyboard_state.grab_toggled) {
-                camera_params.pitch -= mouse_delta.y / 1024.0;
-                camera_params.yaw += mouse_delta.x / 1024.0;
+                camera_params.pitch -=
+                    static_cast<float>(mouse_delta.y) / 1024.0f;
+                camera_params.yaw +=
+                    static_cast<float>(mouse_delta.x) / 1024.0f;
                 camera_params.pitch = std::clamp(
                     camera_params.pitch,
                     -std::numbers::pi_v<float> / 2.0f + 0.0001f,
@@ -814,8 +807,6 @@ int main() {
         }
         ImGui::Render();
 
-        time += 1.0 / 60.0;
-
         // Wait on the render fence to be signaled
         // (it's signaled before this loop starts so that we don't just block forever on the first frame)
         check_vk_result(device.waitForFences({*render_fence}, true, u64_max));
@@ -834,10 +825,12 @@ int main() {
                 glm::radians(camera_params.fov),
                 float(extent.width),
                 float(extent.height),
-                0.01
+                0.01f
             );
 
-            Uniforms* uniforms = (Uniforms*)resources.uniform_buffer.mapped_ptr;
+            Uniforms* uniforms =
+                reinterpret_cast<Uniforms*>(resources.uniform_buffer.mapped_ptr
+                );
             uniforms->sun_dir = camera_params.sun_dir();
             uniforms->combined_perspective_view = perspective * view;
             uniforms->inv_perspective_view = glm::inverse(perspective * view);

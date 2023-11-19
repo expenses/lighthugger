@@ -15,5 +15,11 @@ ImageWithView ImageWithView::create_image_with_view(
          .format = create_info.format,
          .subresourceRange = subresource_range}
     );
+    auto view_name = std::string(name) + " view";
+    VkImageView c_view = *view;
+    device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+        .objectType = vk::ObjectType::eImageView,
+        .objectHandle = reinterpret_cast<uint64_t>(c_view),
+        .pObjectName = view_name.data()});
     return ImageWithView(std::move(image), std::move(view));
 }

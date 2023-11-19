@@ -10,6 +10,7 @@ struct Mesh {
     AllocatedBuffer uvs;
     std::vector<ImageWithView> images;
     uint32_t num_indices;
+    float bounding_sphere_radius;
 
     MeshBufferAddresses get_addresses(const vk::raii::Device& device);
 };
