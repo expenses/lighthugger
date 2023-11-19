@@ -101,7 +101,7 @@ void PSMain(
 
     float3 normal = normalize(input.normal);
 
-    float n_dot_l = max(dot(SUN_DIR, normal), 0.0);
+    float n_dot_l = max(dot(uniforms.sun_dir, normal), 0.0);
     float3 albedo = textures[input.material_index].Sample(repeat_sampler, input.uv).rgb;
 
     float ambient = 0.05;

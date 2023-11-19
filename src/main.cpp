@@ -20,18 +20,6 @@ const auto u32_max = std::numeric_limits<uint32_t>::max();
 // https://lesleylai.info/en/vk-khr-dynamic-rendering/
 // https://github.com/dokipen3d/vulkanHppMinimalExample/blob/master/main.cpp
 
-static void key_callback(
-    GLFWwindow* window,
-    int key,
-    int /*scancode*/,
-    int action,
-    int /*mods*/
-) {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-    }
-}
-
 struct ResizingResources {
     ImageWithView scene_referred_framebuffer;
     ImageWithView depthbuffer;
@@ -91,6 +79,56 @@ struct Resources {
 };
 
 #include "rendering.h"
+
+struct CameraParams {
+    glm::vec3 position;
+    glm::vec3 velocity = glm::vec3(0.0);
+    float fov;
+
+    float yaw = 0.0;
+    float pitch = 0.0;
+
+    float sun_latitude;
+    float sun_longitude;
+
+    glm::vec3 facing() {
+        return glm::vec3(
+            cos(yaw) * cos(pitch),
+            sin(pitch),
+            sin(yaw) * cos(pitch)
+        );
+    }
+
+    glm::vec3 right() {
+        return glm::vec3(
+            sin(yaw),
+            0.0,
+            cos(yaw)
+        );
+    }
+
+    glm::vec3 sun_dir() {
+        return glm::vec3(
+            cos(sun_latitude) * cos(sun_longitude),
+            sin(sun_longitude),
+            sin(sun_latitude) * cos(sun_longitude)
+        );
+    }
+};
+
+struct KeyboardState {
+    bool left;
+    bool right;
+    bool up;
+    bool down;
+    bool w;
+    bool a;
+    bool s;
+    bool d;
+    bool shift;
+    bool control;
+    bool grab_toggled;
+};
 
 int main() {
     glfwInit();
@@ -220,8 +258,6 @@ int main() {
         NULL,
         NULL
     );
-
-    glfwSetKeyCallback(window, key_callback);
 
     VkSurfaceKHR _surface;
     check_vk_result(static_cast<vk::Result>(
@@ -577,7 +613,12 @@ int main() {
         {}
     );
 
-    float fov = 45.0;
+    auto camera_params = CameraParams {
+        .position = glm::vec3(-86.5, 15.5, -17.0),
+        .fov = 45.0f,
+        .sun_latitude = -2.555f,
+        .sun_longitude = 0.3f,
+    };
 
     auto tracy_ctx =
         TracyVkContext(*phys_device, *device, *graphics_queue, *command_buffer);
@@ -604,6 +645,59 @@ int main() {
     assert(ImGui_ImplVulkan_Init(&imgui_init_info, nullptr));
 
     ImGui_ImplVulkan_CreateFontsTexture();
+
+    KeyboardState keyboard_state = {};
+
+    glfwSetWindowUserPointer(window, &keyboard_state);
+    glfwSetKeyCallback(window, [](
+        GLFWwindow* window,
+        int key,
+        int /*scancode*/,
+        int action,
+        int /*mods*/
+    ) {
+        KeyboardState& keyboard_state = *static_cast<KeyboardState*>(glfwGetWindowUserPointer(window));
+        // With apologies to anyone with a non-US keyboard.
+        switch(key) {
+            case GLFW_KEY_LEFT:
+                keyboard_state.left = action != GLFW_RELEASE;
+                break;
+            case GLFW_KEY_RIGHT:
+                keyboard_state.right = action != GLFW_RELEASE;
+                break;
+            case GLFW_KEY_UP:
+                keyboard_state.up = action != GLFW_RELEASE;
+                break;
+            case GLFW_KEY_DOWN:
+                keyboard_state.down = action != GLFW_RELEASE;
+                break;
+            case GLFW_KEY_W:
+                keyboard_state.w = action != GLFW_RELEASE;
+                break;
+            case GLFW_KEY_A:
+                keyboard_state.a = action != GLFW_RELEASE;
+                break;
+            case GLFW_KEY_S:
+                keyboard_state.s = action != GLFW_RELEASE;
+                break;
+            case GLFW_KEY_D:
+                keyboard_state.d = action != GLFW_RELEASE;
+                break;
+            case GLFW_KEY_LEFT_SHIFT:
+                keyboard_state.shift = action != GLFW_RELEASE;
+                break;
+            case GLFW_KEY_LEFT_CONTROL:
+                keyboard_state.control = action != GLFW_RELEASE;
+                break;
+            case GLFW_KEY_G:
+                keyboard_state.grab_toggled ^= (action == GLFW_PRESS);
+                break;
+
+        }
+        if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+        }
+    });
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -662,13 +756,32 @@ int main() {
             );
         }
 
+        {
+            int left_right = int(keyboard_state.d) - int(keyboard_state.a);
+            int forwards_backwards = int(keyboard_state.w) - int(keyboard_state.s);
+            int up_down = int(keyboard_state.shift) - int(keyboard_state.control);
+            int sun_left_right = int(keyboard_state.right) - int(keyboard_state.left);
+            int sun_up_down = int(keyboard_state.up) - int(keyboard_state.down);
+
+            camera_params.position += float(left_right) * 0.5f * camera_params.right();
+            camera_params.position += float(forwards_backwards) * 0.5f * camera_params.facing();
+            camera_params.position.y += float(up_down) * 0.5f;
+            camera_params.sun_latitude += sun_left_right * 0.025f;
+            camera_params.sun_longitude += sun_up_down * 0.025f;
+            camera_params.sun_longitude = std::clamp(camera_params.sun_longitude, 0.0f, std::numbers::pi_v<float> / 2.0f);
+        }
+
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         {
-            Uniforms* uniforms = (Uniforms*)resources.uniform_buffer.mapped_ptr;
-            ImGui::SliderFloat("fov", &fov, 0.0f, 90.0f);
-            ImGui::Checkbox("stab", &uniforms->stabilize_cascades);
+            ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
+            ImGui::Text("camera pos: (%f, %f, %f", camera_params.position.x, camera_params.position.y, camera_params.position.z);
+            ImGui::Text("yaw: %f", camera_params.yaw);
+            ImGui::Text("pitch: %f", camera_params.pitch);
+            ImGui::Text("sun_latitude: %f", camera_params.sun_latitude);
+            ImGui::Text("sun_longitude: %f", camera_params.sun_longitude);
+            ImGui::Text("grab_toggled: %u", keyboard_state.grab_toggled);
         }
         ImGui::Render();
 
@@ -683,19 +796,20 @@ int main() {
         // due to writing to a value that the previous frame is reading from.
         {
             auto view = glm::lookAt(
-                glm::vec3(sin(time / 2.0) * 100, 100, cos(time / 2.0) * 100),
-                glm::vec3(0, 0, 0),
+                camera_params.position,
+                camera_params.position + camera_params.facing(),
                 glm::vec3(0, 1, 0)
             );
 
             auto perspective = infinite_reverse_z_perspective(
-                glm::radians(fov),
+                glm::radians(camera_params.fov),
                 float(extent.width),
                 float(extent.height),
                 0.01
             );
 
             Uniforms* uniforms = (Uniforms*)resources.uniform_buffer.mapped_ptr;
+            uniforms->sun_dir = camera_params.sun_dir();
             uniforms->combined_perspective_view = perspective * view;
             uniforms->inv_perspective_view = glm::inverse(perspective * view);
         }

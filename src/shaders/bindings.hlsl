@@ -1,7 +1,5 @@
 #include "../shared_cpu_gpu.h"
 
-static float3 SUN_DIR = normalize(float3(1, 2, 1));
-
 [[vk::binding(0)]] Texture2D textures[];
 [[vk::binding(1)]] StructuredBuffer<MeshBufferAddresses> mesh_buffer_addresses;
 [[vk::binding(2)]] cbuffer uniforms {

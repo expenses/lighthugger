@@ -109,7 +109,7 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
     float3 maxExtents = sphere_radius;
     float3 minExtents = -maxExtents;
 
-    float3 lightDir = normalize(-SUN_DIR);
+    float3 lightDir = -uniforms.sun_dir;
 
     float4x4 shadowView = lookAt(lightDir * minExtents.z + frustumCenter, frustumCenter, float3(0,1,0));
 	float4x4 shadowProj = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, maxExtents.z - minExtents.z);

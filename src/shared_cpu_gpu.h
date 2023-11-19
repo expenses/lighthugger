@@ -25,4 +25,5 @@ struct Uniforms {
     MATRIX_TYPE combined_perspective_view;
     MATRIX_TYPE inv_perspective_view;
     bool stabilize_cascades;
+    VEC3_TYPE sun_dir;
 };
