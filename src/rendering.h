@@ -29,7 +29,6 @@ void render(
     const Pipelines& pipelines,
     const DescriptorSet& descriptor_set,
     const Resources& resources,
-    const Mesh& powerplant,
     vk::Image swapchain_image,
     const vk::raii::ImageView& swapchain_image_view,
     vk::Extent2D extent,
@@ -113,7 +112,12 @@ void render(
             vk::PipelineBindPoint::eGraphics,
             *pipelines.geometry_depth_prepass
         );
-        command_buffer.draw(powerplant.num_indices, 1, 0, 0);
+        command_buffer.drawIndirect(
+            resources.draw_calls_buffer.buffer,
+            0,
+            resources.num_draws,
+            sizeof(vk::DrawIndirectCommand)
+        );
         command_buffer.endRendering();
     }
 
@@ -174,7 +178,12 @@ void render(
             vk::PipelineBindPoint::eGraphics,
             *pipelines.shadow_pass
         );
-        command_buffer.draw(powerplant.num_indices, 1, 0, 0);
+        command_buffer.drawIndirect(
+            resources.draw_calls_buffer.buffer,
+            0,
+            resources.num_draws,
+            sizeof(vk::DrawIndirectCommand)
+        );
         command_buffer.endRendering();
     }
     set_scissor_and_viewport(command_buffer, extent.width, extent.height);
@@ -223,7 +232,12 @@ void render(
             vk::PipelineBindPoint::eGraphics,
             *pipelines.render_geometry
         );
-        command_buffer.draw(powerplant.num_indices, 1, 0, 0);
+        command_buffer.drawIndirect(
+            resources.draw_calls_buffer.buffer,
+            0,
+            resources.num_draws,
+            sizeof(vk::DrawIndirectCommand)
+        );
         command_buffer.endRendering();
     }
 

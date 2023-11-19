@@ -86,6 +86,8 @@ struct Resources {
     PersistentlyMappedBuffer uniform_buffer;
     ImageWithView shadowmap;
     AllocatedBuffer depth_info_buffer;
+    AllocatedBuffer draw_calls_buffer;
+    uint32_t num_draws;
 };
 
 #include "rendering.h"
@@ -350,7 +352,20 @@ int main() {
             },
             allocator,
             "depth_info_buffer"
-        )};
+        ),
+        .draw_calls_buffer = AllocatedBuffer(
+            vk::BufferCreateInfo {
+                .size = sizeof(vk::DrawIndirectCommand),
+                .usage = vk::BufferUsageFlagBits::eIndirectBuffer},
+            {
+                .flags =
+                    vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+                .usage = vma::MemoryUsage::eAuto,
+            },
+            allocator,
+            "draw_calls_buffer"
+        ),
+        .num_draws = 1};
 
     auto clamp_sampler = device.createSampler(
         {.magFilter = vk::Filter::eLinear,
@@ -426,6 +441,16 @@ int main() {
         // Drop temp buffers.
         temp_buffers.clear();
     }
+
+    auto powerplant_draw = vk::DrawIndirectCommand {
+        .vertexCount = powerplant.num_indices,
+        .instanceCount = 1,
+        .firstVertex = 0,
+        .firstInstance = 0};
+    resources.draw_calls_buffer.map_and_memcpy(
+        (void*)&powerplant_draw,
+        sizeof powerplant_draw
+    );
 
     auto buffer_addresses = std::array {powerplant.get_addresses(device)};
 
@@ -693,7 +718,6 @@ int main() {
             pipelines,
             descriptor_set,
             resources,
-            powerplant,
             swapchain_images[swapchain_image_index],
             swapchain_image_views[swapchain_image_index],
             extent,
