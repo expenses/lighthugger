@@ -69,11 +69,4 @@ struct AllocatedBuffer {
         std::swap(allocator, other.allocator);
         return *this;
     }
-
-    void map_and_memcpy(void* src, size_t count) {
-        auto ptr = allocator.mapMemory(allocation);
-        std::memcpy(ptr, src, count);
-        allocator.unmapMemory(allocation);
-        allocator.flushAllocation(allocation, 0, VK_WHOLE_SIZE);
-    }
 };

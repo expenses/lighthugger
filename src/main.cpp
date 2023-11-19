@@ -1,5 +1,6 @@
 #include "allocations/base.h"
 #include "allocations/persistently_mapped.h"
+#include "allocations/staging.h"
 #include "debugging.h"
 #include "descriptor_set.h"
 #include "pch.h"
@@ -344,62 +345,6 @@ int main() {
 
     auto descriptor_set = DescriptorSet(std::move(descriptor_sets[0]));
 
-    auto resources = Resources {
-        .resizing = ResizingResources(device, allocator, extent),
-        .uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
-            vk::BufferCreateInfo {
-                .size = sizeof(Uniforms),
-                .usage = vk::BufferUsageFlagBits::eUniformBuffer},
-            {
-                .flags = vma::AllocationCreateFlagBits::eMapped
-                    | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
-                .usage = vma::MemoryUsage::eAuto,
-            },
-            allocator
-        )),
-        .shadowmap = ImageWithView(
-            {.imageType = vk::ImageType::e2D,
-             .format = vk::Format::eD32Sfloat,
-             .extent =
-                 vk::Extent3D {
-                     .width = 1024,
-                     .height = 1024,
-                     .depth = 1,
-                 },
-             .mipLevels = 1,
-             .arrayLayers = 1,
-             .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment
-                 | vk::ImageUsageFlagBits::eSampled},
-            allocator,
-            device,
-            "shadowmap",
-            DEPTH_SUBRESOURCE_RANGE
-        ),
-        .depth_info_buffer = AllocatedBuffer(
-            vk::BufferCreateInfo {
-                .size = sizeof(DepthInfoBuffer),
-                .usage = vk::BufferUsageFlagBits::eStorageBuffer
-                    | vk::BufferUsageFlagBits::eTransferDst},
-            {
-                .usage = vma::MemoryUsage::eAuto,
-            },
-            allocator,
-            "depth_info_buffer"
-        ),
-        .draw_calls_buffer = AllocatedBuffer(
-            vk::BufferCreateInfo {
-                .size = sizeof(vk::DrawIndirectCommand),
-                .usage = vk::BufferUsageFlagBits::eIndirectBuffer},
-            {
-                .flags =
-                    vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
-                .usage = vma::MemoryUsage::eAuto,
-            },
-            allocator,
-            "draw_calls_buffer"
-        ),
-        .num_draws = 1};
-
     auto clamp_sampler = device.createSampler(
         {.magFilter = vk::Filter::eLinear,
          .minFilter = vk::Filter::eLinear,
@@ -455,6 +400,77 @@ int main() {
         descriptor_set
     );
 
+    auto buffer_addresses = std::array {powerplant.get_addresses(device)};
+
+    auto geometry_buffer = upload_via_staging_buffer(
+        buffer_addresses.data(),
+        buffer_addresses.size() * sizeof(MeshBufferAddresses),
+        allocator,
+        vk::BufferUsageFlagBits::eStorageBuffer,
+        "geometry_buffer",
+        command_buffer,
+        temp_buffers
+    );
+
+    auto powerplant_draw = vk::DrawIndirectCommand {
+        .vertexCount = powerplant.num_indices,
+        .instanceCount = 1,
+        .firstVertex = 0,
+        .firstInstance = 0};
+
+    auto resources = Resources {
+        .resizing = ResizingResources(device, allocator, extent),
+        .uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
+            vk::BufferCreateInfo {
+                .size = sizeof(Uniforms),
+                .usage = vk::BufferUsageFlagBits::eUniformBuffer},
+            {
+                .flags = vma::AllocationCreateFlagBits::eMapped
+                    | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+                .usage = vma::MemoryUsage::eAuto,
+            },
+            allocator
+        )),
+        .shadowmap = ImageWithView(
+            {.imageType = vk::ImageType::e2D,
+             .format = vk::Format::eD32Sfloat,
+             .extent =
+                 vk::Extent3D {
+                     .width = 1024,
+                     .height = 1024,
+                     .depth = 1,
+                 },
+             .mipLevels = 1,
+             .arrayLayers = 1,
+             .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment
+                 | vk::ImageUsageFlagBits::eSampled},
+            allocator,
+            device,
+            "shadowmap",
+            DEPTH_SUBRESOURCE_RANGE
+        ),
+        .depth_info_buffer = AllocatedBuffer(
+            vk::BufferCreateInfo {
+                .size = sizeof(DepthInfoBuffer),
+                .usage = vk::BufferUsageFlagBits::eStorageBuffer
+                    | vk::BufferUsageFlagBits::eTransferDst},
+            {
+                .usage = vma::MemoryUsage::eAuto,
+            },
+            allocator,
+            "depth_info_buffer"
+        ),
+        .draw_calls_buffer = upload_via_staging_buffer(
+            &powerplant_draw,
+            sizeof(vk::DrawIndirectCommand),
+            allocator,
+            vk::BufferUsageFlagBits::eIndirectBuffer,
+            "draw_calls_buffer",
+            command_buffer,
+            temp_buffers
+        ),
+        .num_draws = 1};
+
     command_buffer.end();
 
     {
@@ -474,36 +490,6 @@ int main() {
         // Drop temp buffers.
         temp_buffers.clear();
     }
-
-    auto powerplant_draw = vk::DrawIndirectCommand {
-        .vertexCount = powerplant.num_indices,
-        .instanceCount = 1,
-        .firstVertex = 0,
-        .firstInstance = 0};
-    resources.draw_calls_buffer.map_and_memcpy(
-        (void*)&powerplant_draw,
-        sizeof powerplant_draw
-    );
-
-    auto buffer_addresses = std::array {powerplant.get_addresses(device)};
-
-    auto geometry_buffer = AllocatedBuffer(
-        vk::BufferCreateInfo {
-            .size = buffer_addresses.size() * sizeof(MeshBufferAddresses),
-            .usage = vk::BufferUsageFlagBits::eTransferSrc
-                | vk::BufferUsageFlagBits::eStorageBuffer},
-        {
-            .flags = vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
-            .usage = vma::MemoryUsage::eAuto,
-        },
-        allocator,
-        "geometry_buffer"
-    );
-
-    geometry_buffer.map_and_memcpy(
-        (void*)buffer_addresses.data(),
-        buffer_addresses.size() * sizeof(MeshBufferAddresses)
-    );
 
     auto image_info = vk::DescriptorImageInfo {
         .imageView = *resources.resizing.scene_referred_framebuffer.view,

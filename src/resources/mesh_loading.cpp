@@ -1,31 +1,7 @@
 #include "mesh_loading.h"
 
+#include "../allocations/staging.h"
 #include "image_loading.h"
-
-template<class T>
-AllocatedBuffer allocate_from_vector(
-    const std::vector<T>& vector,
-    vma::Allocator allocator,
-    const std::string& name
-) {
-    AllocatedBuffer buffer(
-        vk::BufferCreateInfo {
-            .size = vector.size() * sizeof(T),
-            .usage = vk::BufferUsageFlagBits::eTransferSrc
-                | vk::BufferUsageFlagBits::eStorageBuffer
-                | vk::BufferUsageFlagBits::eShaderDeviceAddress},
-        {
-            .flags = vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
-            .usage = vma::MemoryUsage::eAuto,
-        },
-        allocator,
-        name.data()
-    );
-
-    buffer.map_and_memcpy((void*)vector.data(), vector.size() * sizeof(T));
-
-    return buffer;
-}
 
 Mesh load_obj(
     const char* filepath,
@@ -86,38 +62,63 @@ Mesh load_obj(
 
     // Todo: should use staging buffers instead of host-accessible storage buffers.
 
-    auto index_buffer = allocate_from_vector(
-        indices,
+    auto index_buffer = upload_via_staging_buffer(
+        indices.data(),
+        indices.size() * sizeof(uint32_t),
         allocator,
-        std::string(filepath) + " index buffer"
+        vk::BufferUsageFlagBits::eStorageBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        std::string(filepath) + " index buffer",
+        command_buffer,
+        temp_buffers
     );
 
-    auto vertex_buffer = allocate_from_vector(
-        attrib.vertices,
+    auto position_buffer = upload_via_staging_buffer(
+        attrib.vertices.data(),
+        attrib.vertices.size() * sizeof(float),
         allocator,
-        std::string(filepath) + " vertex buffer"
+        vk::BufferUsageFlagBits::eStorageBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        std::string(filepath) + " position buffer",
+        command_buffer,
+        temp_buffers
     );
 
-    auto normal_buffer = allocate_from_vector(
-        attrib.normals,
+    auto normal_buffer = upload_via_staging_buffer(
+        attrib.normals.data(),
+        attrib.normals.size() * sizeof(float),
         allocator,
-        std::string(filepath) + " normal buffer"
+        vk::BufferUsageFlagBits::eStorageBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        std::string(filepath) + " normal buffer",
+        command_buffer,
+        temp_buffers
     );
 
-    auto uv_buffer = allocate_from_vector(
-        attrib.texcoords,
+    auto uv_buffer = upload_via_staging_buffer(
+        attrib.texcoords.data(),
+        attrib.texcoords.size() * sizeof(float),
         allocator,
-        std::string(filepath) + " uv buffer"
+        vk::BufferUsageFlagBits::eStorageBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        std::string(filepath) + " uv buffer",
+        command_buffer,
+        temp_buffers
     );
 
-    auto material_id_buffer = allocate_from_vector(
-        material_ids,
+    auto material_id_buffer = upload_via_staging_buffer(
+        material_ids.data(),
+        material_ids.size() * sizeof(uint32_t),
         allocator,
-        std::string(filepath) + " material id buffer"
+        vk::BufferUsageFlagBits::eStorageBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        std::string(filepath) + " material id buffer",
+        command_buffer,
+        temp_buffers
     );
 
     return Mesh(
-        std::move(vertex_buffer),
+        std::move(position_buffer),
         std::move(index_buffer),
         std::move(normal_buffer),
         std::move(material_id_buffer),
@@ -129,7 +130,7 @@ Mesh load_obj(
 
 MeshBufferAddresses Mesh::get_addresses(const vk::raii::Device& device) {
     return {
-        .positions = device.getBufferAddress({.buffer = vertices.buffer}),
+        .positions = device.getBufferAddress({.buffer = positions.buffer}),
         .indices = device.getBufferAddress({.buffer = indices.buffer}),
         .normals = device.getBufferAddress({.buffer = normals.buffer}),
         .uvs = device.getBufferAddress({.buffer = uvs.buffer}),
