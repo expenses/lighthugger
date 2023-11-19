@@ -12,6 +12,8 @@ struct MeshBufferAddresses {
     uint64_t normals;
     uint64_t uvs;
     uint64_t material_indices;
+    uint32_t num_indices;
+    float bounding_sphere_radius;
 };
 
 struct DepthInfoBuffer {

@@ -50,13 +50,13 @@ Mesh load_obj(
     for (auto& shape : shapes) {
         for (auto& index : shape.mesh.indices) {
             assert(index.vertex_index == index.normal_index);
-            indices.push_back(index.vertex_index);
+            indices.push_back(static_cast<uint32_t>(index.vertex_index));
         }
         // :( material ids are stored unindexed.
-        for (uint32_t material_id : shape.mesh.material_ids) {
-            material_ids.push_back(material_id);
-            material_ids.push_back(material_id);
-            material_ids.push_back(material_id);
+        for (auto material_id : shape.mesh.material_ids) {
+            material_ids.push_back(static_cast<uint32_t>(material_id));
+            material_ids.push_back(static_cast<uint32_t>(material_id));
+            material_ids.push_back(static_cast<uint32_t>(material_id));
         }
     }
 
@@ -146,5 +146,7 @@ MeshBufferAddresses Mesh::get_addresses(const vk::raii::Device& device) {
         .normals = device.getBufferAddress({.buffer = normals.buffer}),
         .uvs = device.getBufferAddress({.buffer = uvs.buffer}),
         .material_indices =
-            device.getBufferAddress({.buffer = material_ids.buffer})};
+            device.getBufferAddress({.buffer = material_ids.buffer}),
+        .num_indices = num_indices,
+        .bounding_sphere_radius = bounding_sphere_radius};
 }
