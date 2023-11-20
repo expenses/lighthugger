@@ -60,6 +60,14 @@ void render(
         {}
     );
 
+    {
+        command_buffer.bindPipeline(
+            vk::PipelineBindPoint::eCompute,
+            *pipelines.write_draw_calls
+        );
+        command_buffer.dispatch(1, 1, 1);
+    }
+
     insert_color_image_barriers(
         command_buffer,
         std::array {

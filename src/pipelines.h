@@ -9,6 +9,7 @@ struct Pipelines {
     vk::raii::Pipeline shadow_pass;
     vk::raii::Pipeline read_depth;
     vk::raii::Pipeline generate_matrices;
+    vk::raii::Pipeline write_draw_calls;
     vk::raii::PipelineLayout pipeline_layout;
 
     DescriptorSetLayouts dsl;

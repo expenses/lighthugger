@@ -477,12 +477,6 @@ int main() {
         temp_buffers
     );
 
-    auto powerplant_draw = vk::DrawIndirectCommand {
-        .vertexCount = powerplant.num_indices,
-        .instanceCount = 1,
-        .firstVertex = 0,
-        .firstInstance = 0};
-
     auto resources = Resources {
         .resizing = ResizingResources(device, allocator, extent),
         .uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
@@ -525,14 +519,16 @@ int main() {
             allocator,
             "depth_info_buffer"
         ),
-        .draw_calls_buffer = upload_via_staging_buffer(
-            &powerplant_draw,
-            sizeof(vk::DrawIndirectCommand),
+        .draw_calls_buffer = AllocatedBuffer(
+            vk::BufferCreateInfo {
+                .size = sizeof(vk::DrawIndirectCommand),
+                .usage = vk::BufferUsageFlagBits::eIndirectBuffer
+                    | vk::BufferUsageFlagBits::eStorageBuffer},
+            {
+                .usage = vma::MemoryUsage::eAuto,
+            },
             allocator,
-            vk::BufferUsageFlagBits::eIndirectBuffer,
-            "draw_calls_buffer",
-            command_buffer,
-            temp_buffers
+            "draw_calls_buffer"
         ),
         .num_draws = 1};
 
@@ -591,6 +587,11 @@ int main() {
 
     auto depth_info_buffer_info = vk::DescriptorBufferInfo {
         .buffer = resources.depth_info_buffer.buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE};
+
+    auto draw_calls_buffer_info = vk::DescriptorBufferInfo {
+        .buffer = resources.draw_calls_buffer.buffer,
         .offset = 0,
         .range = VK_WHOLE_SIZE};
 
@@ -657,6 +658,12 @@ int main() {
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampler,
                 .pImageInfo = &shadowmap_comparison_sampler_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *descriptor_set.set,
+                .dstBinding = 11,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eStorageBuffer,
+                .pBufferInfo = &draw_calls_buffer_info},
         },
         {}
     );
@@ -807,7 +814,7 @@ int main() {
         {
             ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
             ImGui::Text(
-                "camera pos: (%f, %f, %f",
+                "camera pos: (%f, %f, %f)",
                 camera_params.position.x,
                 camera_params.position.y,
                 camera_params.position.z

@@ -131,7 +131,8 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .binding = 1,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eVertex,
+            .stageFlags = vk::ShaderStageFlagBits::eVertex
+                | vk::ShaderStageFlagBits::eCompute,
         },
         // Uniforms
         vk::DescriptorSetLayoutBinding {
@@ -201,6 +202,13 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eFragment,
         },
+        // draw calls buffer
+        vk::DescriptorSetLayoutBinding {
+            .binding = 11,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        },
     };
 
     std::vector<vk::DescriptorBindingFlags> flags(everything_bindings.size());
@@ -250,6 +258,11 @@ Pipelines Pipelines::compile_pipelines(
 
     auto read_depth =
         create_shader_from_file(device, "compiled_shaders/read_depth.spv");
+
+    auto write_draw_calls = create_shader_from_file(
+        device,
+        "compiled_shaders/write_draw_calls.spv"
+    );
 
     auto blit_stages = std::array {
         vk::PipelineShaderStageCreateInfo {
@@ -375,6 +388,14 @@ Pipelines Pipelines::compile_pipelines(
                     .module = *read_depth,
                     .pName = "generate_matrices",
                 },
+            .layout = *pipeline_layout},
+        vk::ComputePipelineCreateInfo {
+            .stage =
+                vk::PipelineShaderStageCreateInfo {
+                    .stage = vk::ShaderStageFlagBits::eCompute,
+                    .module = *write_draw_calls,
+                    .pName = "write_draw_calls",
+                },
             .layout = *pipeline_layout}};
 
     auto graphics_pipelines =
@@ -401,6 +422,11 @@ Pipelines Pipelines::compile_pipelines(
             std::move(compute_pipelines[1]),
             device,
             "generate_matrices"
+        ),
+        .write_draw_calls = name_pipeline(
+            std::move(compute_pipelines[2]),
+            device,
+            "write_draw_calls"
         ),
         .pipeline_layout = std::move(pipeline_layout),
         .dsl = std::move(descriptor_set_layouts),

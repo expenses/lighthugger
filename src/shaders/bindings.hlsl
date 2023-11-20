@@ -13,3 +13,4 @@
 [[vk::binding(8)]] RWStructuredBuffer<DepthInfoBuffer> depth_info;
 [[vk::binding(9)]] Texture2D<float> shadowmap;
 [[vk::binding(10)]] SamplerComparisonState shadowmap_comparison_sampler;
+[[vk::binding(11)]] RWStructuredBuffer<DrawIndirectCommand> draw_calls;

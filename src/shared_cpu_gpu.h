@@ -29,3 +29,11 @@ struct Uniforms {
     bool stabilize_cascades;
     VEC3_TYPE sun_dir;
 };
+
+// Same as VkDrawIndirectCommand
+struct DrawIndirectCommand {
+    uint32_t vertexCount;
+    uint32_t instanceCount;
+    uint32_t firstVertex;
+    uint32_t firstInstance;
+};
