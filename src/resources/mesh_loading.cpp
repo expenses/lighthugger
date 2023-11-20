@@ -60,6 +60,8 @@ Mesh load_obj(
         }
     }
 
+    BoundingBox bounding_box;
+
     float bounding_sphere_radius = 0.0;
     for (uint32_t i = 0; i < attrib.vertices.size() / 3; i++) {
         auto position = glm::vec3(
@@ -69,6 +71,8 @@ Mesh load_obj(
         );
         bounding_sphere_radius =
             std::max(bounding_sphere_radius, glm::length2(position));
+
+        bounding_box.insert(position);
     }
     bounding_sphere_radius = sqrtf(bounding_sphere_radius);
 
@@ -137,7 +141,8 @@ Mesh load_obj(
         .uvs = std::move(uv_buffer),
         .images = std::move(images),
         .num_indices = static_cast<uint32_t>(indices.size()),
-        .bounding_sphere_radius = bounding_sphere_radius};
+        .bounding_sphere_radius = bounding_sphere_radius,
+        .bounding_box = bounding_box};
 }
 
 MeshBufferAddresses Mesh::get_addresses(const vk::raii::Device& device) {
@@ -149,5 +154,9 @@ MeshBufferAddresses Mesh::get_addresses(const vk::raii::Device& device) {
         .material_indices =
             device.getBufferAddress({.buffer = material_ids.buffer}),
         .num_indices = num_indices,
-        .bounding_sphere_radius = bounding_sphere_radius};
+        .bounding_sphere_radius = bounding_sphere_radius,
+        .longest_distance = std::min(
+            bounding_sphere_radius * 2.0f,
+            bounding_box.diagonal_length()
+        )};
 }

@@ -78,6 +78,7 @@ struct Resources {
     AllocatedBuffer depth_info_buffer;
     AllocatedBuffer draw_calls_buffer;
     uint32_t num_draws;
+    std::array<vk::raii::ImageView, 4> shadowmap_layer_views;
 };
 
 #include "rendering.h"
@@ -477,6 +478,86 @@ int main() {
         temp_buffers
     );
 
+    auto shadowmap = ImageWithView(
+        {.imageType = vk::ImageType::e2D,
+         .format = vk::Format::eD32Sfloat,
+         .extent =
+             vk::Extent3D {
+                 .width = 1024,
+                 .height = 1024,
+                 .depth = 1,
+             },
+         .mipLevels = 1,
+         .arrayLayers = 4,
+         .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment
+             | vk::ImageUsageFlagBits::eSampled},
+        allocator,
+        device,
+        "shadowmap",
+        {
+            .aspectMask = vk::ImageAspectFlagBits::eDepth,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 4,
+        },
+        vk::ImageViewType::e2DArray
+    );
+
+    auto shadowmap_layer_views = std::array {
+        device.createImageView(
+            {.image = shadowmap.image.image,
+             .viewType = vk::ImageViewType::e2D,
+             .format = vk::Format::eD32Sfloat,
+             .subresourceRange =
+                 {
+                     .aspectMask = vk::ImageAspectFlagBits::eDepth,
+                     .baseMipLevel = 0,
+                     .levelCount = 1,
+                     .baseArrayLayer = 0,
+                     .layerCount = 1,
+                 }}
+        ),
+        device.createImageView(
+            {.image = shadowmap.image.image,
+             .viewType = vk::ImageViewType::e2D,
+             .format = vk::Format::eD32Sfloat,
+             .subresourceRange =
+                 {
+                     .aspectMask = vk::ImageAspectFlagBits::eDepth,
+                     .baseMipLevel = 0,
+                     .levelCount = 1,
+                     .baseArrayLayer = 1,
+                     .layerCount = 1,
+                 }}
+        ),
+        device.createImageView(
+            {.image = shadowmap.image.image,
+             .viewType = vk::ImageViewType::e2D,
+             .format = vk::Format::eD32Sfloat,
+             .subresourceRange =
+                 {
+                     .aspectMask = vk::ImageAspectFlagBits::eDepth,
+                     .baseMipLevel = 0,
+                     .levelCount = 1,
+                     .baseArrayLayer = 2,
+                     .layerCount = 1,
+                 }}
+        ),
+        device.createImageView(
+            {.image = shadowmap.image.image,
+             .viewType = vk::ImageViewType::e2D,
+             .format = vk::Format::eD32Sfloat,
+             .subresourceRange =
+                 {
+                     .aspectMask = vk::ImageAspectFlagBits::eDepth,
+                     .baseMipLevel = 0,
+                     .levelCount = 1,
+                     .baseArrayLayer = 3,
+                     .layerCount = 1,
+                 }}
+        )};
+
     auto resources = Resources {
         .resizing = ResizingResources(device, allocator, extent),
         .uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
@@ -490,24 +571,7 @@ int main() {
             },
             allocator
         )),
-        .shadowmap = ImageWithView(
-            {.imageType = vk::ImageType::e2D,
-             .format = vk::Format::eD32Sfloat,
-             .extent =
-                 vk::Extent3D {
-                     .width = 1024,
-                     .height = 1024,
-                     .depth = 1,
-                 },
-             .mipLevels = 1,
-             .arrayLayers = 1,
-             .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment
-                 | vk::ImageUsageFlagBits::eSampled},
-            allocator,
-            device,
-            "shadowmap",
-            DEPTH_SUBRESOURCE_RANGE
-        ),
+        .shadowmap = std::move(shadowmap),
         .depth_info_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
                 .size = sizeof(DepthInfoBuffer),
@@ -530,7 +594,8 @@ int main() {
             allocator,
             "draw_calls_buffer"
         ),
-        .num_draws = 1};
+        .num_draws = 1,
+        .shadowmap_layer_views = std::move(shadowmap_layer_views)};
 
     command_buffer.end();
 

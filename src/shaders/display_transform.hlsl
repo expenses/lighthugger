@@ -26,6 +26,6 @@ void PSMain(
     float shadow_screen_percentage = 0.3;
 
     if (inputs.uv.x < shadow_screen_percentage && inputs.uv.y < shadow_screen_percentage) {
-        target_0 = float4(shadowmap.Sample(clamp_sampler, inputs.uv / shadow_screen_percentage).xxx, 1.0);
+        target_0 = float4(shadowmap.Sample(clamp_sampler, float3(inputs.uv / shadow_screen_percentage, 0)).xxx, 1.0);
     }
 }

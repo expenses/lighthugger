@@ -237,12 +237,18 @@ Pipelines Pipelines::compile_pipelines(
     auto descriptor_set_layout_array =
         std::array {*descriptor_set_layouts.everything};
 
+    // Simple push constant for instructing the shadow pass which shadowmap to render to.
+    auto push_constants = std::array {vk::PushConstantRange {
+        .stageFlags = vk::ShaderStageFlagBits::eVertex,
+        .offset = 0,
+        .size = sizeof(uint32_t)}};
+
     auto pipeline_layout =
         device.createPipelineLayout(vk::PipelineLayoutCreateInfo {
             .setLayoutCount = descriptor_set_layout_array.size(),
             .pSetLayouts = descriptor_set_layout_array.data(),
-            .pushConstantRangeCount = 0,
-            .pPushConstantRanges = nullptr,
+            .pushConstantRangeCount = push_constants.size(),
+            .pPushConstantRanges = push_constants.data(),
         });
 
     auto render_geometry =

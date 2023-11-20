@@ -38,12 +38,6 @@ void render(
 ) {
     TracyVkZone(tracy_ctx, *command_buffer, "main");
 
-    {
-        command_buffer
-            .fillBuffer(resources.depth_info_buffer.buffer, 0, 4, u32_max);
-        command_buffer.fillBuffer(resources.depth_info_buffer.buffer, 4, 4, 0);
-    }
-
     set_scissor_and_viewport(command_buffer, extent.width, extent.height);
     command_buffer.bindDescriptorSets(
         vk::PipelineBindPoint::eGraphics,
@@ -92,7 +86,14 @@ void render(
                 .discard_contents = true,
                 .queue_family = graphics_queue_family,
                 .image = resources.shadowmap.image.image,
-                .subresource_range = DEPTH_SUBRESOURCE_RANGE}
+                .subresource_range =
+                    {
+                        .aspectMask = vk::ImageAspectFlagBits::eDepth,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 4,
+                    }}
 
         }
     );
@@ -149,8 +150,8 @@ void render(
             *pipelines.read_depth
         );
         command_buffer.dispatch(
-            dispatch_size(extent.width, 8),
-            dispatch_size(extent.height, 8),
+            dispatch_size(extent.width, 8 * 2),
+            dispatch_size(extent.height, 8 * 2),
             1
         );
     }
@@ -168,32 +169,40 @@ void render(
 
         set_scissor_and_viewport(command_buffer, 1024, 1024);
 
-        vk::RenderingAttachmentInfoKHR depth_attachment_info = {
-            .imageView = *resources.shadowmap.view,
-            .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-            .loadOp = vk::AttachmentLoadOp::eClear,
-            .storeOp = vk::AttachmentStoreOp::eStore,
-            .clearValue = {.depthStencil = {.depth = 1.0f}}};
-        command_buffer.beginRendering(
-            {.renderArea =
-                 {
-                     .offset = {},
-                     .extent = vk::Extent2D {.width = 1024, .height = 1024},
-                 },
-             .layerCount = 1,
-             .pDepthAttachment = &depth_attachment_info}
-        );
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eGraphics,
             *pipelines.shadow_pass
         );
-        command_buffer.drawIndirect(
-            resources.draw_calls_buffer.buffer,
-            0,
-            resources.num_draws,
-            sizeof(vk::DrawIndirectCommand)
-        );
-        command_buffer.endRendering();
+        for (uint32_t i = 0; i < resources.shadowmap_layer_views.size(); i++) {
+            vk::RenderingAttachmentInfoKHR depth_attachment_info = {
+                .imageView = *resources.shadowmap_layer_views[i],
+                .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+                .loadOp = vk::AttachmentLoadOp::eClear,
+                .storeOp = vk::AttachmentStoreOp::eStore,
+                .clearValue = {.depthStencil = {.depth = 1.0f}}};
+            command_buffer.beginRendering(
+                {.renderArea =
+                     {
+                         .offset = {},
+                         .extent = vk::Extent2D {.width = 1024, .height = 1024},
+                     },
+                 .layerCount = 1,
+                 .pDepthAttachment = &depth_attachment_info}
+            );
+            command_buffer.pushConstants<uint32_t>(
+                *pipelines.pipeline_layout,
+                vk::ShaderStageFlagBits::eVertex,
+                0,
+                {i}
+            );
+            command_buffer.drawIndirect(
+                resources.draw_calls_buffer.buffer,
+                0,
+                resources.num_draws,
+                sizeof(vk::DrawIndirectCommand)
+            );
+            command_buffer.endRendering();
+        }
     }
     set_scissor_and_viewport(command_buffer, extent.width, extent.height);
     insert_color_image_barriers(
@@ -205,7 +214,14 @@ void render(
             .discard_contents = false,
             .queue_family = graphics_queue_family,
             .image = resources.shadowmap.image.image,
-            .subresource_range = DEPTH_SUBRESOURCE_RANGE}
+            .subresource_range =
+                {
+                    .aspectMask = vk::ImageAspectFlagBits::eDepth,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 4,
+                }}
 
         }
     );

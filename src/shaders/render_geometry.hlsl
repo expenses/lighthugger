@@ -1,5 +1,6 @@
 #include "inputs/pos.hlsl"
 #include "bindings.hlsl"
+#include "debug.hlsl"
 
 uint load_index(uint64_t address, uint vertex_id) {
     return vk::RawBufferLoad<uint>(address + sizeof(uint) * vertex_id);
@@ -26,6 +27,9 @@ float4 depth_only(
     return mul(uniforms.combined_perspective_view, float4(position, 1.0));
 }
 
+[[vk::push_constant]]
+ShadowPassConstant shadow_constant;
+
 [shader("vertex")]
 float4 shadow_pass(
     uint vId : SV_VertexID
@@ -36,7 +40,7 @@ float4 shadow_pass(
     uint offset = load_index(addresses.indices, vId);
     float3 position = load_float3(addresses.positions, offset);
 
-    return mul(depth_info[0].shadow_rendering_matrices[0], float4(position, 1.0));
+    return mul(depth_info[0].shadow_rendering_matrices[shadow_constant.cascade_index], float4(position, 1.0));
 }
 
 [shader("vertex")]
@@ -59,21 +63,6 @@ V2P VSMain(uint vId : SV_VertexID)
     return vsOut;
 }
 
-// From the sascha willems tut.
-float textureProj(float4 shadowCoord, float2 offset, uint cascadeIndex)
-{
-    float shadow = 1.0;
-    float bias = 0.005;
-
-    if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 ) {
-            float dist = shadowmap.Sample(clamp_sampler, float2(shadowCoord.xy + offset));
-            if (shadowCoord.w > 0 && dist < shadowCoord.z - bias) {
-                    shadow = 0.0;
-            }
-    }
-    return shadow;
-}
-
 static const float4x4 biasMat = float4x4(
     0.5, 0.0, 0.0, 0.5,
     0.0, 0.5, 0.0, 0.5,
@@ -86,18 +75,23 @@ void PSMain(
     V2P input,
     [[vk::location(0)]] out float4 target_0: SV_Target0
 ) {
-    float4 shadowCoord = mul(biasMat, mul(depth_info[0].shadow_rendering_matrices[0], float4(input.world_pos, 1.0)));
+    uint cascade_index;
+    for (cascade_index = 0; cascade_index < 4; cascade_index++) {
+        if (depth_info[0].cascade_splits[cascade_index] <= input.Pos.z) {
+            break;
+        }
+    }
+
+    float4 shadowCoord = mul(biasMat, mul(depth_info[0].shadow_rendering_matrices[cascade_index], float4(input.world_pos, 1.0)));
     shadowCoord /= shadowCoord.w;
-    float bias = 0.05;
     float shadow_sum = 0.0;
     for (int x = -1; x <= 1; x++) {
         for (int y = -1; y <= 1; y++) {
             float2 offset = float2(x, y) / 1024.0;
-            shadow_sum += shadowmap.SampleCmpLevelZero(shadowmap_comparison_sampler, float2(shadowCoord.xy) + offset, shadowCoord.z - bias);
+            shadow_sum += shadowmap.SampleCmpLevelZero(shadowmap_comparison_sampler, float3(shadowCoord.xy + offset, cascade_index),  shadowCoord.z);
         }
     }
     shadow_sum /= 9.0;
-
 
     float3 normal = normalize(input.normal);
 
@@ -110,5 +104,6 @@ void PSMain(
 
     float3 diffuse = albedo * lighting;
 
+    float3 debug_col = DEBUG_COLOURS[cascade_index];
     target_0 = float4(diffuse, 1.0);
 }

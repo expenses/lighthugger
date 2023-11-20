@@ -1,6 +1,13 @@
 #include "bindings.hlsl"
 #include "matrices.hlsl"
 
+#define FLT_MAX 3.402823466e+38
+#define FLT_MIN 1.175494351e-38
+
+uint min_if_not_zero(uint a, uint b) {
+    return a != 0 ? min(a, b) : b;
+}
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void read_depth(uint3 global_id: SV_DispatchThreadID){
@@ -9,23 +16,36 @@ void read_depth(uint3 global_id: SV_DispatchThreadID){
     depth_buffer.GetDimensions(width, height);
     float2 pixel_size = 1.0 / float2(uint2(width, height));
 
-    float2 coord = float2(global_id.xy) + 0.5;
+    uint2 coord = global_id.xy * 2 + 1;
     float2 uv = coord * pixel_size;
 
-    float depth = depth_buffer.SampleLevel(clamp_sampler, uv, 0.0);
-    uint depth_reinterpreted = asuint(depth);
+    float4 depth = depth_buffer.Gather(clamp_sampler, uv, 0.0);
+    uint4 depth_reinterpreted = asuint(depth);
 
-    if (depth_reinterpreted == 0) {
-        return;
+    // min the values, trying to avoid propagating zeros.
+    uint depth_min = min_if_not_zero(
+        min_if_not_zero(depth_reinterpreted.x, depth_reinterpreted.y),
+        min_if_not_zero(depth_reinterpreted.z, depth_reinterpreted.w)
+    );
+    uint depth_max = max(
+        max(depth_reinterpreted.x, depth_reinterpreted.y),
+        max(depth_reinterpreted.z, depth_reinterpreted.w)
+    );
+
+    // Min all values in the subgroup,
+    if (depth_min != 0) {
+        uint subgroup_min = WaveActiveMin(depth_min);
+
+        // https://www.khronos.org/assets/uploads/developers/library/2018-vulkan-devday/06-subgroups.pdf
+        // equiv of subgroup elect
+        if (WaveIsFirstLane()) {
+            InterlockedMin(depth_info[0].min_depth, subgroup_min);
+        }
     }
 
-    uint subgroup_min = WaveActiveMin(depth_reinterpreted);
-    uint subgroup_max = WaveActiveMax(depth_reinterpreted);
+    uint subgroup_max = WaveActiveMax(depth_max);
 
-    // https://www.khronos.org/assets/uploads/developers/library/2018-vulkan-devday/06-subgroups.pdf
-    // equiv of subgroup elect
     if (WaveIsFirstLane()) {
-        InterlockedMin(depth_info[0].min_depth, subgroup_min);
         InterlockedMax(depth_info[0].max_depth, subgroup_max);
     }
 }
@@ -38,15 +58,17 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
 
     DepthInfoBuffer info = depth_info[0];
 
-
+    // Note: these values are misleading. As 0.0 is the infinite plane,
+    // the max_depth is actually the closer value!
     float min_depth = asfloat(info.min_depth);
     float max_depth = asfloat(info.max_depth);
 
+    float4x4 invCam = uniforms.inv_perspective_view;
 
     uint cascade_index = global_id.x;
 
-    float cascadeSplits[4];
-
+    //float cascadeSplits[4];
+    /*
     float nearClip = 0.01;
     float farClip = 100000.0;
     float clipRange = farClip - nearClip;
@@ -57,7 +79,6 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
     float range = maxZ - minZ;
     float ratio = maxZ / minZ;
 
-    float4x4 invCam = uniforms.inv_perspective_view;
 
     float cascadeSplitLambda = 0.95;
 
@@ -70,9 +91,14 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
             float d = cascadeSplitLambda * (log - uniform_value) + uniform_value;
             cascadeSplits[i] = (d - nearClip) / clipRange;
     }
+    */
 
-    float lastSplitDist = min_depth;//(cascade_index > 0 ? cascadeSplits[cascade_index - 1] : min_depth);
-    float splitDist = max_depth;//cascadeSplits[cascade_index];
+    float cascadeSplits[4] = {
+        lerp(max_depth, min_depth, 0.25), lerp(max_depth, min_depth, 0.5), lerp(max_depth, min_depth, 0.75), min_depth
+    };
+
+    float lastSplitDist = (cascade_index > 0 ? cascadeSplits[cascade_index - 1] : max_depth);
+    float splitDist = cascadeSplits[cascade_index];
 
     // Get the corners of the visible depth slice in view space
     float3 frustumCorners[8] = {
@@ -109,29 +135,19 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
     float3 maxExtents = sphere_radius;
     float3 minExtents = -maxExtents;
 
-    float3 lightDir = -uniforms.sun_dir;
+    // Set the camera to be a fixed distance away from the frustum center, so that
+    // we don't get clipping on the near plane. We use the longest distance of the
+    // (currently only) mesh in the scene for this.
+    // Ideally you want to have the near and far plane be the distance of the closest
+    // point on a mesh and the furthest point on a mesh respectively.
+    float shadow_cam_distance = mesh_buffer_addresses[0].longest_distance;
 
-    float4x4 shadowView = lookAt(lightDir * minExtents.z + frustumCenter, frustumCenter, float3(0,1,0));
-	float4x4 shadowProj = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, maxExtents.z - minExtents.z);
-
-    uint sMapSize = 1024;
-
-    if (uniforms.stabilize_cascades) {
-        // Create the rounding matrix, by projecting the world-space origin and determining
-        // the fractional offset in texel space
-        float4x4 shadowMatrix = mul(shadowView, shadowProj);
-        float3 shadowOrigin = 0.0f;
-        shadowOrigin = mul(float4(shadowOrigin, 1.0f), shadowMatrix).xyz;
-        shadowOrigin *= (sMapSize / 2.0f);
-
-        float3 roundedOrigin = round(shadowOrigin);
-        float3 roundOffset = roundedOrigin - shadowOrigin;
-        roundOffset = roundOffset * (2.0f / sMapSize);
-        roundOffset.z = 0.0f;
-
-        shadowProj[3][0] += roundOffset.x;
-        shadowProj[3][1] += roundOffset.y;
-    }
+    float4x4 shadowView = lookAt(shadow_cam_distance * uniforms.sun_dir + frustumCenter, frustumCenter, float3(0,1,0));
+	float4x4 shadowProj = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, shadow_cam_distance * 2.0);
 
     depth_info[0].shadow_rendering_matrices[cascade_index] = mul(shadowProj, shadowView);
+    depth_info[0].cascade_splits = cascadeSplits;
+    depth_info[0].min_depth = asuint(FLT_MAX);
+    depth_info[0].max_depth = asuint(FLT_MIN);
+
 }

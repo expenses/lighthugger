@@ -14,19 +14,19 @@ struct MeshBufferAddresses {
     uint64_t material_indices;
     uint32_t num_indices;
     float bounding_sphere_radius;
+    float longest_distance;
 };
 
 struct DepthInfoBuffer {
+    MATRIX_TYPE shadow_rendering_matrices[4];
+    float cascade_splits[4];
     uint32_t min_depth;
     uint32_t max_depth;
-    MATRIX_TYPE shadow_rendering_matrices[4];
-    //float cascade_splits[4];
 };
 
 struct Uniforms {
     MATRIX_TYPE combined_perspective_view;
     MATRIX_TYPE inv_perspective_view;
-    bool stabilize_cascades;
     VEC3_TYPE sun_dir;
 };
 
@@ -36,4 +36,8 @@ struct DrawIndirectCommand {
     uint32_t instanceCount;
     uint32_t firstVertex;
     uint32_t firstInstance;
+};
+
+struct ShadowPassConstant {
+    uint cascade_index;
 };
