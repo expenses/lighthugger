@@ -22,7 +22,9 @@ struct Mesh {
     AllocatedBuffer normals;
     AllocatedBuffer material_ids;
     AllocatedBuffer uvs;
+    AllocatedBuffer material_info;
     std::vector<ImageWithView> images;
+    std::vector<uint32_t> image_indices;
     uint32_t num_indices;
     float bounding_sphere_radius;
     BoundingBox bounding_box;

@@ -189,11 +189,11 @@ void render(
                  .layerCount = 1,
                  .pDepthAttachment = &depth_attachment_info}
             );
-            command_buffer.pushConstants<uint32_t>(
+            command_buffer.pushConstants<ShadowPassConstant>(
                 *pipelines.pipeline_layout,
                 vk::ShaderStageFlagBits::eVertex,
                 0,
-                {i}
+                {{.cascade_index = i}}
             );
             command_buffer.drawIndirect(
                 resources.draw_calls_buffer.buffer,

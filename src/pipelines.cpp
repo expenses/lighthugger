@@ -1,5 +1,7 @@
 #include "pipelines.h"
 
+#include "shared_cpu_gpu.h"
+
 const auto RGBA_MASK = vk::ColorComponentFlagBits::eR
     | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB
     | vk::ColorComponentFlagBits::eA;
@@ -241,7 +243,7 @@ Pipelines Pipelines::compile_pipelines(
     auto push_constants = std::array {vk::PushConstantRange {
         .stageFlags = vk::ShaderStageFlagBits::eVertex,
         .offset = 0,
-        .size = sizeof(uint32_t)}};
+        .size = sizeof(ShadowPassConstant)}};
 
     auto pipeline_layout =
         device.createPipelineLayout(vk::PipelineLayoutCreateInfo {

@@ -14,6 +14,12 @@ float3 load_float3(uint64_t address, uint offset) {
     );
 }
 
+MaterialInfo load_material_info(uint64_t address, uint offset) {
+    MaterialInfo material_info;
+    material_info.albedo_texture_index = vk::RawBufferLoad<uint32_t>(address + offset * sizeof(MaterialInfo));
+    return material_info;
+}
+
 [shader("vertex")]
 float4 depth_only(
     uint vId : SV_VertexID
@@ -60,6 +66,7 @@ V2P VSMain(uint vId : SV_VertexID)
     vsOut.normal = normal;
     vsOut.material_index = material_index;
     vsOut.uv = uv;
+    vsOut.material_info_address = addresses.material_info;
     return vsOut;
 }
 
@@ -75,6 +82,7 @@ void PSMain(
     V2P input,
     [[vk::location(0)]] out float4 target_0: SV_Target0
 ) {
+    MaterialInfo material_info = load_material_info(input.material_info_address, input.material_index);
     uint cascade_index;
     for (cascade_index = 0; cascade_index < 4; cascade_index++) {
         if (depth_info[0].cascade_splits[cascade_index] <= input.Pos.z) {
@@ -96,7 +104,7 @@ void PSMain(
     float3 normal = normalize(input.normal);
 
     float n_dot_l = max(dot(uniforms.sun_dir, normal), 0.0);
-    float3 albedo = textures[input.material_index].Sample(repeat_sampler, input.uv).rgb;
+    float3 albedo = textures[material_info.albedo_texture_index].Sample(repeat_sampler, input.uv).rgb;
 
     float ambient = 0.05;
 

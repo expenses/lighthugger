@@ -1,3 +1,5 @@
+#pragma once
+
 #ifdef __HLSL_VERSION
     #define MATRIX_TYPE float4x4
     #define VEC3_TYPE float3
@@ -12,6 +14,7 @@ struct MeshBufferAddresses {
     uint64_t normals;
     uint64_t uvs;
     uint64_t material_indices;
+    uint64_t material_info;
     uint32_t num_indices;
     float bounding_sphere_radius;
     float longest_distance;
@@ -40,4 +43,8 @@ struct DrawIndirectCommand {
 
 struct ShadowPassConstant {
     uint cascade_index;
+};
+
+struct MaterialInfo {
+    uint32_t albedo_texture_index;
 };

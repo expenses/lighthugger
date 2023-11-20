@@ -1,11 +1,13 @@
 #pragma once
 #include "allocations/image_with_view.h"
+#include "allocations/persistently_mapped.h"
+#include "shared_cpu_gpu.h"
 
-struct BindlessImageTracker {
-    uint32_t next_image_index = 0;
+struct IndexTracker {
+    uint32_t next_index = 0;
     std::vector<uint32_t> free_indices;
 
-    BindlessImageTracker() {}
+    IndexTracker() {}
 
     uint32_t push() {
         if (!free_indices.empty()) {
@@ -14,8 +16,8 @@ struct BindlessImageTracker {
             return index;
         }
 
-        uint32_t index = next_image_index;
-        next_image_index += 1;
+        uint32_t index = next_index;
+        next_index += 1;
 
         return index;
     }
@@ -27,7 +29,7 @@ struct BindlessImageTracker {
 
 struct DescriptorSet {
     vk::raii::DescriptorSet set;
-    BindlessImageTracker tracker;
+    IndexTracker tracker;
 
     DescriptorSet(vk::raii::DescriptorSet set_) : set(std::move(set_)) {}
 
