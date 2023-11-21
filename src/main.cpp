@@ -21,68 +21,7 @@ const auto u64_max = std::numeric_limits<uint64_t>::max();
 // https://lesleylai.info/en/vk-khr-dynamic-rendering/
 // https://github.com/dokipen3d/vulkanHppMinimalExample/blob/master/main.cpp
 
-struct ResizingResources {
-    ImageWithView scene_referred_framebuffer;
-    ImageWithView depthbuffer;
-
-    ResizingResources(
-        const vk::raii::Device& device,
-        vma::Allocator allocator,
-        vk::Extent2D extent
-    ) :
-        scene_referred_framebuffer(ImageWithView(
-            {
-                .imageType = vk::ImageType::e2D,
-                .format = vk::Format::eR16G16B16A16Sfloat,
-                .extent =
-                    vk::Extent3D {
-                        .width = extent.width,
-                        .height = extent.height,
-                        .depth = 1,
-                    },
-                .mipLevels = 1,
-                .arrayLayers = 1,
-                .usage = vk::ImageUsageFlagBits::eColorAttachment
-                    | vk::ImageUsageFlagBits::eSampled,
-            },
-            allocator,
-            device,
-            "scene_referred_framebuffer",
-            COLOR_SUBRESOURCE_RANGE
-        )),
-        depthbuffer(ImageWithView(
-            {.imageType = vk::ImageType::e2D,
-             .format = vk::Format::eD32Sfloat,
-             .extent =
-                 vk::Extent3D {
-                     .width = extent.width,
-                     .height = extent.height,
-                     .depth = 1,
-                 },
-             .mipLevels = 1,
-             .arrayLayers = 1,
-             .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment
-                 | vk::ImageUsageFlagBits::eSampled},
-            allocator,
-            device,
-            "depthbuffer",
-            DEPTH_SUBRESOURCE_RANGE
-        )) {}
-};
-
-struct Resources {
-    ResizingResources resizing;
-    PersistentlyMappedBuffer uniform_buffer;
-    ImageWithView shadowmap;
-    AllocatedBuffer depth_info_buffer;
-    AllocatedBuffer instance_buffer;
-    AllocatedBuffer draw_calls_buffer;
-    AllocatedBuffer geometry_buffer;
-    AllocatedBuffer draw_counts_buffer;
-    uint32_t max_num_draws;
-    std::array<vk::raii::ImageView, 4> shadowmap_layer_views;
-};
-
+#include "frame_resources.h"
 #include "rendering.h"
 
 struct CameraParams {
@@ -429,35 +368,6 @@ int main() {
 
     auto descriptor_set = DescriptorSet(std::move(descriptor_sets[0]));
 
-    auto clamp_sampler = device.createSampler(
-        {.magFilter = vk::Filter::eLinear,
-         .minFilter = vk::Filter::eLinear,
-         .addressModeU = vk::SamplerAddressMode::eClampToEdge,
-         .addressModeV = vk::SamplerAddressMode::eClampToEdge,
-         .addressModeW = vk::SamplerAddressMode::eClampToEdge,
-         .maxLod = VK_LOD_CLAMP_NONE}
-    );
-
-    auto repeat_sampler = device.createSampler(
-        {.magFilter = vk::Filter::eLinear,
-         .minFilter = vk::Filter::eLinear,
-         .addressModeU = vk::SamplerAddressMode::eRepeat,
-         .addressModeV = vk::SamplerAddressMode::eRepeat,
-         .addressModeW = vk::SamplerAddressMode::eRepeat,
-         .maxLod = VK_LOD_CLAMP_NONE}
-    );
-
-    auto shadowmap_comparison_sampler = device.createSampler(
-        {.magFilter = vk::Filter::eLinear,
-         .minFilter = vk::Filter::eLinear,
-         .addressModeU = vk::SamplerAddressMode::eClampToEdge,
-         .addressModeV = vk::SamplerAddressMode::eClampToEdge,
-         .addressModeW = vk::SamplerAddressMode::eClampToEdge,
-         .compareEnable = true,
-         .compareOp = vk::CompareOp::eLess,
-         .maxLod = VK_LOD_CLAMP_NONE}
-    );
-
     std::vector<AllocatedBuffer> temp_buffers;
 
     command_buffer.begin(
@@ -643,7 +553,39 @@ int main() {
             temp_buffers
         ),
         .max_num_draws = 1024,
-        .shadowmap_layer_views = std::move(shadowmap_layer_views)};
+        .shadowmap_layer_views = std::move(shadowmap_layer_views),
+        .display_transform_lut = std::move(display_transform_lut),
+
+        .clamp_sampler = device.createSampler(
+            {.magFilter = vk::Filter::eLinear,
+             .minFilter = vk::Filter::eLinear,
+             .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+             .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+             .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+             .maxLod = VK_LOD_CLAMP_NONE}
+        ),
+
+        .repeat_sampler = device.createSampler(
+            {.magFilter = vk::Filter::eLinear,
+             .minFilter = vk::Filter::eLinear,
+             .addressModeU = vk::SamplerAddressMode::eRepeat,
+             .addressModeV = vk::SamplerAddressMode::eRepeat,
+             .addressModeW = vk::SamplerAddressMode::eRepeat,
+             .maxLod = VK_LOD_CLAMP_NONE}
+        ),
+
+        .shadowmap_comparison_sampler = device.createSampler(
+            {.magFilter = vk::Filter::eLinear,
+             .minFilter = vk::Filter::eLinear,
+             .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+             .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+             .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+             .compareEnable = true,
+             .compareOp = vk::CompareOp::eLess,
+             .maxLod = VK_LOD_CLAMP_NONE}
+        )
+
+    };
 
     command_buffer.end();
 
@@ -665,143 +607,8 @@ int main() {
         temp_buffers.clear();
     }
 
-    auto image_info = vk::DescriptorImageInfo {
-        .imageView = *resources.resizing.scene_referred_framebuffer.view,
-        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
-
-    auto depthbuffer_image_info = vk::DescriptorImageInfo {
-        .imageView = *resources.resizing.depthbuffer.view,
-        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
-
-    auto lut_image_info = vk::DescriptorImageInfo {
-        .imageView = *display_transform_lut.view,
-        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
-
-    auto shadowmap_image_info = vk::DescriptorImageInfo {
-        .imageView = *resources.shadowmap.view,
-        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
-
-    auto clamp_sampler_info =
-        vk::DescriptorImageInfo {.sampler = *clamp_sampler};
-    auto repeat_sampler_info =
-        vk::DescriptorImageInfo {.sampler = *repeat_sampler};
-    auto shadowmap_comparison_sampler_info =
-        vk::DescriptorImageInfo {.sampler = *shadowmap_comparison_sampler};
-
-    auto geometry_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = resources.geometry_buffer.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-
-    auto uniform_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = resources.uniform_buffer.buffer.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-
-    auto depth_info_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = resources.depth_info_buffer.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-
-    auto draw_calls_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = resources.draw_calls_buffer.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-
-    auto instance_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = resources.instance_buffer.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-
-    auto draw_counts_buffer = vk::DescriptorBufferInfo {
-        .buffer = resources.draw_counts_buffer.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-
     // Write initial descriptor sets.
-    device.updateDescriptorSets(
-        {
-            vk::WriteDescriptorSet {
-                .dstSet = *descriptor_set.set,
-                .dstBinding = 1,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eStorageBuffer,
-                .pBufferInfo = &geometry_buffer_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *descriptor_set.set,
-                .dstBinding = 2,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eUniformBuffer,
-                .pBufferInfo = &uniform_buffer_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *descriptor_set.set,
-                .dstBinding = 3,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampledImage,
-                .pImageInfo = &image_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *descriptor_set.set,
-                .dstBinding = 4,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampler,
-                .pImageInfo = &clamp_sampler_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *descriptor_set.set,
-                .dstBinding = 5,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampledImage,
-                .pImageInfo = &lut_image_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *descriptor_set.set,
-                .dstBinding = 6,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampler,
-                .pImageInfo = &repeat_sampler_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *descriptor_set.set,
-                .dstBinding = 7,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampledImage,
-                .pImageInfo = &depthbuffer_image_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *descriptor_set.set,
-                .dstBinding = 8,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eStorageBuffer,
-                .pBufferInfo = &depth_info_buffer_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *descriptor_set.set,
-                .dstBinding = 9,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampledImage,
-                .pImageInfo = &shadowmap_image_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *descriptor_set.set,
-                .dstBinding = 10,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampler,
-                .pImageInfo = &shadowmap_comparison_sampler_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *descriptor_set.set,
-                .dstBinding = 11,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eStorageBuffer,
-                .pBufferInfo = &draw_calls_buffer_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *descriptor_set.set,
-                .dstBinding = 12,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eStorageBuffer,
-                .pBufferInfo = &instance_buffer_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *descriptor_set.set,
-                .dstBinding = 13,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eStorageBuffer,
-                .pBufferInfo = &draw_counts_buffer},
-        },
-        {}
-    );
+    descriptor_set.write_descriptors(resources, device);
 
     auto camera_params = CameraParams {
         .position = glm::vec3(-86.5, 15.5, -17.0),
@@ -876,32 +683,9 @@ int main() {
             );
 
             resources.resizing = ResizingResources(device, allocator, extent);
-
-            image_info = vk::DescriptorImageInfo {
-                .imageView =
-                    *resources.resizing.scene_referred_framebuffer.view,
-                .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
-
-            depthbuffer_image_info = vk::DescriptorImageInfo {
-                .imageView = *resources.resizing.depthbuffer.view,
-                .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
-
-            device.updateDescriptorSets(
-                {
-                    vk::WriteDescriptorSet {
-                        .dstSet = *descriptor_set.set,
-                        .dstBinding = 3,
-                        .descriptorCount = 1,
-                        .descriptorType = vk::DescriptorType::eSampledImage,
-                        .pImageInfo = &image_info},
-                    vk::WriteDescriptorSet {
-                        .dstSet = *descriptor_set.set,
-                        .dstBinding = 7,
-                        .descriptorCount = 1,
-                        .descriptorType = vk::DescriptorType::eSampledImage,
-                        .pImageInfo = &depthbuffer_image_info},
-                },
-                {}
+            descriptor_set.write_resizing_descriptors(
+                resources.resizing,
+                device
             );
         }
         {

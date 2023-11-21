@@ -1,6 +1,7 @@
 #pragma once
 #include "allocations/image_with_view.h"
 #include "allocations/persistently_mapped.h"
+#include "frame_resources.h"
 #include "shared_cpu_gpu.h"
 
 struct IndexTracker {
@@ -34,4 +35,14 @@ struct DescriptorSet {
     DescriptorSet(vk::raii::DescriptorSet set_) : set(std::move(set_)) {}
 
     uint32_t write_image(const ImageWithView& image, vk::Device device);
+
+    void write_resizing_descriptors(
+        const ResizingResources& resizing_resources,
+        const vk::raii::Device& device
+    );
+
+    void write_descriptors(
+        const Resources& resources,
+        const vk::raii::Device& device
+    );
 };
