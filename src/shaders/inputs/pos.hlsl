@@ -5,5 +5,5 @@ struct Varyings {
     [[vk::location(2)]] float3 normal: COLOR1;
     [[vk::location(3)]] float2 uv: COLOR2;
     [[vk::location(4)]] uint32_t material_index: COLOR3;
-    [[vk::location(5)]] uint32_t model_index: COLOR4;
+    [[vk::location(5)]] uint32_t instance_index: COLOR4;
 };

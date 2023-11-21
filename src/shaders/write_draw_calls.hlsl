@@ -10,14 +10,16 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
     }
 
     Instance instance = instances[id];
-    MeshBufferAddresses addresses = mesh_buffer_addresses[instance.mesh_index];
+
+    // cull here
+
+    uint32_t current_draw;
+    InterlockedAdd(draw_counts[0], 1, current_draw);
 
     // Todo: merge draw calls that use the same mesh.
 
-    draw_calls[id].vertexCount = addresses.num_indices;
-    draw_calls[id].instanceCount = 1;
-    draw_calls[id].firstVertex = 0;
-    draw_calls[id].firstInstance = id;
-
-    InterlockedAdd(draw_counts[0], 1);
+    draw_calls[current_draw].vertexCount = instance.mesh_info.num_indices;
+    draw_calls[current_draw].instanceCount = 1;
+    draw_calls[current_draw].firstVertex = 0;
+    draw_calls[current_draw].firstInstance = id;
 }

@@ -74,11 +74,6 @@ void DescriptorSet::write_descriptors(
     auto shadowmap_comparison_sampler_info = vk::DescriptorImageInfo {
         .sampler = *resources.shadowmap_comparison_sampler};
 
-    auto geometry_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = resources.geometry_buffer.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-
     auto uniform_buffer_info = vk::DescriptorBufferInfo {
         .buffer = resources.uniform_buffer.buffer.buffer,
         .offset = 0,
@@ -112,7 +107,7 @@ void DescriptorSet::write_descriptors(
                 .dstBinding = 1,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eStorageBuffer,
-                .pBufferInfo = &geometry_buffer_info},
+                .pBufferInfo = &instance_buffer_info},
             vk::WriteDescriptorSet {
                 .dstSet = *set,
                 .dstBinding = 2,
@@ -164,12 +159,6 @@ void DescriptorSet::write_descriptors(
             vk::WriteDescriptorSet {
                 .dstSet = *set,
                 .dstBinding = 12,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eStorageBuffer,
-                .pBufferInfo = &instance_buffer_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *set,
-                .dstBinding = 13,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eStorageBuffer,
                 .pBufferInfo = &draw_counts_buffer},

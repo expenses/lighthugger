@@ -29,7 +29,7 @@ struct Mesh {
     float bounding_sphere_radius;
     BoundingBox bounding_box;
 
-    MeshBufferAddresses get_addresses(const vk::raii::Device& device);
+    MeshInfo get_info(const vk::raii::Device& device);
 };
 
 Mesh load_obj(

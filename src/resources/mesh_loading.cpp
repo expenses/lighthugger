@@ -172,7 +172,7 @@ Mesh load_obj(
         .bounding_box = bounding_box};
 }
 
-MeshBufferAddresses Mesh::get_addresses(const vk::raii::Device& device) {
+MeshInfo Mesh::get_info(const vk::raii::Device& device) {
     return {
         .positions = device.getBufferAddress({.buffer = positions.buffer}),
         .indices = device.getBufferAddress({.buffer = indices.buffer}),

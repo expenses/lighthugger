@@ -10,7 +10,7 @@
     #define VEC3_TYPE glm::vec3
 #endif
 
-struct MeshBufferAddresses {
+struct MeshInfo {
     uint64_t positions;
     uint64_t indices;
     uint64_t normals;
@@ -48,6 +48,7 @@ struct DrawIndirectCommand {
 
 struct Instance {
     MATRIX4_TYPE transform;
+    MeshInfo mesh_info;
     //MATRIX3_TYPE normal_transform;
     uint32_t mesh_index;
     uint32_t _padding0;

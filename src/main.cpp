@@ -466,14 +466,16 @@ int main() {
                  }}
         )};
 
-    auto buffer_addresses = std::array {powerplant.get_addresses(device)};
+    auto powerplant_info = powerplant.get_info(device);
     auto instances = std::array {
         Instance {
             .transform = glm::translate(glm::mat4(1), glm::vec3(0, 0, 0)),
+            .mesh_info = powerplant_info,
             //.normal_transform = glm::mat3(1.0),
             .mesh_index = 0},
         Instance {
             .transform = glm::translate(glm::mat4(1), glm::vec3(0, 0, 100)),
+            .mesh_info = powerplant_info,
             //.normal_transform = glm::mat3(1.0),
             .mesh_index = 0},
     };
@@ -525,15 +527,6 @@ int main() {
             },
             allocator,
             "draw_counts_buffer"
-        ),
-        .geometry_buffer = upload_via_staging_buffer(
-            buffer_addresses.data(),
-            buffer_addresses.size() * sizeof(MeshBufferAddresses),
-            allocator,
-            vk::BufferUsageFlagBits::eStorageBuffer,
-            "geometry_buffer",
-            command_buffer,
-            temp_buffers
         ),
         .instance_buffer = upload_via_staging_buffer(
             instances.data(),

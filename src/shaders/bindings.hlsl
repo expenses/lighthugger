@@ -1,7 +1,7 @@
 #include "../shared_cpu_gpu.h"
 
 [[vk::binding(0)]] Texture2D textures[];
-[[vk::binding(1)]] StructuredBuffer<MeshBufferAddresses> mesh_buffer_addresses;
+[[vk::binding(1)]] StructuredBuffer<Instance> instances;
 [[vk::binding(2)]] cbuffer uniforms {
     Uniforms uniforms;
 }
@@ -14,5 +14,4 @@
 [[vk::binding(9)]] Texture2DArray<float> shadowmap;
 [[vk::binding(10)]] SamplerComparisonState shadowmap_comparison_sampler;
 [[vk::binding(11)]] RWStructuredBuffer<DrawIndirectCommand> draw_calls;
-[[vk::binding(12)]] StructuredBuffer<Instance> instances;
-[[vk::binding(13)]] RWStructuredBuffer<uint32_t> draw_counts;
+[[vk::binding(12)]] RWStructuredBuffer<uint32_t> draw_counts;

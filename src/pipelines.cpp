@@ -128,14 +128,14 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .descriptorCount = 512,
             .stageFlags = vk::ShaderStageFlagBits::eFragment,
         },
-        // Geometry buffer
+        // instance buffer
         vk::DescriptorSetLayoutBinding {
             .binding = 1,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eVertex
-                | vk::ShaderStageFlagBits::eFragment
-                | vk::ShaderStageFlagBits::eCompute,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute
+                | vk::ShaderStageFlagBits::eVertex
+                | vk::ShaderStageFlagBits::eFragment,
         },
         // Uniforms
         vk::DescriptorSetLayoutBinding {
@@ -212,17 +212,9 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
-        // instance buffer
-        vk::DescriptorSetLayoutBinding {
-            .binding = 12,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute
-                | vk::ShaderStageFlagBits::eVertex,
-        },
         // draw counts buffer
         vk::DescriptorSetLayoutBinding {
-            .binding = 13,
+            .binding = 12,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute},
