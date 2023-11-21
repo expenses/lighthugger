@@ -150,6 +150,4 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
 	float4x4 shadowProj = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, shadow_cam_distance * 2.0);
 
     depth_info[0].shadow_rendering_matrices[cascade_index] = mul(shadowProj, shadowView);
-    depth_info[0].min_depth = asuint(FLT_MAX);
-    depth_info[0].max_depth = asuint(FLT_MIN);
 }

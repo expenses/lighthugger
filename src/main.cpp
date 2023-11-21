@@ -78,7 +78,8 @@ struct Resources {
     AllocatedBuffer instance_buffer;
     AllocatedBuffer draw_calls_buffer;
     AllocatedBuffer geometry_buffer;
-    uint32_t num_draws;
+    AllocatedBuffer draw_counts_buffer;
+    uint32_t max_num_draws;
     std::array<vk::raii::ImageView, 4> shadowmap_layer_views;
 };
 
@@ -286,6 +287,7 @@ int main() {
         .descriptorBindingPartiallyBound = true,
         .runtimeDescriptorArray = true,
         .bufferDeviceAddress = true,
+        .drawIndirectCount = true,
     };
 
     vk::PhysicalDeviceDynamicRenderingFeatures dyn_rendering_features = {
@@ -610,6 +612,18 @@ int main() {
             allocator,
             "draw_calls_buffer"
         ),
+        .draw_counts_buffer = AllocatedBuffer(
+            vk::BufferCreateInfo {
+                .size = sizeof(uint32_t),
+                .usage = vk::BufferUsageFlagBits::eIndirectBuffer
+                    | vk::BufferUsageFlagBits::eStorageBuffer
+                    | vk::BufferUsageFlagBits::eTransferDst},
+            {
+                .usage = vma::MemoryUsage::eAuto,
+            },
+            allocator,
+            "draw_counts_buffer"
+        ),
         .geometry_buffer = upload_via_staging_buffer(
             buffer_addresses.data(),
             buffer_addresses.size() * sizeof(MeshBufferAddresses),
@@ -628,7 +642,7 @@ int main() {
             command_buffer,
             temp_buffers
         ),
-        .num_draws = 2,
+        .max_num_draws = 1024,
         .shadowmap_layer_views = std::move(shadowmap_layer_views)};
 
     command_buffer.end();
@@ -696,6 +710,11 @@ int main() {
 
     auto instance_buffer_info = vk::DescriptorBufferInfo {
         .buffer = resources.instance_buffer.buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE};
+
+    auto draw_counts_buffer = vk::DescriptorBufferInfo {
+        .buffer = resources.draw_counts_buffer.buffer,
         .offset = 0,
         .range = VK_WHOLE_SIZE};
 
@@ -774,6 +793,12 @@ int main() {
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eStorageBuffer,
                 .pBufferInfo = &instance_buffer_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *descriptor_set.set,
+                .dstBinding = 13,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eStorageBuffer,
+                .pBufferInfo = &draw_counts_buffer},
         },
         {}
     );

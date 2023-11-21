@@ -15,3 +15,4 @@
 [[vk::binding(10)]] SamplerComparisonState shadowmap_comparison_sampler;
 [[vk::binding(11)]] RWStructuredBuffer<DrawIndirectCommand> draw_calls;
 [[vk::binding(12)]] StructuredBuffer<Instance> instances;
+[[vk::binding(13)]] RWStructuredBuffer<uint32_t> draw_counts;

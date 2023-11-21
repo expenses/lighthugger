@@ -16,4 +16,6 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
     draw_calls[id].instanceCount = 1;
     draw_calls[id].firstVertex = 0;
     draw_calls[id].firstInstance = id;
+
+    InterlockedAdd(draw_counts[0], 1);
 }

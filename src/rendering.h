@@ -1,3 +1,4 @@
+const auto u32_max = std::numeric_limits<uint64_t>::max();
 
 uint32_t dispatch_size(uint32_t width, uint32_t workgroup_size) {
     return static_cast<uint32_t>(std::ceil(float(width) / float(workgroup_size))
@@ -37,6 +38,16 @@ void render(
     tracy::VkCtx* tracy_ctx
 ) {
     TracyVkZone(tracy_ctx, *command_buffer, "main");
+
+    // Clear the depth min/max values.
+    {
+        auto offset = sizeof(glm::mat4) * 4;
+        command_buffer
+            .fillBuffer(resources.depth_info_buffer.buffer, offset, 4, u32_max);
+        command_buffer
+            .fillBuffer(resources.depth_info_buffer.buffer, offset + 4, 4, 0);
+    }
+    { command_buffer.fillBuffer(resources.draw_counts_buffer.buffer, 0, 4, 0); }
 
     set_scissor_and_viewport(command_buffer, extent.width, extent.height);
     command_buffer.bindDescriptorSets(
@@ -122,10 +133,12 @@ void render(
             vk::PipelineBindPoint::eGraphics,
             *pipelines.geometry_depth_prepass
         );
-        command_buffer.drawIndirect(
+        command_buffer.drawIndirectCount(
             resources.draw_calls_buffer.buffer,
             0,
-            resources.num_draws,
+            resources.draw_counts_buffer.buffer,
+            0,
+            resources.max_num_draws,
             sizeof(vk::DrawIndirectCommand)
         );
         command_buffer.endRendering();
@@ -195,10 +208,12 @@ void render(
                 0,
                 {{.cascade_index = i}}
             );
-            command_buffer.drawIndirect(
+            command_buffer.drawIndirectCount(
                 resources.draw_calls_buffer.buffer,
                 0,
-                resources.num_draws,
+                resources.draw_counts_buffer.buffer,
+                0,
+                resources.max_num_draws,
                 sizeof(vk::DrawIndirectCommand)
             );
             command_buffer.endRendering();
@@ -257,10 +272,12 @@ void render(
             vk::PipelineBindPoint::eGraphics,
             *pipelines.render_geometry
         );
-        command_buffer.drawIndirect(
+        command_buffer.drawIndirectCount(
             resources.draw_calls_buffer.buffer,
             0,
-            resources.num_draws,
+            resources.draw_counts_buffer.buffer,
+            0,
+            resources.max_num_draws,
             sizeof(vk::DrawIndirectCommand)
         );
         command_buffer.endRendering();
