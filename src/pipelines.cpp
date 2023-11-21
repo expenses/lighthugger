@@ -98,7 +98,7 @@ create_shader_from_file(const vk::raii::Device& device, const char* filepath) {
 
     auto shader = device.createShaderModule(vk::ShaderModuleCreateInfo {
         .codeSize = bytes.size(),
-        .pCode = (uint32_t*)bytes.data(),
+        .pCode = reinterpret_cast<uint32_t*>(bytes.data()),
     });
 
     return shader;
@@ -134,6 +134,7 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eVertex
+                | vk::ShaderStageFlagBits::eFragment
                 | vk::ShaderStageFlagBits::eCompute,
         },
         // Uniforms
@@ -210,6 +211,14 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        },
+        // instance buffer
+        vk::DescriptorSetLayoutBinding {
+            .binding = 12,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute
+                | vk::ShaderStageFlagBits::eVertex,
         },
     };
 

@@ -11,7 +11,6 @@
 #include "sync.h"
 
 const auto u64_max = std::numeric_limits<uint64_t>::max();
-const auto u32_max = std::numeric_limits<uint32_t>::max();
 
 // Sources:
 // https://vkguide.dev
@@ -76,7 +75,9 @@ struct Resources {
     PersistentlyMappedBuffer uniform_buffer;
     ImageWithView shadowmap;
     AllocatedBuffer depth_info_buffer;
+    AllocatedBuffer instance_buffer;
     AllocatedBuffer draw_calls_buffer;
+    AllocatedBuffer geometry_buffer;
     uint32_t num_draws;
     std::array<vk::raii::ImageView, 4> shadowmap_layer_views;
 };
@@ -119,7 +120,7 @@ struct CameraParams {
             return;
         }
 
-        auto movement = glm::normalize(glm::vec3(movement_vector)) * 0.5f;
+        auto movement = glm::normalize(glm::vec3(movement_vector)) * 2.0f;
 
         position += movement.x * right();
         position += movement.z * facing();
@@ -291,7 +292,10 @@ int main() {
         .pNext = &vulkan_1_2_features,
         .dynamicRendering = true};
 
-    auto vulkan_1_0_features = vk::PhysicalDeviceFeatures {.shaderInt64 = true};
+    auto vulkan_1_0_features = vk::PhysicalDeviceFeatures {
+        .shaderInt64 = true,
+        .multiDrawIndirect = true,
+    };
 
     auto device_extensions = std::array {
         "VK_KHR_swapchain",
@@ -478,18 +482,6 @@ int main() {
         descriptor_set
     );
 
-    auto buffer_addresses = std::array {powerplant.get_addresses(device)};
-
-    auto geometry_buffer = upload_via_staging_buffer(
-        buffer_addresses.data(),
-        buffer_addresses.size() * sizeof(MeshBufferAddresses),
-        allocator,
-        vk::BufferUsageFlagBits::eStorageBuffer,
-        "geometry_buffer",
-        command_buffer,
-        temp_buffers
-    );
-
     auto shadowmap = ImageWithView(
         {.imageType = vk::ImageType::e2D,
          .format = vk::Format::eD32Sfloat,
@@ -570,6 +562,18 @@ int main() {
                  }}
         )};
 
+    auto buffer_addresses = std::array {powerplant.get_addresses(device)};
+    auto instances = std::array {
+        Instance {
+            .transform = glm::translate(glm::mat4(1), glm::vec3(0, 0, 0)),
+            //.normal_transform = glm::mat3(1.0),
+            .mesh_index = 0},
+        Instance {
+            .transform = glm::translate(glm::mat4(1), glm::vec3(0, 0, 100)),
+            //.normal_transform = glm::mat3(1.0),
+            .mesh_index = 0},
+    };
+
     auto resources = Resources {
         .resizing = ResizingResources(device, allocator, extent),
         .uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
@@ -597,7 +601,7 @@ int main() {
         ),
         .draw_calls_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
-                .size = sizeof(vk::DrawIndirectCommand),
+                .size = sizeof(vk::DrawIndirectCommand) * 1024,
                 .usage = vk::BufferUsageFlagBits::eIndirectBuffer
                     | vk::BufferUsageFlagBits::eStorageBuffer},
             {
@@ -606,7 +610,25 @@ int main() {
             allocator,
             "draw_calls_buffer"
         ),
-        .num_draws = 1,
+        .geometry_buffer = upload_via_staging_buffer(
+            buffer_addresses.data(),
+            buffer_addresses.size() * sizeof(MeshBufferAddresses),
+            allocator,
+            vk::BufferUsageFlagBits::eStorageBuffer,
+            "geometry_buffer",
+            command_buffer,
+            temp_buffers
+        ),
+        .instance_buffer = upload_via_staging_buffer(
+            instances.data(),
+            instances.size() * sizeof(Instance),
+            allocator,
+            vk::BufferUsageFlagBits::eStorageBuffer,
+            "instance buffer",
+            command_buffer,
+            temp_buffers
+        ),
+        .num_draws = 2,
         .shadowmap_layer_views = std::move(shadowmap_layer_views)};
 
     command_buffer.end();
@@ -653,7 +675,7 @@ int main() {
         vk::DescriptorImageInfo {.sampler = *shadowmap_comparison_sampler};
 
     auto geometry_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = geometry_buffer.buffer,
+        .buffer = resources.geometry_buffer.buffer,
         .offset = 0,
         .range = VK_WHOLE_SIZE};
 
@@ -669,6 +691,11 @@ int main() {
 
     auto draw_calls_buffer_info = vk::DescriptorBufferInfo {
         .buffer = resources.draw_calls_buffer.buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE};
+
+    auto instance_buffer_info = vk::DescriptorBufferInfo {
+        .buffer = resources.instance_buffer.buffer,
         .offset = 0,
         .range = VK_WHOLE_SIZE};
 
@@ -741,6 +768,12 @@ int main() {
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eStorageBuffer,
                 .pBufferInfo = &draw_calls_buffer_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *descriptor_set.set,
+                .dstBinding = 12,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eStorageBuffer,
+                .pBufferInfo = &instance_buffer_info},
         },
         {}
     );
@@ -785,6 +818,10 @@ int main() {
 
     auto prev_mouse = glm::dvec2(0.0, 0.0);
     glfwGetCursorPos(window, &prev_mouse.x, &prev_mouse.y);
+
+    Uniforms* uniforms =
+        reinterpret_cast<Uniforms*>(resources.uniform_buffer.mapped_ptr);
+    uniforms->num_instances = 2;
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -885,10 +922,8 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         {
-            Uniforms* uniforms =
-                reinterpret_cast<Uniforms*>(resources.uniform_buffer.mapped_ptr
-                );
             ImGui::Checkbox("debug cascades", &uniforms->debug_cascades);
+            ImGui::Checkbox("debug shadowmaps", &uniforms->debug_shadowmaps);
             ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
             ImGui::Text(
                 "camera pos: (%f, %f, %f)",
@@ -929,9 +964,6 @@ int main() {
                 0.01f
             );
 
-            Uniforms* uniforms =
-                reinterpret_cast<Uniforms*>(resources.uniform_buffer.mapped_ptr
-                );
             uniforms->sun_dir = camera_params.sun_dir();
             uniforms->combined_perspective_view = perspective * view;
             uniforms->inv_perspective_view = glm::inverse(perspective * view);

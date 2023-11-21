@@ -14,3 +14,4 @@
 [[vk::binding(9)]] Texture2DArray<float> shadowmap;
 [[vk::binding(10)]] SamplerComparisonState shadowmap_comparison_sampler;
 [[vk::binding(11)]] RWStructuredBuffer<DrawIndirectCommand> draw_calls;
+[[vk::binding(12)]] StructuredBuffer<Instance> instances;

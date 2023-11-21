@@ -22,15 +22,17 @@ MaterialInfo load_material_info(uint64_t address, uint offset) {
 
 [shader("vertex")]
 float4 depth_only(
-    uint vId : SV_VertexID
+    uint vertex_id : SV_VertexID, uint instance_id: SV_InstanceID
 ): SV_Position
 {
-    MeshBufferAddresses addresses = mesh_buffer_addresses.Load(0);
+    Instance instance = instances[instance_id];
+    MeshBufferAddresses addresses = mesh_buffer_addresses[instance.mesh_index];
 
-    uint offset = load_index(addresses.indices, vId);
+    uint offset = load_index(addresses.indices, vertex_id);
     float3 position = load_float3(addresses.positions, offset);
+    float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
 
-    return mul(uniforms.combined_perspective_view, float4(position, 1.0));
+    return mul(uniforms.combined_perspective_view, float4(world_pos, 1.0));
 }
 
 [[vk::push_constant]]
@@ -38,39 +40,44 @@ ShadowPassConstant shadow_constant;
 
 [shader("vertex")]
 float4 shadow_pass(
-    uint vId : SV_VertexID
+    uint vertex_id : SV_VertexID, uint instance_id: SV_InstanceID
 ): SV_Position
 {
-    MeshBufferAddresses addresses = mesh_buffer_addresses.Load(0);
+    Instance instance = instances[instance_id];
+    MeshBufferAddresses addresses = mesh_buffer_addresses[instance.mesh_index];
 
-    uint offset = load_index(addresses.indices, vId);
+    uint offset = load_index(addresses.indices, vertex_id);
     float3 position = load_float3(addresses.positions, offset);
+    float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
 
-    return mul(depth_info[0].shadow_rendering_matrices[shadow_constant.cascade_index], float4(position, 1.0));
+    return mul(depth_info[0].shadow_rendering_matrices[shadow_constant.cascade_index], float4(world_pos, 1.0));
 }
 
 [shader("vertex")]
-V2P VSMain(uint vId : SV_VertexID)
+Varyings VSMain(uint vertex_id : SV_VertexID, uint instance_id: SV_InstanceID)
 {
-    MeshBufferAddresses addresses = mesh_buffer_addresses.Load(0);
+    Instance instance = instances[instance_id];
+    MeshBufferAddresses addresses = mesh_buffer_addresses.Load(instance.mesh_index);
 
-    uint material_index = vk::RawBufferLoad<uint>(addresses.material_indices + sizeof(uint) * vId);
-    uint offset = load_index(addresses.indices, vId);
+    uint material_index = vk::RawBufferLoad<uint>(addresses.material_indices + sizeof(uint) * vertex_id);
+    uint offset = load_index(addresses.indices, vertex_id);
     float3 position = load_float3(addresses.positions, offset);
     float3 normal = load_float3(addresses.normals, offset);
-    float2 uv = vk::RawBufferLoad<float2>(addresses.uvs + sizeof(float2) * offset);
 
-    V2P vsOut;
-    vsOut.world_pos = position;
-    vsOut.Pos = mul(uniforms.combined_perspective_view, float4(position, 1.0));
-    vsOut.normal = normal;
-    vsOut.material_index = material_index;
-    vsOut.uv = uv;
-    vsOut.material_info_address = addresses.material_info;
-    return vsOut;
+    float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
+    //normal = mul(instance.normal_transform, normalize(normal));
+
+    Varyings varyings;
+    varyings.clip_pos = mul(uniforms.combined_perspective_view, float4(world_pos, 1.0));
+    varyings.world_pos = world_pos;
+    varyings.normal = normal;
+    varyings.material_index = material_index;
+    varyings.uv = vk::RawBufferLoad<float2>(addresses.uvs + sizeof(float2) * offset);
+    varyings.model_index = instance.mesh_index;
+    return varyings;
 }
 
-static const float4x4 biasMat = float4x4(
+static const float4x4 bias_matrix = float4x4(
     0.5, 0.0, 0.0, 0.5,
     0.0, 0.5, 0.0, 0.5,
     0.0, 0.0, 1.0, 0.0,
@@ -79,24 +86,34 @@ static const float4x4 biasMat = float4x4(
 
 [shader("pixel")]
 void PSMain(
-    V2P input,
+    Varyings input,
     [[vk::location(0)]] out float4 target_0: SV_Target0
 ) {
-    MaterialInfo material_info = load_material_info(input.material_info_address, input.material_index);
+    MeshBufferAddresses addresses = mesh_buffer_addresses.Load(input.model_index);
+    MaterialInfo material_info = load_material_info(addresses.material_info, input.material_index);
     uint cascade_index;
+    float4 shadow_coord;
     for (cascade_index = 0; cascade_index < 4; cascade_index++) {
-        if (depth_info[0].cascade_splits[cascade_index] <= input.Pos.z) {
+        // Get the coordinate in shadow view space.
+        shadow_coord = mul(depth_info[0].shadow_rendering_matrices[cascade_index], float4(input.world_pos, 1.0));
+        // If it's inside the cascade view space (which is NDC so -1 to 1) then stop as
+        // this is the highest quality cascade for the fragment.
+        if (abs(shadow_coord.x) < 1.0 && abs(shadow_coord.y) < 1.0) {
             break;
         }
     }
 
-    float4 shadowCoord = mul(biasMat, mul(depth_info[0].shadow_rendering_matrices[cascade_index], float4(input.world_pos, 1.0)));
-    shadowCoord /= shadowCoord.w;
+    float4 shadow_view_coord = mul(bias_matrix, shadow_coord);
+    shadow_view_coord /= shadow_view_coord.w;
     float shadow_sum = 0.0;
     for (int x = -1; x <= 1; x++) {
         for (int y = -1; y <= 1; y++) {
             float2 offset = float2(x, y) / 1024.0;
-            shadow_sum += shadowmap.SampleCmpLevelZero(shadowmap_comparison_sampler, float3(shadowCoord.xy + offset, cascade_index),  shadowCoord.z);
+            shadow_sum += shadowmap.SampleCmpLevelZero(
+                shadowmap_comparison_sampler,
+                float3(shadow_view_coord.xy + offset, cascade_index),
+                shadow_view_coord.z
+            );
         }
     }
     shadow_sum /= 9.0;

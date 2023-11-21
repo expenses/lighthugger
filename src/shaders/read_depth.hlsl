@@ -4,11 +4,10 @@
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38
 
-// Written to not require branches.
-// I'm not sure it matters though.
 uint min_if_not_zero(uint a, uint b) {
-    uint mask = uint(a != 0u);
-    return mask * min(a, b) + (1u - mask) * b;
+    // Use HLSL 2021's `select` instead of `?:` to avoid branches.
+    // Not sure if it matters.
+    return select(a != 0u, select(b != 0u, min(a, b), a), b);
 }
 
 uint max4(uint4 values) {
@@ -151,8 +150,6 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
 	float4x4 shadowProj = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, shadow_cam_distance * 2.0);
 
     depth_info[0].shadow_rendering_matrices[cascade_index] = mul(shadowProj, shadowView);
-    depth_info[0].cascade_splits = cascadeSplits;
     depth_info[0].min_depth = asuint(FLT_MAX);
     depth_info[0].max_depth = asuint(FLT_MIN);
-
 }
