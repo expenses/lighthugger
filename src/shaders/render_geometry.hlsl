@@ -112,6 +112,10 @@ void PSMain(
 
     float3 diffuse = albedo * lighting;
 
-    float3 debug_col = DEBUG_COLOURS[cascade_index];
     target_0 = float4(diffuse, 1.0);
+
+    if (uniforms.debug_cascades) {
+        float3 debug_col = DEBUG_COLOURS[cascade_index];
+        target_0 = float4(albedo * debug_col, 1.0);
+    }
 }

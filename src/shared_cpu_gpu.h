@@ -31,6 +31,7 @@ struct Uniforms {
     MATRIX_TYPE combined_perspective_view;
     MATRIX_TYPE inv_perspective_view;
     VEC3_TYPE sun_dir;
+    bool debug_cascades;
 };
 
 // Same as VkDrawIndirectCommand

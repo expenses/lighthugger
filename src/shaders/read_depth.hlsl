@@ -4,8 +4,19 @@
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38
 
+// Written to not require branches.
+// I'm not sure it matters though.
 uint min_if_not_zero(uint a, uint b) {
-    return a != 0 ? min(a, b) : b;
+    uint mask = uint(a != 0u);
+    return mask * min(a, b) + (1u - mask) * b;
+}
+
+uint max4(uint4 values) {
+    return max(max(values.x, values.y), max(values.z, values.w));
+}
+
+uint min4(uint4 values) {
+    return min_if_not_zero(min_if_not_zero(values.x, values.y), min_if_not_zero(values.z, values.w));
 }
 
 [shader("compute")]
@@ -23,14 +34,7 @@ void read_depth(uint3 global_id: SV_DispatchThreadID){
     uint4 depth_reinterpreted = asuint(depth);
 
     // min the values, trying to avoid propagating zeros.
-    uint depth_min = min_if_not_zero(
-        min_if_not_zero(depth_reinterpreted.x, depth_reinterpreted.y),
-        min_if_not_zero(depth_reinterpreted.z, depth_reinterpreted.w)
-    );
-    uint depth_max = max(
-        max(depth_reinterpreted.x, depth_reinterpreted.y),
-        max(depth_reinterpreted.z, depth_reinterpreted.w)
-    );
+    uint depth_min = min4(depth_reinterpreted);
 
     // Min all values in the subgroup,
     if (depth_min != 0) {
@@ -43,6 +47,7 @@ void read_depth(uint3 global_id: SV_DispatchThreadID){
         }
     }
 
+    uint depth_max = max4(depth_reinterpreted);
     uint subgroup_max = WaveActiveMax(depth_max);
 
     if (WaveIsFirstLane()) {

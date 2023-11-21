@@ -113,6 +113,18 @@ struct CameraParams {
             sinf(sun_latitude) * cosf(sun_longitude)
         );
     }
+
+    void move_camera(glm::ivec3 movement_vector) {
+        if (movement_vector == glm::ivec3(0)) {
+            return;
+        }
+
+        auto movement = glm::normalize(glm::vec3(movement_vector)) * 0.5f;
+
+        position += movement.x * right();
+        position += movement.z * facing();
+        position.y += movement.y;
+    }
 };
 
 struct KeyboardState {
@@ -831,20 +843,16 @@ int main() {
             );
         }
         {
-            int left_right = int(keyboard_state.d) - int(keyboard_state.a);
-            int forwards_backwards =
-                int(keyboard_state.w) - int(keyboard_state.s);
-            int up_down =
-                int(keyboard_state.shift) - int(keyboard_state.control);
             int sun_left_right =
                 int(keyboard_state.right) - int(keyboard_state.left);
             int sun_up_down = int(keyboard_state.up) - int(keyboard_state.down);
 
-            camera_params.position +=
-                static_cast<float>(left_right) * 0.5f * camera_params.right();
-            camera_params.position += static_cast<float>(forwards_backwards)
-                * 0.5f * camera_params.facing();
-            camera_params.position.y += static_cast<float>(up_down) * 0.5f;
+            camera_params.move_camera(glm::ivec3(
+                int(keyboard_state.d) - int(keyboard_state.a),
+                int(keyboard_state.shift) - int(keyboard_state.control),
+                int(keyboard_state.w) - int(keyboard_state.s)
+            ));
+
             camera_params.sun_latitude +=
                 static_cast<float>(sun_left_right) * 0.025f;
             camera_params.sun_longitude +=
@@ -877,6 +885,10 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         {
+            Uniforms* uniforms =
+                reinterpret_cast<Uniforms*>(resources.uniform_buffer.mapped_ptr
+                );
+            ImGui::Checkbox("debug cascades", &uniforms->debug_cascades);
             ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
             ImGui::Text(
                 "camera pos: (%f, %f, %f)",
