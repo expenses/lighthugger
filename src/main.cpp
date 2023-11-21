@@ -375,14 +375,6 @@ int main() {
     );
 
     // Load all resources
-    auto display_transform_lut = load_dds(
-        "external/tony-mc-mapface/shader/tony_mc_mapface.dds",
-        allocator,
-        device,
-        command_buffer,
-        graphics_queue_family,
-        temp_buffers
-    );
 
     auto powerplant = load_obj(
         "powerplant/Powerplant.obj",
@@ -554,8 +546,14 @@ int main() {
         ),
         .max_num_draws = 1024,
         .shadowmap_layer_views = std::move(shadowmap_layer_views),
-        .display_transform_lut = std::move(display_transform_lut),
-
+        .display_transform_lut = load_dds(
+            "external/tony-mc-mapface/shader/tony_mc_mapface.dds",
+            allocator,
+            device,
+            command_buffer,
+            graphics_queue_family,
+            temp_buffers
+        ),
         .clamp_sampler = device.createSampler(
             {.magFilter = vk::Filter::eLinear,
              .minFilter = vk::Filter::eLinear,

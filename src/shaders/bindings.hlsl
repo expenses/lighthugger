@@ -4,7 +4,7 @@
 [[vk::binding(1)]] StructuredBuffer<MeshBufferAddresses> mesh_buffer_addresses;
 [[vk::binding(2)]] cbuffer uniforms {
     Uniforms uniforms;
-};
+}
 [[vk::binding(3)]] Texture2D<float3> scene_referred_framebuffer;
 [[vk::binding(4)]] SamplerState clamp_sampler;
 [[vk::binding(5)]] Texture3D<float3> display_transform_lut;

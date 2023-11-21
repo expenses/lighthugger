@@ -4,27 +4,27 @@
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38
 
-uint min_if_not_zero(uint a, uint b) {
+uint32_t min_if_not_zero(uint32_t a, uint32_t b) {
     // Use HLSL 2021's `select` instead of `?:` to avoid branches.
     // Not sure if it matters.
     return select(a != 0u, select(b != 0u, min(a, b), a), b);
 }
 
-uint max4(uint4 values) {
+uint32_t max4(uint4 values) {
     return max(max(values.x, values.y), max(values.z, values.w));
 }
 
-uint min4(uint4 values) {
+uint32_t min4(uint4 values) {
     return min_if_not_zero(min_if_not_zero(values.x, values.y), min_if_not_zero(values.z, values.w));
 }
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void read_depth(uint3 global_id: SV_DispatchThreadID){
-    uint width;
-    uint height;
+    uint32_t width;
+    uint32_t height;
     depth_buffer.GetDimensions(width, height);
-    float2 pixel_size = 1.0 / float2(uint2(width, height));
+    float2 pixel_size = 1.0 / float2(width, height);
 
     uint2 coord = global_id.xy * 2 + 1;
     float2 uv = coord * pixel_size;
@@ -33,11 +33,11 @@ void read_depth(uint3 global_id: SV_DispatchThreadID){
     uint4 depth_reinterpreted = asuint(depth);
 
     // min the values, trying to avoid propagating zeros.
-    uint depth_min = min4(depth_reinterpreted);
+    uint32_t depth_min = min4(depth_reinterpreted);
 
     // Min all values in the subgroup,
     if (depth_min != 0) {
-        uint subgroup_min = WaveActiveMin(depth_min);
+        uint32_t subgroup_min = WaveActiveMin(depth_min);
 
         // https://www.khronos.org/assets/uploads/developers/library/2018-vulkan-devday/06-subgroups.pdf
         // equiv of subgroup elect
@@ -46,8 +46,8 @@ void read_depth(uint3 global_id: SV_DispatchThreadID){
         }
     }
 
-    uint depth_max = max4(depth_reinterpreted);
-    uint subgroup_max = WaveActiveMax(depth_max);
+    uint32_t depth_max = max4(depth_reinterpreted);
+    uint32_t subgroup_max = WaveActiveMax(depth_max);
 
     if (WaveIsFirstLane()) {
         InterlockedMax(depth_info[0].max_depth, subgroup_max);
@@ -69,7 +69,7 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
 
     float4x4 invCam = uniforms.inv_perspective_view;
 
-    uint cascade_index = global_id.x;
+    uint32_t cascade_index = global_id.x;
 
     //float cascadeSplits[4];
     /*

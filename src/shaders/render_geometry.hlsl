@@ -2,34 +2,28 @@
 #include "bindings.hlsl"
 #include "debug.hlsl"
 
-uint load_index(uint64_t address, uint vertex_id) {
-    return vk::RawBufferLoad<uint>(address + sizeof(uint) * vertex_id);
+template<class T>
+T load_value(uint64_t address, uint32_t offset) {
+    return vk::RawBufferLoad<T>(address + sizeof(T) * offset);
 }
 
-float3 load_float3(uint64_t address, uint offset) {
-    return float3(
-        vk::RawBufferLoad<float>(address + sizeof(float) * (offset * 3)),
-        vk::RawBufferLoad<float>(address + sizeof(float) * ((offset * 3) + 1)),
-        vk::RawBufferLoad<float>(address + sizeof(float) * ((offset * 3) + 2))
-    );
-}
-
-MaterialInfo load_material_info(uint64_t address, uint offset) {
+MaterialInfo load_material_info(uint64_t address, uint32_t offset) {
+    uint64_t base_address = address + offset * sizeof(MaterialInfo);
     MaterialInfo material_info;
-    material_info.albedo_texture_index = vk::RawBufferLoad<uint32_t>(address + offset * sizeof(MaterialInfo));
+    material_info.albedo_texture_index = load_value<uint32_t>(base_address, 0);
     return material_info;
 }
 
 [shader("vertex")]
 float4 depth_only(
-    uint vertex_id : SV_VertexID, uint instance_id: SV_InstanceID
+    uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_InstanceID
 ): SV_Position
 {
     Instance instance = instances[instance_id];
     MeshBufferAddresses addresses = mesh_buffer_addresses[instance.mesh_index];
 
-    uint offset = load_index(addresses.indices, vertex_id);
-    float3 position = load_float3(addresses.positions, offset);
+    uint32_t offset = load_value<uint32_t>(addresses.indices, vertex_id);
+    float3 position = load_value<float3>(addresses.positions, offset);
     float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
 
     return mul(uniforms.combined_perspective_view, float4(world_pos, 1.0));
@@ -40,29 +34,29 @@ ShadowPassConstant shadow_constant;
 
 [shader("vertex")]
 float4 shadow_pass(
-    uint vertex_id : SV_VertexID, uint instance_id: SV_InstanceID
+    uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_InstanceID
 ): SV_Position
 {
     Instance instance = instances[instance_id];
     MeshBufferAddresses addresses = mesh_buffer_addresses[instance.mesh_index];
 
-    uint offset = load_index(addresses.indices, vertex_id);
-    float3 position = load_float3(addresses.positions, offset);
+    uint32_t offset = load_value<uint32_t>(addresses.indices, vertex_id);
+    float3 position = load_value<float3>(addresses.positions, offset);
     float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
 
     return mul(depth_info[0].shadow_rendering_matrices[shadow_constant.cascade_index], float4(world_pos, 1.0));
 }
 
 [shader("vertex")]
-Varyings VSMain(uint vertex_id : SV_VertexID, uint instance_id: SV_InstanceID)
+Varyings VSMain(uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_InstanceID)
 {
     Instance instance = instances[instance_id];
-    MeshBufferAddresses addresses = mesh_buffer_addresses.Load(instance.mesh_index);
+    MeshBufferAddresses addresses = mesh_buffer_addresses[instance.mesh_index];
 
-    uint material_index = vk::RawBufferLoad<uint>(addresses.material_indices + sizeof(uint) * vertex_id);
-    uint offset = load_index(addresses.indices, vertex_id);
-    float3 position = load_float3(addresses.positions, offset);
-    float3 normal = load_float3(addresses.normals, offset);
+    uint32_t material_index = load_value<uint32_t>(addresses.material_indices, vertex_id);
+    uint32_t offset = load_value<uint32_t>(addresses.indices, vertex_id);
+    float3 position = load_value<float3>(addresses.positions, offset);
+    float3 normal = load_value<float3>(addresses.normals, offset);
 
     float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
     //normal = mul(instance.normal_transform, normalize(normal));
@@ -72,7 +66,7 @@ Varyings VSMain(uint vertex_id : SV_VertexID, uint instance_id: SV_InstanceID)
     varyings.world_pos = world_pos;
     varyings.normal = normal;
     varyings.material_index = material_index;
-    varyings.uv = vk::RawBufferLoad<float2>(addresses.uvs + sizeof(float2) * offset);
+    varyings.uv = load_value<float2>(addresses.uvs, offset);
     varyings.model_index = instance.mesh_index;
     return varyings;
 }
@@ -89,10 +83,10 @@ void PSMain(
     Varyings input,
     [[vk::location(0)]] out float4 target_0: SV_Target0
 ) {
-    MeshBufferAddresses addresses = mesh_buffer_addresses.Load(input.model_index);
+    MeshBufferAddresses addresses = mesh_buffer_addresses[input.model_index];
     MaterialInfo material_info = load_material_info(addresses.material_info, input.material_index);
-    uint cascade_index;
-    float4 shadow_coord;
+    uint32_t cascade_index;
+    float4 shadow_coord = float4(0,0,0,0);
     for (cascade_index = 0; cascade_index < 4; cascade_index++) {
         // Get the coordinate in shadow view space.
         shadow_coord = mul(depth_info[0].shadow_rendering_matrices[cascade_index], float4(input.world_pos, 1.0));

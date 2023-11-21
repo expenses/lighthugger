@@ -1,7 +1,7 @@
 #include "inputs/pos_uv.hlsl"
 
 [shader("vertex")]
-Varyings VSMain(uint vId : SV_VertexID)
+Varyings VSMain(uint32_t vId : SV_VertexID)
 {
     Varyings outputs;
     outputs.uv = float2((vId << 1) & 2, vId & 2);
