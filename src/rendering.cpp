@@ -41,17 +41,21 @@ void render(
     uint32_t graphics_queue_family,
     tracy::VkCtx* tracy_ctx
 ) {
+    ZoneScoped;
     TracyVkZone(tracy_ctx, *command_buffer, "main");
 
-    // Clear the depth min/max values.
     {
+        TracyVkZone(tracy_ctx, *command_buffer, "buffer clears");
+
+        // Clear the depth min/max values.
         auto offset = sizeof(glm::mat4) * 4;
         command_buffer
             .fillBuffer(resources.depth_info_buffer.buffer, offset, 4, u32_max);
         command_buffer
             .fillBuffer(resources.depth_info_buffer.buffer, offset + 4, 4, 0);
+        // Clear draw counts.
+        command_buffer.fillBuffer(resources.draw_counts_buffer.buffer, 0, 4, 0);
     }
-    { command_buffer.fillBuffer(resources.draw_counts_buffer.buffer, 0, 4, 0); }
 
     set_scissor_and_viewport(command_buffer, extent.width, extent.height);
     command_buffer.bindDescriptorSets(
@@ -70,6 +74,8 @@ void render(
     );
 
     {
+        TracyVkZone(tracy_ctx, *command_buffer, "write draw calls");
+
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eCompute,
             *pipelines.write_draw_calls
@@ -315,6 +321,8 @@ void render(
     );
 
     {
+        TracyVkZone(tracy_ctx, *command_buffer, "display transform and imgui");
+
         vk::RenderingAttachmentInfoKHR color_attachment_info = {
             .imageView = *swapchain_image_view,
             .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
