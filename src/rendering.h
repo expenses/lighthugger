@@ -10,5 +10,6 @@ void render(
     const vk::raii::ImageView& swapchain_image_view,
     vk::Extent2D extent,
     uint32_t graphics_queue_family,
-    tracy::VkCtx* tracy_ctx
+    tracy::VkCtx* tracy_ctx,
+    uint32_t swapchain_image_index
 );

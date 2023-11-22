@@ -1,4 +1,3 @@
-#include "inputs/pos.hlsl"
 #include "bindings.hlsl"
 #include "debug.hlsl"
 
@@ -44,6 +43,15 @@ float4 shadow_pass(
 
     return mul(depth_info[0].shadow_rendering_matrices[shadow_constant.cascade_index], float4(world_pos, 1.0));
 }
+
+struct Varyings {
+    [[vk::location(0)]] float4 clip_pos : SV_Position;
+    [[vk::location(1)]] float3 world_pos : COLOR0;
+    [[vk::location(2)]] float3 normal: COLOR1;
+    [[vk::location(3)]] float2 uv: COLOR2;
+    [[vk::location(4)]] uint32_t material_index: COLOR3;
+    [[vk::location(5)]] uint32_t instance_index: COLOR4;
+};
 
 [shader("vertex")]
 Varyings VSMain(uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_InstanceID)

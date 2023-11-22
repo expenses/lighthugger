@@ -34,16 +34,6 @@ void DescriptorSet::write_resizing_descriptors(
     const vk::raii::Device& device,
     const std::vector<vk::raii::ImageView>& swapchain_image_views
 ) {
-    std::vector<vk::DescriptorImageInfo> swapchain_image_infos(
-        swapchain_image_views.size()
-    );
-
-    for (uint32_t i = 0; i < swapchain_image_views.size(); i++) {
-        swapchain_image_infos[i] = vk::DescriptorImageInfo {
-            .imageView = *swapchain_image_views[i],
-            .imageLayout = vk::ImageLayout::eGeneral};
-    }
-
     auto image_info = vk::DescriptorImageInfo {
         .imageView = *resizing_resources.scene_referred_framebuffer.view,
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
@@ -53,27 +43,40 @@ void DescriptorSet::write_resizing_descriptors(
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
 
     device.updateDescriptorSets(
-        {vk::WriteDescriptorSet {
-             .dstSet = *set,
-             .dstBinding = 3,
-             .descriptorCount = 1,
-             .descriptorType = vk::DescriptorType::eSampledImage,
-             .pImageInfo = &image_info},
-         vk::WriteDescriptorSet {
-             .dstSet = *set,
-             .dstBinding = 7,
-             .descriptorCount = 1,
-             .descriptorType = vk::DescriptorType::eSampledImage,
-             .pImageInfo = &depthbuffer_image_info},
-         vk::WriteDescriptorSet {
-             .dstSet = *set,
-             .dstBinding = 13,
-             .descriptorCount =
-                 static_cast<uint32_t>(swapchain_image_infos.size()),
-             .descriptorType = vk::DescriptorType::eStorageImage,
-             .pImageInfo = swapchain_image_infos.data()}},
+        {
+            vk::WriteDescriptorSet {
+                .dstSet = *set,
+                .dstBinding = 3,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampledImage,
+                .pImageInfo = &image_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *set,
+                .dstBinding = 7,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampledImage,
+                .pImageInfo = &depthbuffer_image_info},
+        },
         {}
     );
+
+    for (uint32_t i = 0; i < swapchain_image_views.size(); i++) {
+        auto swapchain_image_info = vk::DescriptorImageInfo {
+            .imageView = *swapchain_image_views[i],
+            .imageLayout = vk::ImageLayout::eGeneral};
+
+        device.updateDescriptorSets(
+            {
+                vk::WriteDescriptorSet {
+                    .dstSet = *swapchain_image_sets[i],
+                    .dstBinding = 0,
+                    .descriptorCount = 1,
+                    .descriptorType = vk::DescriptorType::eStorageImage,
+                    .pImageInfo = &swapchain_image_info},
+            },
+            {}
+        );
+    }
 }
 
 void DescriptorSet::write_descriptors(

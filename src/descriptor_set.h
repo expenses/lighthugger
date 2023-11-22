@@ -30,9 +30,15 @@ struct IndexTracker {
 
 struct DescriptorSet {
     vk::raii::DescriptorSet set;
+    std::vector<vk::raii::DescriptorSet> swapchain_image_sets;
     IndexTracker tracker;
 
-    DescriptorSet(vk::raii::DescriptorSet set_) : set(std::move(set_)) {}
+    DescriptorSet(
+        vk::raii::DescriptorSet set_,
+        std::vector<vk::raii::DescriptorSet> swapchain_image_sets_
+    ) :
+        set(std::move(set_)),
+        swapchain_image_sets(std::move(swapchain_image_sets_)) {}
 
     uint32_t write_image(const ImageWithView& image, vk::Device device);
 

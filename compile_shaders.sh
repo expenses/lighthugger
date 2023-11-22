@@ -1,6 +1,5 @@
 shaders='
 display_transform.hlsl
-fullscreen_tri.hlsl
 render_geometry.hlsl
 read_depth.hlsl
 write_draw_calls.hlsl

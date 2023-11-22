@@ -352,11 +352,7 @@ int main() {
     auto render_fence =
         device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
 
-    auto pipelines = Pipelines::compile_pipelines(
-        device,
-        swapchain_create_info.imageFormat,
-        swapchain_images.size()
-    );
+    auto pipelines = Pipelines::compile_pipelines(device);
 
     auto pool_sizes = std::array {
         vk::DescriptorPoolSize {
@@ -377,15 +373,31 @@ int main() {
          .pPoolSizes = pool_sizes.data()}
     );
 
-    auto descriptor_set_layouts = std::array {*pipelines.dsl.everything};
+    std::vector<vk::DescriptorSetLayout> descriptor_sets_to_create;
+    descriptor_sets_to_create.reserve(swapchain_images.size() + 1);
 
-    auto descriptor_sets =
+    for (uint32_t i = 0; i < swapchain_images.size(); i++) {
+        descriptor_sets_to_create.push_back(
+            *pipelines.dsl.swapchain_storage_image
+        );
+    }
+    descriptor_sets_to_create.push_back(*pipelines.dsl.everything);
+
+    std::vector<vk::raii::DescriptorSet> descriptor_sets =
         device.allocateDescriptorSets(vk::DescriptorSetAllocateInfo {
             .descriptorPool = *descriptor_pool,
-            .descriptorSetCount = descriptor_set_layouts.size(),
-            .pSetLayouts = descriptor_set_layouts.data()});
+            .descriptorSetCount =
+                static_cast<uint32_t>(descriptor_sets_to_create.size()),
+            .pSetLayouts = descriptor_sets_to_create.data()});
 
-    auto descriptor_set = DescriptorSet(std::move(descriptor_sets[0]));
+    auto everything_set = std::move(descriptor_sets.back());
+    descriptor_sets.pop_back();
+    auto swapchain_image_sets = std::move(descriptor_sets);
+
+    auto descriptor_set = DescriptorSet(
+        std::move(everything_set),
+        std::move(swapchain_image_sets)
+    );
 
     std::vector<AllocatedBuffer> temp_buffers;
 
@@ -691,13 +703,16 @@ int main() {
                 swapchain_create_info.imageFormat
             );
             for (size_t i = 0; i < swapchain_images.size(); i++) {
-        VkImage c_image = swapchain_images[i];
-        std::string name = std::string("swapchain image ") + std::to_string(i);
-        device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-            .objectType = vk::ObjectType::eImage,
-            .objectHandle = reinterpret_cast<uint64_t>(c_image),
-            .pObjectName = name.data()});
-    }
+                VkImage c_image = swapchain_images[i];
+                std::string name =
+                    std::string("swapchain image ") + std::to_string(i);
+                device.setDebugUtilsObjectNameEXT(
+                    vk::DebugUtilsObjectNameInfoEXT {
+                        .objectType = vk::ObjectType::eImage,
+                        .objectHandle = reinterpret_cast<uint64_t>(c_image),
+                        .pObjectName = name.data()}
+                );
+            }
 
             resources.resizing = ResizingResources(device, allocator, extent);
             descriptor_set.write_resizing_descriptors(
@@ -818,7 +833,8 @@ int main() {
             swapchain_image_views[swapchain_image_index],
             extent,
             graphics_queue_family,
-            tracy_ctx
+            tracy_ctx,
+            swapchain_image_index
         );
         TracyVkCollect(tracy_ctx, *command_buffer);
 

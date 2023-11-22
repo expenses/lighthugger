@@ -1,4 +1,3 @@
-#include "inputs/pos_uv.hlsl"
 #include "bindings.hlsl"
 
 float3 tony_mc_mapface(float3 stimulus) {
@@ -22,34 +21,12 @@ float3 linear_to_srgb_transfer_function(float3 value) {
     return float3(linear_to_srgb_transfer_function(value.x), linear_to_srgb_transfer_function(value.y), linear_to_srgb_transfer_function(value.z));
 }
 
-[shader("pixel")]
-void PSMain(
-    Varyings inputs,
-    [[vk::location(0)]] out float4 target_0: SV_Target0
-) {
-    float3 stimulus = scene_referred_framebuffer.Sample(clamp_sampler, inputs.uv);
-
-    target_0 = float4(tony_mc_mapface(stimulus), 1.0);
-
-    if (uniforms.debug_shadowmaps) {
-        float shadow_screen_percentage = 0.3;
-
-        if (inputs.uv.x < shadow_screen_percentage && inputs.uv.y < shadow_screen_percentage) {
-            float2 shadow_uv = inputs.uv / shadow_screen_percentage;
-            shadow_uv.x = 1.0 - shadow_uv.x;
-            target_0 = float4(shadowmap.Sample(clamp_sampler, float3(shadow_uv, 0)).xxx, 1.0);
-        }
-    }
-
-    target_0.xyz = linear_to_srgb_transfer_function(target_0.xyz);
-}
-
 [[vk::push_constant]]
 DisplayTransformConstant display_transform_constant;
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
-void display_transform_compute(
+void display_transform(
     uint3 global_id: SV_DispatchThreadID
 ) {
     uint32_t width;

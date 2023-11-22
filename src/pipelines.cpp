@@ -118,10 +118,8 @@ vk::raii::Pipeline name_pipeline(
     return pipeline;
 }
 
-DescriptorSetLayouts create_descriptor_set_layouts(
-    const vk::raii::Device& device,
-    uint32_t num_swapchain_images
-) {
+DescriptorSetLayouts
+create_descriptor_set_layouts(const vk::raii::Device& device) {
     auto everything_bindings = std::array {
         // Bindless images
         vk::DescriptorSetLayoutBinding {
@@ -153,24 +151,21 @@ DescriptorSetLayouts create_descriptor_set_layouts(
             .binding = 3,
             .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment
-                | vk::ShaderStageFlagBits::eCompute,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
         // clamp sampler
         vk::DescriptorSetLayoutBinding {
             .binding = 4,
             .descriptorType = vk::DescriptorType::eSampler,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment
-                | vk::ShaderStageFlagBits::eCompute,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
         // display transform LUT
         vk::DescriptorSetLayoutBinding {
             .binding = 5,
             .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment
-                | vk::ShaderStageFlagBits::eCompute,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
         // repeat sampler
         vk::DescriptorSetLayoutBinding {
@@ -223,12 +218,6 @@ DescriptorSetLayouts create_descriptor_set_layouts(
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute},
-        // swapchain images
-        vk::DescriptorSetLayoutBinding {
-            .binding = 13,
-            .descriptorType = vk::DescriptorType::eStorageImage,
-            .descriptorCount = num_swapchain_images,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute},
     };
 
     std::vector<vk::DescriptorBindingFlags> flags(everything_bindings.size());
@@ -239,25 +228,33 @@ DescriptorSetLayouts create_descriptor_set_layouts(
         .bindingCount = static_cast<uint32_t>(flags.size()),
         .pBindingFlags = flags.data()};
 
+    auto swapchain_storage_image_bindings = std::array {
+        vk::DescriptorSetLayoutBinding {
+            .binding = 0,
+            .descriptorType = vk::DescriptorType::eStorageImage,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute},
+    };
+
     return DescriptorSetLayouts {
         .everything = device.createDescriptorSetLayout({
             .pNext = &flags_create_info,
             .bindingCount = everything_bindings.size(),
             .pBindings = everything_bindings.data(),
         }),
+        .swapchain_storage_image = device.createDescriptorSetLayout({
+            .bindingCount = swapchain_storage_image_bindings.size(),
+            .pBindings = swapchain_storage_image_bindings.data(),
+        }),
     };
 }
 
-Pipelines Pipelines::compile_pipelines(
-    const vk::raii::Device& device,
-    vk::Format swapchain_format,
-    uint32_t num_swapchain_images
-) {
-    auto descriptor_set_layouts =
-        create_descriptor_set_layouts(device, num_swapchain_images);
+Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
+    auto descriptor_set_layouts = create_descriptor_set_layouts(device);
 
-    auto descriptor_set_layout_array =
-        std::array {*descriptor_set_layouts.everything};
+    auto descriptor_set_layout_array = std::array {
+        *descriptor_set_layouts.everything,
+        *descriptor_set_layouts.swapchain_storage_image};
 
     // Simple push constant for instructing the shadow pass which shadowmap to render to.
     auto push_constants = std::array {
@@ -281,9 +278,6 @@ Pipelines Pipelines::compile_pipelines(
     auto render_geometry =
         create_shader_from_file(device, "compiled_shaders/render_geometry.spv");
 
-    auto fullscreen_tri =
-        create_shader_from_file(device, "compiled_shaders/fullscreen_tri.spv");
-
     auto display_transform = create_shader_from_file(
         device,
         "compiled_shaders/display_transform.spv"
@@ -296,17 +290,6 @@ Pipelines Pipelines::compile_pipelines(
         device,
         "compiled_shaders/write_draw_calls.spv"
     );
-
-    auto blit_stages = std::array {
-        vk::PipelineShaderStageCreateInfo {
-            .stage = vk::ShaderStageFlagBits::eVertex,
-            .module = *fullscreen_tri,
-            .pName = "VSMain",
-        },
-        vk::PipelineShaderStageCreateInfo {
-            .stage = vk::ShaderStageFlagBits::eFragment,
-            .module = *display_transform,
-            .pName = "PSMain"}};
 
     auto render_geometry_stages = std::array {
         vk::PipelineShaderStageCreateInfo {
@@ -331,10 +314,6 @@ Pipelines Pipelines::compile_pipelines(
         .pName = "shadow_pass",
     }};
 
-    auto swapchain_format_rendering_info = vk::PipelineRenderingCreateInfoKHR {
-        .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &swapchain_format};
-
     auto rgba16f = vk::Format::eR16G16B16A16Sfloat;
 
     auto rgba16f_format_rendering_info = vk::PipelineRenderingCreateInfoKHR {
@@ -346,21 +325,7 @@ Pipelines Pipelines::compile_pipelines(
         .depthAttachmentFormat = vk::Format::eD32Sfloat};
 
     auto graphics_pipeline_infos =
-        std::array {// display_transform
-                    vk::GraphicsPipelineCreateInfo {
-                        .pNext = &swapchain_format_rendering_info,
-                        .stageCount = blit_stages.size(),
-                        .pStages = blit_stages.data(),
-                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
-                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
-                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
-                        .pRasterizationState = &NO_CULL,
-                        .pMultisampleState = &NO_MULTISAMPLING,
-                        .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
-                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
-                        .layout = *pipeline_layout,
-                    },
-                    // render_geometry
+        std::array {// render_geometry
                     vk::GraphicsPipelineCreateInfo {
                         .pNext = &rgba16f_format_rendering_info,
                         .stageCount = render_geometry_stages.size(),
@@ -390,6 +355,7 @@ Pipelines Pipelines::compile_pipelines(
                         .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
                         .layout = *pipeline_layout,
                     },
+                    // Shadow pass
                     vk::GraphicsPipelineCreateInfo {
                         .pNext = &depth_only_rendering_info,
                         .stageCount = shadow_pass_stage.size(),
@@ -435,7 +401,7 @@ Pipelines Pipelines::compile_pipelines(
                 vk::PipelineShaderStageCreateInfo {
                     .stage = vk::ShaderStageFlagBits::eCompute,
                     .module = *display_transform,
-                    .pName = "display_transform_compute",
+                    .pName = "display_transform",
                 },
             .layout = *pipeline_layout}};
 
@@ -446,11 +412,10 @@ Pipelines Pipelines::compile_pipelines(
         device.createComputePipelines(nullptr, compute_pipeline_infos);
 
     return Pipelines {
-        .display_transform = std::move(graphics_pipelines[0]),
-        .render_geometry = std::move(graphics_pipelines[1]),
-        .geometry_depth_prepass = std::move(graphics_pipelines[2]),
+        .render_geometry = std::move(graphics_pipelines[0]),
+        .geometry_depth_prepass = std::move(graphics_pipelines[1]),
         .shadow_pass = name_pipeline(
-            std::move(graphics_pipelines[3]),
+            std::move(graphics_pipelines[2]),
             device,
             "shadow_pass"
         ),
@@ -469,7 +434,7 @@ Pipelines Pipelines::compile_pipelines(
             device,
             "write_draw_calls"
         ),
-        .display_transform_compute = name_pipeline(
+        .display_transform = name_pipeline(
             std::move(compute_pipelines[3]),
             device,
             "display_transform_compute"

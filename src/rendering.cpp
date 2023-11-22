@@ -39,7 +39,8 @@ void render(
     const vk::raii::ImageView& swapchain_image_view,
     vk::Extent2D extent,
     uint32_t graphics_queue_family,
-    tracy::VkCtx* tracy_ctx
+    tracy::VkCtx* tracy_ctx,
+    uint32_t swapchain_image_index
 ) {
     ZoneScoped;
     TracyVkZone(tracy_ctx, *command_buffer, "main");
@@ -69,7 +70,8 @@ void render(
         vk::PipelineBindPoint::eCompute,
         *pipelines.pipeline_layout,
         0,
-        {*descriptor_set.set},
+        {*descriptor_set.set,
+         *descriptor_set.swapchain_image_sets[swapchain_image_index]},
         {}
     );
 
@@ -120,7 +122,8 @@ void render(
             // Get swapchain image ready for rendering.
             ImageBarrier {
                 .prev_access = THSVS_ACCESS_NONE,
-                .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
+                .next_access = THSVS_ACCESS_COMPUTE_SHADER_WRITE,
+                .next_layout = THSVS_IMAGE_LAYOUT_GENERAL,
                 .discard_contents = true,
                 .queue_family = graphics_queue_family,
                 .image = swapchain_image},
@@ -321,12 +324,25 @@ void render(
     );
 
     {
-        TracyVkZone(tracy_ctx, *command_buffer, "display transform and imgui");
+        TracyVkZone(tracy_ctx, *command_buffer, "display transform");
+        command_buffer.bindPipeline(
+            vk::PipelineBindPoint::eCompute,
+            *pipelines.display_transform
+        );
+        command_buffer.dispatch(
+            dispatch_size(extent.width, 8),
+            dispatch_size(extent.height, 8),
+            1
+        );
+    }
+
+    {
+        TracyVkZone(tracy_ctx, *command_buffer, "imgui");
 
         vk::RenderingAttachmentInfoKHR color_attachment_info = {
             .imageView = *swapchain_image_view,
             .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-            .loadOp = vk::AttachmentLoadOp::eDontCare,
+            .loadOp = vk::AttachmentLoadOp::eLoad,
             .storeOp = vk::AttachmentStoreOp::eStore,
             .clearValue = {}};
         command_buffer.beginRendering(
@@ -340,21 +356,8 @@ void render(
              .pColorAttachments = &color_attachment_info}
         );
 
-        command_buffer.bindPipeline(
-            vk::PipelineBindPoint::eGraphics,
-            *pipelines.display_transform
-        );
-
-        {
-            TracyVkZone(tracy_ctx, *command_buffer, "display_transform");
-            command_buffer.draw(3, 1, 0, 0);
-        }
-
-        {
-            TracyVkZone(tracy_ctx, *command_buffer, "imgui");
-            ImDrawData* draw_data = ImGui::GetDrawData();
-            ImGui_ImplVulkan_RenderDrawData(draw_data, *command_buffer);
-        }
+        ImDrawData* draw_data = ImGui::GetDrawData();
+        ImGui_ImplVulkan_RenderDrawData(draw_data, *command_buffer);
 
         command_buffer.endRendering();
     }
@@ -366,6 +369,7 @@ void render(
         std::array {ImageBarrier {
             .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
             .next_access = THSVS_ACCESS_PRESENT,
+            .prev_layout = THSVS_IMAGE_LAYOUT_GENERAL,
             .queue_family = graphics_queue_family,
             .image = swapchain_image}}
     );
