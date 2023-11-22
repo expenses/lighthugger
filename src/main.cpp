@@ -443,59 +443,27 @@ int main() {
         vk::ImageViewType::e2DArray
     );
 
+    auto create_shadow_view = [&](uint32_t base_layer) {
+        return device.createImageView(
+            {.image = shadowmap.image.image,
+             .viewType = vk::ImageViewType::e2D,
+             .format = vk::Format::eD32Sfloat,
+             .subresourceRange =
+                 {
+                     .aspectMask = vk::ImageAspectFlagBits::eDepth,
+                     .baseMipLevel = 0,
+                     .levelCount = 1,
+                     .baseArrayLayer = base_layer,
+                     .layerCount = 1,
+                 }}
+        );
+    };
+
     auto shadowmap_layer_views = std::array {
-        device.createImageView(
-            {.image = shadowmap.image.image,
-             .viewType = vk::ImageViewType::e2D,
-             .format = vk::Format::eD32Sfloat,
-             .subresourceRange =
-                 {
-                     .aspectMask = vk::ImageAspectFlagBits::eDepth,
-                     .baseMipLevel = 0,
-                     .levelCount = 1,
-                     .baseArrayLayer = 0,
-                     .layerCount = 1,
-                 }}
-        ),
-        device.createImageView(
-            {.image = shadowmap.image.image,
-             .viewType = vk::ImageViewType::e2D,
-             .format = vk::Format::eD32Sfloat,
-             .subresourceRange =
-                 {
-                     .aspectMask = vk::ImageAspectFlagBits::eDepth,
-                     .baseMipLevel = 0,
-                     .levelCount = 1,
-                     .baseArrayLayer = 1,
-                     .layerCount = 1,
-                 }}
-        ),
-        device.createImageView(
-            {.image = shadowmap.image.image,
-             .viewType = vk::ImageViewType::e2D,
-             .format = vk::Format::eD32Sfloat,
-             .subresourceRange =
-                 {
-                     .aspectMask = vk::ImageAspectFlagBits::eDepth,
-                     .baseMipLevel = 0,
-                     .levelCount = 1,
-                     .baseArrayLayer = 2,
-                     .layerCount = 1,
-                 }}
-        ),
-        device.createImageView(
-            {.image = shadowmap.image.image,
-             .viewType = vk::ImageViewType::e2D,
-             .format = vk::Format::eD32Sfloat,
-             .subresourceRange =
-                 {
-                     .aspectMask = vk::ImageAspectFlagBits::eDepth,
-                     .baseMipLevel = 0,
-                     .levelCount = 1,
-                     .baseArrayLayer = 3,
-                     .layerCount = 1,
-                 }}
-        )};
+        create_shadow_view(0),
+        create_shadow_view(1),
+        create_shadow_view(2),
+        create_shadow_view(3)};
 
     auto powerplant_info = powerplant.get_info(device);
     auto instances = std::array {
@@ -675,6 +643,7 @@ int main() {
     Uniforms* uniforms =
         reinterpret_cast<Uniforms*>(resources.uniform_buffer.mapped_ptr);
     uniforms->num_instances = instances.size();
+    uniforms->sun_intensity = glm::vec3(1.0);
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -767,6 +736,12 @@ int main() {
             ImGui::Checkbox("debug cascades", &uniforms->debug_cascades);
             ImGui::Checkbox("debug shadowmaps", &uniforms->debug_shadowmaps);
             ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
+            ImGui::SliderFloat(
+                "sun_intensity",
+                &uniforms->sun_intensity.x,
+                0.0f,
+                100.0f
+            );
             ImGui::Text(
                 "camera pos: (%f, %f, %f)",
                 camera_params.position.x,

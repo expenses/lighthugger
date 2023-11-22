@@ -13,7 +13,7 @@ struct ImageWithView {
         vk::ImageCreateInfo create_info,
         vma::Allocator allocator,
         const vk::raii::Device& device,
-        const char* name,
+        const std::string& name,
         vk::ImageSubresourceRange subresource_range,
         vk::ImageViewType view_type
     );
@@ -22,7 +22,7 @@ struct ImageWithView {
         vk::ImageCreateInfo create_info,
         vma::Allocator allocator,
         const vk::raii::Device& device,
-        const char* name,
+        const std::string& name,
         vk::ImageSubresourceRange subresource_range,
         vk::ImageViewType view_type = vk::ImageViewType::e2D
     ) :

@@ -5,7 +5,7 @@
 AllocatedImage::AllocatedImage(
     vk::ImageCreateInfo create_info,
     vma::Allocator allocator_,
-    const char* name
+    const std::string& name
 ) {
     allocator = allocator_;
     vma::AllocationCreateInfo alloc_info = {.usage = vma::MemoryUsage::eAuto};
@@ -17,20 +17,18 @@ AllocatedImage::AllocatedImage(
         nullptr
     ));
 
-    if (name) {
-        auto device = allocator.getAllocatorInfo().device;
-        device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-            .objectType = vk::ObjectType::eImage,
-            .objectHandle = reinterpret_cast<uint64_t>(&*image),
-            .pObjectName = name});
-    }
+    auto device = allocator.getAllocatorInfo().device;
+    device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+        .objectType = vk::ObjectType::eImage,
+        .objectHandle = reinterpret_cast<uint64_t>(&*image),
+        .pObjectName = name.data()});
 }
 
 AllocatedBuffer::AllocatedBuffer(
     vk::BufferCreateInfo create_info,
     vma::AllocationCreateInfo alloc_info,
     vma::Allocator allocator_,
-    const char* name
+    const std::string& name
 ) {
     allocator = allocator_;
     check_vk_result(allocator.createBuffer(
@@ -40,11 +38,9 @@ AllocatedBuffer::AllocatedBuffer(
         &allocation,
         nullptr
     ));
-    if (name) {
-        auto device = allocator.getAllocatorInfo().device;
-        device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-            .objectType = vk::ObjectType::eBuffer,
-            .objectHandle = reinterpret_cast<uint64_t>(&*buffer),
-            .pObjectName = name});
-    }
+    auto device = allocator.getAllocatorInfo().device;
+    device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+        .objectType = vk::ObjectType::eBuffer,
+        .objectHandle = reinterpret_cast<uint64_t>(&*buffer),
+        .pObjectName = name.data()});
 }

@@ -136,7 +136,8 @@ ImageWithView load_dds(
                 | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
             .usage = vma::MemoryUsage::eAuto,
         },
-        allocator
+        allocator,
+        staging_buffer_name
     ));
 
     stream.read(

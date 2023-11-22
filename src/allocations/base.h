@@ -14,7 +14,7 @@ struct AllocatedImage {
     AllocatedImage(
         vk::ImageCreateInfo create_info,
         vma::Allocator allocator_,
-        const char* name = nullptr
+        const std::string& name
     );
 
     AllocatedImage& operator=(AllocatedImage&& other) {
@@ -45,18 +45,8 @@ struct AllocatedBuffer {
         vk::BufferCreateInfo create_info,
         vma::AllocationCreateInfo alloc_info,
         vma::Allocator allocator_,
-        const char* name = nullptr
+        const std::string& name
     );
-
-    AllocatedBuffer(
-        vk::BufferCreateInfo create_info,
-        vma::Allocator allocator_
-    ) :
-        AllocatedBuffer(
-            create_info,
-            {.usage = vma::MemoryUsage::eAuto},
-            allocator_
-        ) {}
 
     ~AllocatedBuffer() {
         if (allocator)

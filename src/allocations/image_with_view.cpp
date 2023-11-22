@@ -4,7 +4,7 @@ ImageWithView ImageWithView::create_image_with_view(
     vk::ImageCreateInfo create_info,
     vma::Allocator allocator,
     const vk::raii::Device& device,
-    const char* name,
+    const std::string& name,
     vk::ImageSubresourceRange subresource_range,
     vk::ImageViewType view_type
 ) {
@@ -15,7 +15,7 @@ ImageWithView ImageWithView::create_image_with_view(
          .format = create_info.format,
          .subresourceRange = subresource_range}
     );
-    auto view_name = std::string(name) + " view";
+    auto view_name = name + " view";
     VkImageView c_view = *view;
     device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
         .objectType = vk::ObjectType::eImageView,

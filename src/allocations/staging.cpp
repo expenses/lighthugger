@@ -20,7 +20,7 @@ AllocatedBuffer upload_via_staging_buffer(
             .usage = vma::MemoryUsage::eAuto,
         },
         allocator,
-        staging_buffer_name.data()
+        staging_buffer_name
     ));
     std::memcpy(staging_buffer.mapped_ptr, bytes, num_bytes);
 
@@ -32,7 +32,7 @@ AllocatedBuffer upload_via_staging_buffer(
             .usage = vma::MemoryUsage::eAuto,
         },
         allocator,
-        name.data()
+        name
     );
 
     command_buffer.copyBuffer(

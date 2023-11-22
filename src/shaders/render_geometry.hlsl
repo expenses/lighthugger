@@ -124,7 +124,7 @@ void PSMain(
 
     float ambient = 0.05;
 
-    float3 lighting = max(n_dot_l * shadow_sum, ambient);
+    float3 lighting = max(n_dot_l * shadow_sum * uniforms.sun_intensity, ambient);
 
     float3 diffuse = albedo * lighting;
 
