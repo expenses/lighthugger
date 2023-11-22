@@ -76,13 +76,7 @@ void render(
     insert_color_image_barriers(
         command_buffer,
         std::array {
-            ImageBarrier {
-                .prev_access = THSVS_ACCESS_NONE,
-                .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-                .discard_contents = true,
-                .queue_family = graphics_queue_family,
-                .image =
-                    resources.resizing.scene_referred_framebuffer.image.image},
+            // Get depth buffer ready for rendering.
             ImageBarrier {
                 .prev_access = THSVS_ACCESS_NONE,
                 .next_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
@@ -90,7 +84,7 @@ void render(
                 .queue_family = graphics_queue_family,
                 .image = resources.resizing.depthbuffer.image.image,
                 .subresource_range = DEPTH_SUBRESOURCE_RANGE},
-
+            // Get shadowmaps ready for rendering.
             ImageBarrier {
                 .prev_access = THSVS_ACCESS_NONE,
                 .next_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
@@ -104,7 +98,22 @@ void render(
                         .levelCount = 1,
                         .baseArrayLayer = 0,
                         .layerCount = 4,
-                    }}
+                    }},
+            // Get framebuffer ready for writing
+            ImageBarrier {
+                .prev_access = THSVS_ACCESS_NONE,
+                .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
+                .discard_contents = true,
+                .queue_family = graphics_queue_family,
+                .image =
+                    resources.resizing.scene_referred_framebuffer.image.image},
+            // Get swapchain image ready for rendering.
+            ImageBarrier {
+                .prev_access = THSVS_ACCESS_NONE,
+                .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
+                .discard_contents = true,
+                .queue_family = graphics_queue_family,
+                .image = swapchain_image},
 
         }
     );
@@ -146,13 +155,16 @@ void render(
 
     insert_color_image_barriers(
         command_buffer,
-        std::array {ImageBarrier {
-            .prev_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
-            .next_access =
-                THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
-            .queue_family = graphics_queue_family,
-            .image = resources.resizing.depthbuffer.image.image,
-            .subresource_range = DEPTH_SUBRESOURCE_RANGE}}
+        std::array {
+            // Switch depthbuffer from write to read.
+            ImageBarrier {
+                .prev_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
+                .next_access =
+                    THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+                .queue_family = graphics_queue_family,
+                .image = resources.resizing.depthbuffer.image.image,
+                .subresource_range = DEPTH_SUBRESOURCE_RANGE},
+        }
     );
 
     {
@@ -221,20 +233,22 @@ void render(
     set_scissor_and_viewport(command_buffer, extent.width, extent.height);
     insert_color_image_barriers(
         command_buffer,
-        std::array {ImageBarrier {
-            .prev_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
-            .next_access =
-                THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
-            .queue_family = graphics_queue_family,
-            .image = resources.shadowmap.image.image,
-            .subresource_range =
-                {
-                    .aspectMask = vk::ImageAspectFlagBits::eDepth,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 4,
-                }}
+        std::array {
+            // Switch shadowmap from write to read.
+            ImageBarrier {
+                .prev_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
+                .next_access =
+                    THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+                .queue_family = graphics_queue_family,
+                .image = resources.shadowmap.image.image,
+                .subresource_range =
+                    {
+                        .aspectMask = vk::ImageAspectFlagBits::eDepth,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 4,
+                    }}
 
         }
     );
@@ -284,6 +298,7 @@ void render(
     insert_color_image_barriers(
         command_buffer,
         std::array {
+            // Switch framebuffer from write to read.
             ImageBarrier {
                 .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
                 .next_access =
@@ -291,12 +306,6 @@ void render(
                 .queue_family = graphics_queue_family,
                 .image =
                     resources.resizing.scene_referred_framebuffer.image.image},
-            ImageBarrier {
-                .prev_access = THSVS_ACCESS_NONE,
-                .next_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
-                .discard_contents = true,
-                .queue_family = graphics_queue_family,
-                .image = swapchain_image},
         }
     );
 
