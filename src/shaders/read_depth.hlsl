@@ -1,5 +1,5 @@
-#include "bindings.hlsl"
-#include "matrices.hlsl"
+#include "common/bindings.hlsl"
+#include "common/matrices.hlsl"
 
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38

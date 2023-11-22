@@ -1,4 +1,4 @@
-#include "bindings.hlsl"
+#include "common/bindings.hlsl"
 
 float3 tony_mc_mapface(float3 stimulus) {
     // Apply a non-linear transform that the LUT is encoded with.

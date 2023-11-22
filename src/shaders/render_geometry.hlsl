@@ -1,5 +1,5 @@
-#include "bindings.hlsl"
-#include "debug.hlsl"
+#include "common/bindings.hlsl"
+#include "common/debug.hlsl"
 
 template<class T>
 T load_value(uint64_t address, uint32_t offset) {

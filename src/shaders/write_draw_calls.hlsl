@@ -1,4 +1,4 @@
-#include "bindings.hlsl"
+#include "common/bindings.hlsl"
 
 [shader("compute")]
 [numthreads(64, 1, 1)]

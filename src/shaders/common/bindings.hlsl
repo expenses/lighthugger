@@ -1,4 +1,4 @@
-#include "../shared_cpu_gpu.h"
+#include "../../shared_cpu_gpu.h"
 
 [[vk::binding(0)]] Texture2D textures[];
 [[vk::binding(1)]] ByteAddressBuffer instances;
