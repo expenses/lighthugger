@@ -30,6 +30,7 @@ struct DepthInfoBuffer {
 struct Uniforms {
     MATRIX4_TYPE combined_perspective_view;
     MATRIX4_TYPE inv_perspective_view;
+    MATRIX4_TYPE view;
     VEC3_TYPE sun_dir;
     uint32_t _padding0;
     VEC3_TYPE sun_intensity;

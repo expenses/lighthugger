@@ -11,7 +11,28 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
 
     Instance instance = load_instance(id);
 
-    // cull here
+    // Extract position and scale from transform matrix
+    float3 position = float3(instance.transform[0][3], instance.transform[1][3], instance.transform[2][3]);
+    // todo: not 100% sure if this is correct. Might need to be transposed.
+    float3 scale = float3(
+        length(instance.transform[0].xyz),
+        length(instance.transform[1].xyz),
+        length(instance.transform[2].xyz)
+    );
+    // 99% of the time scales will be uniform. But in the chance they're not,
+    // use the longest dimension.
+    float scale_scalar = max(max(scale.x, scale.y), scale.z);
+
+    float bounding_sphere_radius = instance.mesh_info.bounding_sphere_radius * scale_scalar;
+
+    float3 view_pos = mul(uniforms.view, float4(position, 1.0)).xyz;
+
+    // Cull any objects completely behind the camera.
+    if (view_pos.z - bounding_sphere_radius > 0.01) {
+        return;
+    }
+
+    // todo: cull on vertical and horizontal planes.
 
     uint32_t current_draw;
     InterlockedAdd(draw_counts[0], 1, current_draw);

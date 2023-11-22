@@ -782,6 +782,7 @@ int main() {
             );
 
             uniforms->sun_dir = camera_params.sun_dir();
+            uniforms->view = view;
             uniforms->combined_perspective_view = perspective * view;
             uniforms->inv_perspective_view = glm::inverse(perspective * view);
         }
