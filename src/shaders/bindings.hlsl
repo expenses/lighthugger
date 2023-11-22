@@ -15,7 +15,8 @@
 [[vk::binding(10)]] SamplerComparisonState shadowmap_comparison_sampler;
 [[vk::binding(11)]] RWStructuredBuffer<DrawIndirectCommand> draw_calls;
 [[vk::binding(12)]] RWStructuredBuffer<uint32_t> draw_counts;
-[[vk::binding(13)]] RWTexture2D<float4> swapchain_images[];
+
+[[vk::binding(0, 1)]] RWTexture2D<float4> swapchain_image;
 
 Instance load_instance(uint32_t offset) {
     uint32_t packed_instance_size = 160;

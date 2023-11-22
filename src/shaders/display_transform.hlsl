@@ -75,5 +75,5 @@ void display_transform_compute(
 
     float3 srgb_encoded_value = linear_to_srgb_transfer_function(linear_display_referred_value);
 
-    swapchain_images[display_transform_constant.swapchain_image_index][global_id.xy] = float4(srgb_encoded_value, 1.0);
+    swapchain_image[global_id.xy] = float4(srgb_encoded_value, 1.0);
 }

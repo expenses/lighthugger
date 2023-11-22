@@ -304,6 +304,14 @@ int main() {
     auto swapchain = device.createSwapchainKHR(swapchain_create_info);
 
     auto swapchain_images = swapchain.getImages();
+    for (size_t i = 0; i < swapchain_images.size(); i++) {
+        VkImage c_image = swapchain_images[i];
+        std::string name = std::string("swapchain image ") + std::to_string(i);
+        device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+            .objectType = vk::ObjectType::eImage,
+            .objectHandle = reinterpret_cast<uint64_t>(c_image),
+            .pObjectName = name.data()});
+    }
     auto swapchain_image_views = create_swapchain_image_views(
         device,
         swapchain_images,
@@ -682,6 +690,14 @@ int main() {
                 swapchain_images,
                 swapchain_create_info.imageFormat
             );
+            for (size_t i = 0; i < swapchain_images.size(); i++) {
+        VkImage c_image = swapchain_images[i];
+        std::string name = std::string("swapchain image ") + std::to_string(i);
+        device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+            .objectType = vk::ObjectType::eImage,
+            .objectHandle = reinterpret_cast<uint64_t>(c_image),
+            .pObjectName = name.data()});
+    }
 
             resources.resizing = ResizingResources(device, allocator, extent);
             descriptor_set.write_resizing_descriptors(
