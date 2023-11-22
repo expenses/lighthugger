@@ -19,7 +19,7 @@ float4 depth_only(
     uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_InstanceID
 ): SV_Position
 {
-    Instance instance = instances[instance_id];
+    Instance instance = load_instance(instance_id);
 
     uint32_t offset = load_value<uint32_t>(instance.mesh_info.indices, vertex_id);
     float3 position = load_value<float3>(instance.mesh_info.positions, offset);
@@ -36,7 +36,7 @@ float4 shadow_pass(
     uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_InstanceID
 ): SV_Position
 {
-    Instance instance = instances[instance_id];
+    Instance instance = load_instance(instance_id);
 
     uint32_t offset = load_value<uint32_t>(instance.mesh_info.indices, vertex_id);
     float3 position = load_value<float3>(instance.mesh_info.positions, offset);
@@ -48,7 +48,7 @@ float4 shadow_pass(
 [shader("vertex")]
 Varyings VSMain(uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_InstanceID)
 {
-    Instance instance = instances[instance_id];
+    Instance instance = load_instance(instance_id);
 
     uint16_t material_index = load_value<uint16_t>(instance.mesh_info.material_indices, vertex_id);
     uint32_t offset = load_value<uint32_t>(instance.mesh_info.indices, vertex_id);
@@ -56,7 +56,7 @@ Varyings VSMain(uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_Insta
     float3 normal = load_value<float3>(instance.mesh_info.normals, offset);
 
     float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
-    //normal = mul(instance.normal_transform, normalize(normal));
+    normal = mul(instance.normal_transform, normal);
 
     Varyings varyings;
     varyings.clip_pos = mul(uniforms.combined_perspective_view, float4(world_pos, 1.0));
@@ -80,7 +80,7 @@ void PSMain(
     Varyings input,
     [[vk::location(0)]] out float4 target_0: SV_Target0
 ) {
-    Instance instance = instances[input.instance_index];
+    Instance instance = load_instance(input.instance_index);
     MaterialInfo material_info = load_material_info(instance.mesh_info.material_info, input.material_index);
     uint32_t cascade_index;
     float4 shadow_coord = float4(0,0,0,0);

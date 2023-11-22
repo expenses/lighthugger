@@ -144,7 +144,7 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
     // (currently only) mesh in the scene for this.
     // Ideally you want to have the near and far plane be the distance of the closest
     // point on a mesh and the furthest point on a mesh respectively.
-    float shadow_cam_distance = instances[0].mesh_info.longest_distance;
+    float shadow_cam_distance = load_instance(0).mesh_info.bounding_sphere_radius * 2.0f;
 
     float4x4 shadowView = lookAt(shadow_cam_distance * uniforms.sun_dir + frustumCenter, frustumCenter, float3(0,1,0));
 	float4x4 shadowProj = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, shadow_cam_distance * 2.0);

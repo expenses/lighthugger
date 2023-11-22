@@ -9,7 +9,7 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
         return;
     }
 
-    Instance instance = instances[id];
+    Instance instance = load_instance(id);
 
     // cull here
 

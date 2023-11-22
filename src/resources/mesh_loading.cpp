@@ -185,9 +185,5 @@ MeshInfo Mesh::get_info(const vk::raii::Device& device) {
         .material_info =
             device.getBufferAddress({.buffer = material_info.buffer}),
         .num_indices = num_indices,
-        .bounding_sphere_radius = bounding_sphere_radius,
-        .longest_distance = std::min(
-            bounding_sphere_radius * 2.0f,
-            bounding_box.diagonal_length()
-        )};
+        .bounding_sphere_radius = bounding_sphere_radius};
 }

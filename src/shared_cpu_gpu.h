@@ -19,7 +19,6 @@ struct MeshInfo {
     uint64_t material_info;
     uint32_t num_indices;
     float bounding_sphere_radius;
-    float longest_distance;
 };
 
 struct DepthInfoBuffer {
@@ -49,11 +48,16 @@ struct DrawIndirectCommand {
 struct Instance {
     MATRIX4_TYPE transform;
     MeshInfo mesh_info;
-    //MATRIX3_TYPE normal_transform;
-    uint32_t mesh_index;
-    uint32_t _padding0;
-    uint32_t _padding1;
-    uint32_t _padding2;
+    MATRIX3_TYPE normal_transform;
+
+#ifndef __HLSL_VERSION
+    Instance(glm::mat4 transform_, MeshInfo mesh_info_) :
+        transform(transform_),
+        mesh_info(mesh_info_) {
+        // Normally you want to do a transpose for this but for hlsl you don't seem to need to. Not sure why.
+        normal_transform = glm::mat3(glm::inverse(transform));
+    }
+#endif
 };
 
 struct ShadowPassConstant {

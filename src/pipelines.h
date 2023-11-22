@@ -1,3 +1,5 @@
+#pragma once
+
 struct DescriptorSetLayouts {
     vk::raii::DescriptorSetLayout everything;
 };

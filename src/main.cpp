@@ -223,10 +223,10 @@ int main() {
         .pQueuePriorities = &queue_prio};
 
     auto vulkan_1_2_features = vk::PhysicalDeviceVulkan12Features {
+        .drawIndirectCount = true,
         .descriptorBindingPartiallyBound = true,
         .runtimeDescriptorArray = true,
         .bufferDeviceAddress = true,
-        .drawIndirectCount = true,
     };
 
     vk::PhysicalDeviceDynamicRenderingFeatures dyn_rendering_features = {
@@ -234,9 +234,9 @@ int main() {
         .dynamicRendering = true};
 
     auto vulkan_1_0_features = vk::PhysicalDeviceFeatures {
+        .multiDrawIndirect = true,
         .shaderInt64 = true,
         .shaderInt16 = true,
-        .multiDrawIndirect = true,
     };
 
     auto device_extensions = std::array {
@@ -358,8 +358,9 @@ int main() {
             .descriptorCount = 1024}};
 
     auto descriptor_pool = device.createDescriptorPool(
-        {.maxSets = 128,
-         .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+        {.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+
+         .maxSets = 128,
          .poolSizeCount = pool_sizes.size(),
          .pPoolSizes = pool_sizes.data()}
     );
@@ -474,17 +475,21 @@ int main() {
 
     auto powerplant_info = powerplant.get_info(device);
     auto instances = std::array {
-        Instance {
-            .transform = glm::translate(glm::mat4(1), glm::vec3(0, 0, 0)),
-            .mesh_info = powerplant_info,
-            //.normal_transform = glm::mat3(1.0),
-            .mesh_index = 0},
-        Instance {
-            .transform = glm::translate(glm::mat4(1), glm::vec3(0, 0, 100)),
-            .mesh_info = powerplant_info,
-            //.normal_transform = glm::mat3(1.0),
-            .mesh_index = 0},
-    };
+        Instance(
+            glm::translate(glm::mat4(1), glm::vec3(0, 0, 0)),
+            powerplant_info
+        ),
+        Instance(
+            glm::translate(glm::mat4(1), glm::vec3(0, 0, 100)),
+            powerplant_info
+        ),
+        Instance(
+            glm::translate(
+                glm::rotate(glm::mat4(1), 180.0f, glm::vec3(0, 1, 0)),
+                glm::vec3(200, 0, 0)
+            ),
+            powerplant_info
+        )};
 
     auto resources = Resources {
         .resizing = ResizingResources(device, allocator, extent),
@@ -497,7 +502,8 @@ int main() {
                     | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
                 .usage = vma::MemoryUsage::eAuto,
             },
-            allocator
+            allocator,
+            "uniform_buffer"
         )),
         .shadowmap = std::move(shadowmap),
         .depth_info_buffer = AllocatedBuffer(
@@ -510,6 +516,15 @@ int main() {
             },
             allocator,
             "depth_info_buffer"
+        ),
+        .instance_buffer = upload_via_staging_buffer(
+            instances.data(),
+            instances.size() * sizeof(Instance),
+            allocator,
+            vk::BufferUsageFlagBits::eStorageBuffer,
+            "instance buffer",
+            command_buffer,
+            temp_buffers
         ),
         .draw_calls_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
@@ -534,15 +549,6 @@ int main() {
             allocator,
             "draw_counts_buffer"
         ),
-        .instance_buffer = upload_via_staging_buffer(
-            instances.data(),
-            instances.size() * sizeof(Instance),
-            allocator,
-            vk::BufferUsageFlagBits::eStorageBuffer,
-            "instance buffer",
-            command_buffer,
-            temp_buffers
-        ),
         .max_num_draws = 1024,
         .shadowmap_layer_views = std::move(shadowmap_layer_views),
         .display_transform_lut = load_dds(
@@ -553,36 +559,30 @@ int main() {
             graphics_queue_family,
             temp_buffers
         ),
-        .clamp_sampler = device.createSampler(
-            {.magFilter = vk::Filter::eLinear,
-             .minFilter = vk::Filter::eLinear,
-             .addressModeU = vk::SamplerAddressMode::eClampToEdge,
-             .addressModeV = vk::SamplerAddressMode::eClampToEdge,
-             .addressModeW = vk::SamplerAddressMode::eClampToEdge,
-             .maxLod = VK_LOD_CLAMP_NONE}
-        ),
-
-        .repeat_sampler = device.createSampler(
-            {.magFilter = vk::Filter::eLinear,
-             .minFilter = vk::Filter::eLinear,
-             .addressModeU = vk::SamplerAddressMode::eRepeat,
-             .addressModeV = vk::SamplerAddressMode::eRepeat,
-             .addressModeW = vk::SamplerAddressMode::eRepeat,
-             .maxLod = VK_LOD_CLAMP_NONE}
-        ),
-
-        .shadowmap_comparison_sampler = device.createSampler(
-            {.magFilter = vk::Filter::eLinear,
-             .minFilter = vk::Filter::eLinear,
-             .addressModeU = vk::SamplerAddressMode::eClampToEdge,
-             .addressModeV = vk::SamplerAddressMode::eClampToEdge,
-             .addressModeW = vk::SamplerAddressMode::eClampToEdge,
-             .compareEnable = true,
-             .compareOp = vk::CompareOp::eLess,
-             .maxLod = VK_LOD_CLAMP_NONE}
-        )
-
-    };
+        .repeat_sampler = device.createSampler(vk::SamplerCreateInfo {
+            .magFilter = vk::Filter::eLinear,
+            .minFilter = vk::Filter::eLinear,
+            .addressModeU = vk::SamplerAddressMode::eRepeat,
+            .addressModeV = vk::SamplerAddressMode::eRepeat,
+            .addressModeW = vk::SamplerAddressMode::eRepeat,
+            .maxLod = VK_LOD_CLAMP_NONE}),
+        .clamp_sampler = device.createSampler(vk::SamplerCreateInfo {
+            .magFilter = vk::Filter::eLinear,
+            .minFilter = vk::Filter::eLinear,
+            .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+            .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+            .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+            .maxLod = VK_LOD_CLAMP_NONE}),
+        .shadowmap_comparison_sampler =
+            device.createSampler(vk::SamplerCreateInfo {
+                .magFilter = vk::Filter::eLinear,
+                .minFilter = vk::Filter::eLinear,
+                .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+                .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+                .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+                .compareEnable = true,
+                .compareOp = vk::CompareOp::eLess,
+                .maxLod = VK_LOD_CLAMP_NONE})};
 
     command_buffer.end();
 
@@ -650,7 +650,7 @@ int main() {
 
     Uniforms* uniforms =
         reinterpret_cast<Uniforms*>(resources.uniform_buffer.mapped_ptr);
-    uniforms->num_instances = 2;
+    uniforms->num_instances = instances.size();
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
