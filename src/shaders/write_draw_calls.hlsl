@@ -25,10 +25,14 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
 
     float bounding_sphere_radius = instance.mesh_info.bounding_sphere_radius * scale_scalar;
 
-    float3 view_pos = mul(uniforms.view, float4(position, 1.0)).xyz;
+    float3 sphere_center = mul(uniforms.view, float4(position, 1.0)).xyz;
+    // Flip z, not 100% sure why, copied this from older code.
+    sphere_center.z = -sphere_center.z;
+
+    float z_near = 0.01;
 
     // Cull any objects completely behind the camera.
-    if (view_pos.z - bounding_sphere_radius > 0.01) {
+    if (sphere_center.z + bounding_sphere_radius <= z_near) {
         return;
     }
 

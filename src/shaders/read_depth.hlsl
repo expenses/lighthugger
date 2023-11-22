@@ -26,27 +26,31 @@ void read_depth(uint3 global_id: SV_DispatchThreadID){
     depth_buffer.GetDimensions(width, height);
     float2 pixel_size = 1.0 / float2(width, height);
 
-    uint2 coord = global_id.xy * 2 + 1;
-    float2 uv = coord * pixel_size;
+    // Sample the depth values for a 4x4 block.
+    uint2 coord = global_id.xy * 4;
 
-    float4 depth = depth_buffer.Gather(clamp_sampler, uv, 0.0);
-    uint4 depth_reinterpreted = asuint(depth);
+    uint4 depth_1 = asuint(depth_buffer.Gather(clamp_sampler, (coord + uint2(1, 1)) * pixel_size, 0.0));
+    uint4 depth_2 = asuint(depth_buffer.Gather(clamp_sampler, (coord + uint2(1, 3)) * pixel_size, 0.0));
+    uint4 depth_3 = asuint(depth_buffer.Gather(clamp_sampler, (coord + uint2(3, 1)) * pixel_size, 0.0));
+    uint4 depth_4 = asuint(depth_buffer.Gather(clamp_sampler, (coord + uint2(3, 3)) * pixel_size, 0.0));
 
     // min the values, trying to avoid propagating zeros.
-    uint32_t depth_min = min4(depth_reinterpreted);
+    uint32_t depth_min = min4(uint4(min4(depth_1), min4(depth_2), min4(depth_3), min4(depth_4)));
 
-    // Min all values in the subgroup,
     if (depth_min != 0) {
+        // Min all values in the subgroup,
         uint32_t subgroup_min = WaveActiveMin(depth_min);
 
         // https://www.khronos.org/assets/uploads/developers/library/2018-vulkan-devday/06-subgroups.pdf
         // equiv of subgroup elect
+        // Note: naming is ambiguous but this means the first
+        // _active_ lane.
         if (WaveIsFirstLane()) {
             InterlockedMin(depth_info[0].min_depth, subgroup_min);
         }
     }
 
-    uint32_t depth_max = max4(depth_reinterpreted);
+    uint32_t depth_max = max4(uint4(max4(depth_1), max4(depth_2), max4(depth_3), max4(depth_4)));
     uint32_t subgroup_max = WaveActiveMax(depth_max);
 
     if (WaveIsFirstLane()) {

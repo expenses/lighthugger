@@ -187,8 +187,8 @@ void render(
             *pipelines.read_depth
         );
         command_buffer.dispatch(
-            dispatch_size(extent.width, 8 * 2),
-            dispatch_size(extent.height, 8 * 2),
+            dispatch_size(extent.width, 8 * 4),
+            dispatch_size(extent.height, 8 * 4),
             1
         );
     }
@@ -211,6 +211,8 @@ void render(
             *pipelines.shadow_pass
         );
         for (uint32_t i = 0; i < resources.shadowmap_layer_views.size(); i++) {
+            TracyVkZone(tracy_ctx, *command_buffer, "shadowmap inner");
+
             vk::RenderingAttachmentInfoKHR depth_attachment_info = {
                 .imageView = *resources.shadowmap_layer_views[i],
                 .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
