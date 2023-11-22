@@ -14,6 +14,14 @@ float3 tony_mc_mapface(float3 stimulus) {
     return display_transform_lut.SampleLevel(clamp_sampler, uv, 0);
 }
 
+float linear_to_srgb_transfer_function(float value) {
+    return value <= 0.003130 ? value * 12.92 : 1.055 * pow(value, 1.0/2.4) - 0.055;
+}
+
+float3 linear_to_srgb_transfer_function(float3 value) {
+    return float3(linear_to_srgb_transfer_function(value.x), linear_to_srgb_transfer_function(value.y), linear_to_srgb_transfer_function(value.z));
+}
+
 [shader("pixel")]
 void PSMain(
     Varyings inputs,
@@ -32,4 +40,6 @@ void PSMain(
             target_0 = float4(shadowmap.Sample(clamp_sampler, float3(shadow_uv, 0)).xxx, 1.0);
         }
     }
+
+    target_0.xyz = linear_to_srgb_transfer_function(target_0.xyz);
 }

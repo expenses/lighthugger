@@ -150,7 +150,6 @@ void render(
             .prev_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
             .next_access =
                 THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
-            .discard_contents = false,
             .queue_family = graphics_queue_family,
             .image = resources.resizing.depthbuffer.image.image,
             .subresource_range = DEPTH_SUBRESOURCE_RANGE}}
@@ -226,7 +225,6 @@ void render(
             .prev_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
             .next_access =
                 THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
-            .discard_contents = false,
             .queue_family = graphics_queue_family,
             .image = resources.shadowmap.image.image,
             .subresource_range =
@@ -290,7 +288,6 @@ void render(
                 .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
                 .next_access =
                     THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
-                .discard_contents = false,
                 .queue_family = graphics_queue_family,
                 .image =
                     resources.resizing.scene_referred_framebuffer.image.image},
@@ -347,7 +344,6 @@ void render(
         std::array {ImageBarrier {
             .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
             .next_access = THSVS_ACCESS_PRESENT,
-            .discard_contents = false,
             .queue_family = graphics_queue_family,
             .image = swapchain_image}}
     );

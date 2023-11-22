@@ -208,7 +208,6 @@ ImageWithView load_dds(
             .prev_access = THSVS_ACCESS_TRANSFER_WRITE,
             .next_access =
                 THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
-            .discard_contents = false,
             .queue_family = graphics_queue_family,
             .image = image.image.image}}
     );

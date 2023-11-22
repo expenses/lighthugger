@@ -50,7 +50,7 @@ Varyings VSMain(uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_Insta
 {
     Instance instance = instances[instance_id];
 
-    uint32_t material_index = load_value<uint32_t>(instance.mesh_info.material_indices, vertex_id);
+    uint16_t material_index = load_value<uint16_t>(instance.mesh_info.material_indices, vertex_id);
     uint32_t offset = load_value<uint32_t>(instance.mesh_info.indices, vertex_id);
     float3 position = load_value<float3>(instance.mesh_info.positions, offset);
     float3 normal = load_value<float3>(instance.mesh_info.normals, offset);

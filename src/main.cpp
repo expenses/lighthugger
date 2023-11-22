@@ -235,6 +235,7 @@ int main() {
 
     auto vulkan_1_0_features = vk::PhysicalDeviceFeatures {
         .shaderInt64 = true,
+        .shaderInt16 = true,
         .multiDrawIndirect = true,
     };
 
@@ -287,7 +288,12 @@ int main() {
     vk::SwapchainCreateInfoKHR swapchain_create_info = {
         .surface = *surface,
         .minImageCount = 3,
-        .imageFormat = vk::Format::eB8G8R8A8Srgb,
+        // Note: normally/ideally you should be using an srgb image format!
+        // However, I'm (going to be) doing the final tonemapping in a compute shader where
+        // I can't rely on the hardware linear->srgb transfer function.
+        // Additionally, for whatever reason, imgui applies it's own linear->srgb
+        // transfer function.
+        .imageFormat = vk::Format::eB8G8R8A8Unorm,
         .imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
         .imageExtent = extent,
         .imageArrayLayers = 1,

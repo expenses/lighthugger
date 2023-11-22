@@ -59,8 +59,10 @@ Mesh load_obj(
         material_info.push_back(info);
     }
 
+    assert(materials.size() <= 2 << 15);
+
     std::vector<uint32_t> indices;
-    std::vector<uint32_t> material_ids;
+    std::vector<uint16_t> material_ids;
     for (auto& shape : shapes) {
         for (auto& index : shape.mesh.indices) {
             assert(index.vertex_index == index.normal_index);
@@ -68,9 +70,9 @@ Mesh load_obj(
         }
         // :( material ids are stored unindexed.
         for (auto material_id : shape.mesh.material_ids) {
-            material_ids.push_back(static_cast<uint32_t>(material_id));
-            material_ids.push_back(static_cast<uint32_t>(material_id));
-            material_ids.push_back(static_cast<uint32_t>(material_id));
+            material_ids.push_back(static_cast<uint16_t>(material_id));
+            material_ids.push_back(static_cast<uint16_t>(material_id));
+            material_ids.push_back(static_cast<uint16_t>(material_id));
         }
     }
 
@@ -138,7 +140,7 @@ Mesh load_obj(
 
     auto material_id_buffer = upload_via_staging_buffer(
         material_ids.data(),
-        material_ids.size() * sizeof(uint32_t),
+        material_ids.size() * sizeof(uint16_t),
         allocator,
         vk::BufferUsageFlagBits::eStorageBuffer
             | vk::BufferUsageFlagBits::eShaderDeviceAddress,
