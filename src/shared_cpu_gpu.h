@@ -61,7 +61,11 @@ struct Instance {
 };
 
 struct ShadowPassConstant {
-    uint cascade_index;
+    uint32_t cascade_index;
+};
+
+struct DisplayTransformConstant {
+    uint32_t swapchain_image_index;
 };
 
 struct MaterialInfo {

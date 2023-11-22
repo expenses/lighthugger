@@ -43,3 +43,37 @@ void PSMain(
 
     target_0.xyz = linear_to_srgb_transfer_function(target_0.xyz);
 }
+
+[[vk::push_constant]]
+DisplayTransformConstant display_transform_constant;
+
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void display_transform_compute(
+    uint3 global_id: SV_DispatchThreadID
+) {
+    uint32_t width;
+    uint32_t height;
+    scene_referred_framebuffer.GetDimensions(width, height);
+
+    float2 pixel_size = 1.0 / float2(width, height);
+    float2 uv = (float2(global_id.xy) + 0.5) * pixel_size;
+
+    float3 stimulus = scene_referred_framebuffer.SampleLevel(clamp_sampler, uv, 0.0);
+
+    float3 linear_display_referred_value = tony_mc_mapface(stimulus);
+
+    if (uniforms.debug_shadowmaps) {
+        float shadow_screen_percentage = 0.3;
+
+        if (uv.x < shadow_screen_percentage && uv.y < shadow_screen_percentage) {
+            float2 shadow_uv = uv / shadow_screen_percentage;
+            shadow_uv.x = 1.0 - shadow_uv.x;
+            linear_display_referred_value = shadowmap.SampleLevel(clamp_sampler, float3(shadow_uv, 0), 0.0).xxx;
+        }
+    }
+
+    float3 srgb_encoded_value = linear_to_srgb_transfer_function(linear_display_referred_value);
+
+    swapchain_images[display_transform_constant.swapchain_image_index][global_id.xy] = float4(srgb_encoded_value, 1.0);
+}

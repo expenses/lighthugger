@@ -297,7 +297,8 @@ int main() {
         .imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
         .imageExtent = extent,
         .imageArrayLayers = 1,
-        .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
+        .imageUsage = vk::ImageUsageFlagBits::eColorAttachment
+            | vk::ImageUsageFlagBits::eStorage,
         .presentMode = vk::PresentModeKHR::eFifo,
     };
     auto swapchain = device.createSwapchainKHR(swapchain_create_info);
@@ -343,8 +344,11 @@ int main() {
     auto render_fence =
         device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
 
-    auto pipelines =
-        Pipelines::compile_pipelines(device, swapchain_create_info.imageFormat);
+    auto pipelines = Pipelines::compile_pipelines(
+        device,
+        swapchain_create_info.imageFormat,
+        swapchain_images.size()
+    );
 
     auto pool_sizes = std::array {
         vk::DescriptorPoolSize {
@@ -605,7 +609,7 @@ int main() {
     }
 
     // Write initial descriptor sets.
-    descriptor_set.write_descriptors(resources, device);
+    descriptor_set.write_descriptors(resources, device, swapchain_image_views);
 
     auto camera_params = CameraParams {
         .position = glm::vec3(-86.5, 15.5, -17.0),
@@ -682,7 +686,8 @@ int main() {
             resources.resizing = ResizingResources(device, allocator, extent);
             descriptor_set.write_resizing_descriptors(
                 resources.resizing,
-                device
+                device,
+                swapchain_image_views
             );
         }
         {

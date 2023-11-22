@@ -38,11 +38,13 @@ struct DescriptorSet {
 
     void write_resizing_descriptors(
         const ResizingResources& resizing_resources,
-        const vk::raii::Device& device
+        const vk::raii::Device& device,
+        const std::vector<vk::raii::ImageView>& swapchain_image_views
     );
 
     void write_descriptors(
         const Resources& resources,
-        const vk::raii::Device& device
+        const vk::raii::Device& device,
+        const std::vector<vk::raii::ImageView>& swapchain_image_views
     );
 };

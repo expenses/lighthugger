@@ -118,8 +118,10 @@ vk::raii::Pipeline name_pipeline(
     return pipeline;
 }
 
-DescriptorSetLayouts
-create_descriptor_set_layouts(const vk::raii::Device& device) {
+DescriptorSetLayouts create_descriptor_set_layouts(
+    const vk::raii::Device& device,
+    uint32_t num_swapchain_images
+) {
     auto everything_bindings = std::array {
         // Bindless images
         vk::DescriptorSetLayoutBinding {
@@ -151,7 +153,8 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .binding = 3,
             .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment
+                | vk::ShaderStageFlagBits::eCompute,
         },
         // clamp sampler
         vk::DescriptorSetLayoutBinding {
@@ -166,7 +169,8 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .binding = 5,
             .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment
+                | vk::ShaderStageFlagBits::eCompute,
         },
         // repeat sampler
         vk::DescriptorSetLayoutBinding {
@@ -196,7 +200,8 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .binding = 9,
             .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment
+                | vk::ShaderStageFlagBits::eCompute,
         },
         // Shadowmap comparison sampler
         vk::DescriptorSetLayoutBinding {
@@ -217,6 +222,12 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .binding = 12,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute},
+        // swapchain images
+        vk::DescriptorSetLayoutBinding {
+            .binding = 13,
+            .descriptorType = vk::DescriptorType::eStorageImage,
+            .descriptorCount = num_swapchain_images,
             .stageFlags = vk::ShaderStageFlagBits::eCompute},
     };
 
@@ -239,18 +250,25 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
 
 Pipelines Pipelines::compile_pipelines(
     const vk::raii::Device& device,
-    vk::Format swapchain_format
+    vk::Format swapchain_format,
+    uint32_t num_swapchain_images
 ) {
-    auto descriptor_set_layouts = create_descriptor_set_layouts(device);
+    auto descriptor_set_layouts =
+        create_descriptor_set_layouts(device, num_swapchain_images);
 
     auto descriptor_set_layout_array =
         std::array {*descriptor_set_layouts.everything};
 
     // Simple push constant for instructing the shadow pass which shadowmap to render to.
-    auto push_constants = std::array {vk::PushConstantRange {
-        .stageFlags = vk::ShaderStageFlagBits::eVertex,
-        .offset = 0,
-        .size = sizeof(ShadowPassConstant)}};
+    auto push_constants = std::array {
+        vk::PushConstantRange {
+            .stageFlags = vk::ShaderStageFlagBits::eVertex,
+            .offset = 0,
+            .size = sizeof(ShadowPassConstant)},
+        vk::PushConstantRange {
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+            .offset = 0,
+            .size = sizeof(DisplayTransformConstant)}};
 
     auto pipeline_layout =
         device.createPipelineLayout(vk::PipelineLayoutCreateInfo {
@@ -411,6 +429,14 @@ Pipelines Pipelines::compile_pipelines(
                     .module = *write_draw_calls,
                     .pName = "write_draw_calls",
                 },
+            .layout = *pipeline_layout},
+        vk::ComputePipelineCreateInfo {
+            .stage =
+                vk::PipelineShaderStageCreateInfo {
+                    .stage = vk::ShaderStageFlagBits::eCompute,
+                    .module = *display_transform,
+                    .pName = "display_transform_compute",
+                },
             .layout = *pipeline_layout}};
 
     auto graphics_pipelines =
@@ -442,6 +468,11 @@ Pipelines Pipelines::compile_pipelines(
             std::move(compute_pipelines[2]),
             device,
             "write_draw_calls"
+        ),
+        .display_transform_compute = name_pipeline(
+            std::move(compute_pipelines[3]),
+            device,
+            "display_transform_compute"
         ),
         .pipeline_layout = std::move(pipeline_layout),
         .dsl = std::move(descriptor_set_layouts),

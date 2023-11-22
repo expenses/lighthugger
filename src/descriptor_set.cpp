@@ -1,5 +1,12 @@
 #include "descriptor_set.h"
 
+vk::DescriptorBufferInfo buffer_info(const AllocatedBuffer& buffer) {
+    return vk::DescriptorBufferInfo {
+        .buffer = buffer.buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE};
+}
+
 uint32_t
 DescriptorSet::write_image(const ImageWithView& image, vk::Device device) {
     auto index = tracker.push();
@@ -24,8 +31,19 @@ DescriptorSet::write_image(const ImageWithView& image, vk::Device device) {
 
 void DescriptorSet::write_resizing_descriptors(
     const ResizingResources& resizing_resources,
-    const vk::raii::Device& device
+    const vk::raii::Device& device,
+    const std::vector<vk::raii::ImageView>& swapchain_image_views
 ) {
+    std::vector<vk::DescriptorImageInfo> swapchain_image_infos(
+        swapchain_image_views.size()
+    );
+
+    for (uint32_t i = 0; i < swapchain_image_views.size(); i++) {
+        swapchain_image_infos[i] = vk::DescriptorImageInfo {
+            .imageView = *swapchain_image_views[i],
+            .imageLayout = vk::ImageLayout::eGeneral};
+    }
+
     auto image_info = vk::DescriptorImageInfo {
         .imageView = *resizing_resources.scene_referred_framebuffer.view,
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
@@ -35,29 +53,39 @@ void DescriptorSet::write_resizing_descriptors(
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
 
     device.updateDescriptorSets(
-        {
-            vk::WriteDescriptorSet {
-                .dstSet = *set,
-                .dstBinding = 3,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampledImage,
-                .pImageInfo = &image_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *set,
-                .dstBinding = 7,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampledImage,
-                .pImageInfo = &depthbuffer_image_info},
-        },
+        {vk::WriteDescriptorSet {
+             .dstSet = *set,
+             .dstBinding = 3,
+             .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eSampledImage,
+             .pImageInfo = &image_info},
+         vk::WriteDescriptorSet {
+             .dstSet = *set,
+             .dstBinding = 7,
+             .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eSampledImage,
+             .pImageInfo = &depthbuffer_image_info},
+         vk::WriteDescriptorSet {
+             .dstSet = *set,
+             .dstBinding = 13,
+             .descriptorCount =
+                 static_cast<uint32_t>(swapchain_image_infos.size()),
+             .descriptorType = vk::DescriptorType::eStorageImage,
+             .pImageInfo = swapchain_image_infos.data()}},
         {}
     );
 }
 
 void DescriptorSet::write_descriptors(
     const Resources& resources,
-    const vk::raii::Device& device
+    const vk::raii::Device& device,
+    const std::vector<vk::raii::ImageView>& swapchain_image_views
 ) {
-    write_resizing_descriptors(resources.resizing, device);
+    write_resizing_descriptors(
+        resources.resizing,
+        device,
+        swapchain_image_views
+    );
 
     auto lut_image_info = vk::DescriptorImageInfo {
         .imageView = *resources.display_transform_lut.view,
@@ -74,30 +102,11 @@ void DescriptorSet::write_descriptors(
     auto shadowmap_comparison_sampler_info = vk::DescriptorImageInfo {
         .sampler = *resources.shadowmap_comparison_sampler};
 
-    auto uniform_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = resources.uniform_buffer.buffer.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-
-    auto depth_info_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = resources.depth_info_buffer.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-
-    auto draw_calls_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = resources.draw_calls_buffer.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-
-    auto instance_buffer_info = vk::DescriptorBufferInfo {
-        .buffer = resources.instance_buffer.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-
-    auto draw_counts_buffer = vk::DescriptorBufferInfo {
-        .buffer = resources.draw_counts_buffer.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
+    auto uniform_buffer_info = buffer_info(resources.uniform_buffer.buffer);
+    auto depth_info_buffer_info = buffer_info(resources.depth_info_buffer);
+    auto draw_calls_buffer_info = buffer_info(resources.draw_calls_buffer);
+    auto instance_buffer_info = buffer_info(resources.instance_buffer);
+    auto draw_counts_buffer = buffer_info(resources.draw_counts_buffer);
 
     // Write initial descriptor sets.
     device.updateDescriptorSets(

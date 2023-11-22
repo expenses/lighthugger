@@ -12,12 +12,14 @@ struct Pipelines {
     vk::raii::Pipeline read_depth;
     vk::raii::Pipeline generate_matrices;
     vk::raii::Pipeline write_draw_calls;
+    vk::raii::Pipeline display_transform_compute;
     vk::raii::PipelineLayout pipeline_layout;
 
     DescriptorSetLayouts dsl;
 
     static Pipelines compile_pipelines(
         const vk::raii::Device& device,
-        vk::Format swapchain_format
+        vk::Format swapchain_format,
+        uint32_t num_swapchain_images
     );
 };

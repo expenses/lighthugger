@@ -219,7 +219,8 @@ void render(
             );
             command_buffer.pushConstants<ShadowPassConstant>(
                 *pipelines.pipeline_layout,
-                vk::ShaderStageFlagBits::eVertex,
+                vk::ShaderStageFlagBits::eVertex
+                    | vk::ShaderStageFlagBits::eCompute,
                 0,
                 {{.cascade_index = i}}
             );
