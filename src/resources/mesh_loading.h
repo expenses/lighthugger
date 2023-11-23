@@ -1,3 +1,4 @@
+#pragma once
 #include "../allocations/base.h"
 #include "../descriptor_set.h"
 #include "../shared_cpu_gpu.h"
