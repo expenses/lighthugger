@@ -59,20 +59,28 @@ Mesh load_obj(
         material_info.push_back(info);
     }
 
-    assert(materials.size() <= 2 << 15);
+    assert(materials.size() <= 1 << 16);
 
     std::vector<uint32_t> indices;
-    std::vector<uint16_t> material_ids;
+    std::vector<uint16_t> material_ids(attrib.vertices.size() / 3);
     for (auto& shape : shapes) {
         for (auto& index : shape.mesh.indices) {
             assert(index.vertex_index == index.normal_index);
             indices.push_back(static_cast<uint32_t>(index.vertex_index));
         }
-        // :( material ids are stored unindexed.
-        for (auto material_id : shape.mesh.material_ids) {
-            material_ids.push_back(static_cast<uint16_t>(material_id));
-            material_ids.push_back(static_cast<uint16_t>(material_id));
-            material_ids.push_back(static_cast<uint16_t>(material_id));
+
+        // :( material ids are stored unindexed so we need to reindex them.
+        // This could cause visual problems if a vertex is reused but with different materials.
+        assert(shape.mesh.indices.size() / 3 == shape.mesh.material_ids.size());
+
+        for (size_t i = 0; i < shape.mesh.material_ids.size(); i++) {
+            auto material_id =
+                static_cast<uint16_t>(shape.mesh.material_ids[i]);
+            material_ids[shape.mesh.indices[i * 3].vertex_index] = material_id;
+            material_ids[shape.mesh.indices[i * 3 + 1].vertex_index] =
+                material_id;
+            material_ids[shape.mesh.indices[i * 3 + 2].vertex_index] =
+                material_id;
         }
     }
 

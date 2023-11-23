@@ -3,15 +3,15 @@
 #include "allocations/staging.h"
 #include "debugging.h"
 #include "descriptor_set.h"
+#include "frame_resources.h"
+#include "input.h"
 #include "pch.h"
 #include "pipelines.h"
 #include "projection.h"
+#include "rendering.h"
 #include "resources/image_loading.h"
 #include "resources/mesh_loading.h"
 #include "sync.h"
-#include "frame_resources.h"
-#include "rendering.h"
-#include "input.h"
 
 const auto u64_max = std::numeric_limits<uint64_t>::max();
 
