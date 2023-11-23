@@ -293,6 +293,15 @@ int main() {
         {.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit}
     );
 
+    auto helmet = load_gltf(
+        "glTF/SciFiHelmet.gltf",
+        allocator,
+        device,
+        command_buffer,
+        graphics_queue_family,
+        temp_buffers
+    );
+
     // Load all resources
 
     auto powerplant = load_obj(

@@ -19,6 +19,7 @@
 #include <backends/imgui_impl_vulkan.h>
 #include <imgui.h>
 
+#include <fastgltf/parser.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>

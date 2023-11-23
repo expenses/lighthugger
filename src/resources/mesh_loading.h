@@ -42,3 +42,16 @@ Mesh load_obj(
     std::vector<AllocatedBuffer>& temp_buffers,
     DescriptorSet& descriptor_set
 );
+
+struct GltfMesh {
+    std::vector<ImageWithView> images;
+};
+
+GltfMesh load_gltf(
+    const std::filesystem::path& filepath,
+    vma::Allocator allocator,
+    const vk::raii::Device& device,
+    const vk::raii::CommandBuffer& command_buffer,
+    uint32_t graphics_queue_family,
+    std::vector<AllocatedBuffer>& temp_buffers
+);

@@ -195,3 +195,56 @@ MeshInfo Mesh::get_info(const vk::raii::Device& device) {
         .num_indices = num_indices,
         .bounding_sphere_radius = bounding_sphere_radius};
 }
+
+GltfMesh load_gltf(
+    const std::filesystem::path& filepath,
+    vma::Allocator allocator,
+    const vk::raii::Device& device,
+    const vk::raii::CommandBuffer& command_buffer,
+    uint32_t graphics_queue_family,
+    std::vector<AllocatedBuffer>& temp_buffers
+) {
+    fastgltf::Parser parser;
+    fastgltf::GltfDataBuffer data;
+    data.loadFromFile(filepath);
+
+    auto parent_path = filepath.parent_path();
+
+    auto asset_result =
+        parser.loadGLTF(&data, parent_path, fastgltf::Options::None);
+    if (auto error = asset_result.error(); error != fastgltf::Error::None) {
+        // Some error occurred while reading the buffer, parsing the JSON, or validating the data.
+        dbg(error);
+        abort();
+    }
+
+    auto asset = std::move(asset_result.get());
+
+    auto error = fastgltf::validate(asset);
+    assert(error == fastgltf::Error::None);
+
+    std::vector<ImageWithView> images;
+
+    for (auto& img : asset.images) {
+        std::visit(
+            fastgltf::visitor {
+                [&](fastgltf::sources::URI& filePath) {
+                    auto image_path = parent_path / filePath.uri.fspath();
+                    assert(image_path.extension() == ".ktx2");
+                    images.push_back(load_ktx2_image(
+                        image_path,
+                        allocator,
+                        device,
+                        command_buffer,
+                        graphics_queue_family,
+                        temp_buffers
+                    ));
+                },
+                [](auto&) { assert(false); },
+            },
+            img.data
+        );
+    }
+
+    return {.images = std::move(images)};
+}

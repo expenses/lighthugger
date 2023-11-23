@@ -3,6 +3,7 @@
 #include "../allocations/persistently_mapped.h"
 #include "../sync.h"
 #include "dds.h"
+#include "ktx2.h"
 
 struct FormatInfo {
     vk::Format format;
@@ -210,7 +211,149 @@ ImageWithView load_dds(
             .next_access =
                 THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
             .queue_family = graphics_queue_family,
-            .image = image.image.image}}
+            .image = image.image.image,
+            .subresource_range = subresource_range}}
+    );
+
+    temp_buffers.push_back(std::move(staging_buffer.buffer));
+
+    return image;
+}
+
+ImageWithView load_ktx2_image(
+    const std::filesystem::path& filepath,
+    vma::Allocator allocator,
+    const vk::raii::Device& device,
+    const vk::raii::CommandBuffer& command_buffer,
+    uint32_t graphics_queue_family,
+    std::vector<AllocatedBuffer>& temp_buffers
+) {
+    std::ifstream stream(filepath, std::ios::binary);
+
+    std::array<uint8_t, 12> identifier;
+    stream.read((char*)identifier.data(), identifier.size());
+
+    assert(identifier == KTX2_IDENTIFIER);
+
+    Ktx2Header header;
+
+    stream.read((char*)&header, sizeof header);
+
+    // Only uncompressed images are handled for now.
+    assert(header.supercompression_scheme == 0);
+
+    Ktx2Index index;
+
+    stream.read((char*)&index, sizeof index);
+
+    std::vector<Ktx2LevelIndex> levels(std::max(1u, header.level_count));
+
+    auto total_size = 0;
+
+    for (size_t i = 0; i < std::max(1u, header.level_count); i++) {
+        stream.read((char*)&levels[i], sizeof levels[i]);
+        total_size += levels[i].uncompressed_byte_length;
+    }
+
+    auto subresource_range = vk::ImageSubresourceRange {
+        .aspectMask = vk::ImageAspectFlagBits::eColor,
+        .baseMipLevel = 0,
+        .levelCount = header.level_count,
+        .baseArrayLayer = 0,
+        .layerCount = 1,
+    };
+
+    auto image = ImageWithView(
+        vk::ImageCreateInfo {
+            .imageType = vk::ImageType::e2D,
+            .format = header.format,
+            .extent =
+                vk::Extent3D {
+                    .width = header.width,
+                    .height = header.height,
+                    .depth = std::max(header.depth, 1u),
+                },
+            .mipLevels = header.level_count,
+            .arrayLayers = 1,
+            .usage = vk::ImageUsageFlagBits::eSampled
+                | vk::ImageUsageFlagBits::eTransferDst},
+        allocator,
+        device,
+        std::string(filepath),
+        subresource_range,
+        vk::ImageViewType::e2D
+    );
+
+    auto staging_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
+        vk::BufferCreateInfo {
+            .size = total_size,
+            .usage = vk::BufferUsageFlagBits::eTransferSrc},
+        {
+            .flags = vma::AllocationCreateFlagBits::eMapped
+                | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+            .usage = vma::MemoryUsage::eAuto,
+        },
+        allocator,
+        std::string(filepath) + " staging buffer"
+    ));
+
+    auto offset = 0;
+    std::vector<vk::BufferImageCopy> regions(levels.size());
+
+    for (size_t i = 0; i < levels.size(); i++) {
+        auto level_width = std::max(header.width >> i, 1u);
+        auto level_height = std::max(header.height >> i, 1u);
+
+        auto level = levels[i];
+
+        stream.seekg(level.byte_offset, stream.beg);
+        stream.read(
+            reinterpret_cast<char*>(staging_buffer.mapped_ptr) + offset,
+            level.uncompressed_byte_length
+        );
+        regions[i] = vk::BufferImageCopy {
+            .bufferOffset = offset,
+            .imageSubresource =
+                {
+                    .aspectMask = vk::ImageAspectFlagBits::eColor,
+                    .mipLevel = i,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                },
+            .imageExtent = vk::Extent3D {
+                .width = level_width,
+                .height = level_height,
+                .depth = std::max(header.depth, 1u)}};
+        offset += level.uncompressed_byte_length;
+    }
+
+    insert_color_image_barriers(
+        command_buffer,
+        std::array {ImageBarrier {
+            .prev_access = THSVS_ACCESS_NONE,
+            .next_access = THSVS_ACCESS_TRANSFER_WRITE,
+            .discard_contents = true,
+            .queue_family = graphics_queue_family,
+            .image = image.image.image,
+            .subresource_range = subresource_range}}
+    );
+
+    command_buffer.copyBufferToImage(
+        staging_buffer.buffer.buffer,
+        image.image.image,
+        vk::ImageLayout::eTransferDstOptimal,
+        regions
+    );
+
+    insert_color_image_barriers(
+        command_buffer,
+        std::array {ImageBarrier {
+            .prev_access = THSVS_ACCESS_TRANSFER_WRITE,
+            .next_access =
+                THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+            .queue_family = graphics_queue_family,
+            .image = image.image.image,
+            .subresource_range = subresource_range}}
     );
 
     temp_buffers.push_back(std::move(staging_buffer.buffer));
