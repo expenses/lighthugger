@@ -204,7 +204,7 @@ GltfMesh load_gltf(
     uint32_t graphics_queue_family,
     std::vector<AllocatedBuffer>& temp_buffers
 ) {
-    fastgltf::Parser parser;
+    fastgltf::Parser parser(fastgltf::Extensions::KHR_mesh_quantization);
     fastgltf::GltfDataBuffer data;
     data.loadFromFile(filepath);
 
@@ -214,7 +214,7 @@ GltfMesh load_gltf(
         parser.loadGLTF(&data, parent_path, fastgltf::Options::None);
     if (auto error = asset_result.error(); error != fastgltf::Error::None) {
         // Some error occurred while reading the buffer, parsing the JSON, or validating the data.
-        dbg(error);
+        dbg(fastgltf::getErrorMessage(error));
         abort();
     }
 

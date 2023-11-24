@@ -294,7 +294,7 @@ int main() {
     );
 
     auto helmet = load_gltf(
-        "glTF/SciFiHelmet.gltf",
+        "glTF/out.gltf",
         allocator,
         device,
         command_buffer,
