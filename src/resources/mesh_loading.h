@@ -1,6 +1,7 @@
 #pragma once
 #include "../allocations/base.h"
 #include "../descriptor_set.h"
+#include "../pipelines.h"
 #include "../shared_cpu_gpu.h"
 
 struct BoundingBox {
@@ -48,6 +49,11 @@ struct GltfPrimitive {
     glm::mat4 transform;
 };
 
+struct DescriptorPoolAndSet {
+    vk::raii::DescriptorPool pool;
+    vk::raii::DescriptorSet set;
+};
+
 struct GltfMesh {
     std::vector<ImageWithView> images;
     AllocatedBuffer material_info;
@@ -61,5 +67,7 @@ GltfMesh load_gltf(
     const vk::raii::CommandBuffer& command_buffer,
     uint32_t graphics_queue_family,
     std::vector<AllocatedBuffer>& temp_buffers,
-    DescriptorSet& descriptor_set
+    DescriptorSet& descriptor_set,
+    const Pipelines& pipelines,
+    std::vector<DescriptorPoolAndSet>& temp_descriptor_sets
 );

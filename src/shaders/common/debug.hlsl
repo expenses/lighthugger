@@ -1,5 +1,5 @@
 
-static float3 DEBUG_COLOURS[10] = {
+const static float3 DEBUG_COLOURS[10] = {
     float3(   0.0f/255.0f,   2.0f/255.0f,  91.0f/255.0f ),
     float3(   0.0f/255.0f, 108.0f/255.0f, 251.0f/255.0f ),
     float3(   0.0f/255.0f, 221.0f/255.0f, 221.0f/255.0f ),

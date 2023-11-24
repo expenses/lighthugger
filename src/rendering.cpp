@@ -4,11 +4,6 @@
 
 const auto u32_max = std::numeric_limits<uint32_t>::max();
 
-uint32_t dispatch_size(uint32_t width, uint32_t workgroup_size) {
-    return static_cast<uint32_t>(std::ceil(float(width) / float(workgroup_size))
-    );
-}
-
 void set_scissor_and_viewport(
     const vk::raii::CommandBuffer& command_buffer,
     uint32_t width,

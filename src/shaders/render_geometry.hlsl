@@ -14,8 +14,8 @@ float4 depth_only(
 
     uint32_t offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
 
-    if (mesh_info.type == 1) {
-        position = float3(load_value<uint16_t4>(mesh_info.positions, offset).xyz);
+    if (mesh_info.type == TYPE_QUANITZED) {
+        position = float3(load_uint16_t3(mesh_info.positions, offset));
     } else {
         position = load_value<float3>(mesh_info.positions, offset);
     }
@@ -40,8 +40,8 @@ float4 shadow_pass(
 
     uint32_t offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
 
-    if (mesh_info.type == 1) {
-        position = float3(load_value<uint16_t4>(mesh_info.positions, offset).xyz);
+    if (mesh_info.type == TYPE_QUANITZED) {
+        position = float3(load_uint16_t3(mesh_info.positions, offset));
     } else {
         position = load_value<float3>(mesh_info.positions, offset);
     }
@@ -53,11 +53,11 @@ float4 shadow_pass(
 
 struct Varyings {
     [[vk::location(0)]] float4 clip_pos : SV_Position;
-    [[vk::location(1)]] float3 world_pos : COLOR0;
-    [[vk::location(2)]] float3 normal: COLOR1;
-    [[vk::location(3)]] float2 uv: COLOR2;
-    [[vk::location(4)]] uint32_t material_index: COLOR3;
-    [[vk::location(5)]] uint32_t instance_index: COLOR4;
+    [[vk::location(1)]] float3 world_pos : ATTRIB0;
+    [[vk::location(2)]] float3 normal: ATTRIB1;
+    [[vk::location(3)]] float2 uv: ATTRIB2;
+    [[vk::location(4)]] uint32_t material_index: ATTRIB3;
+    [[vk::location(5)]] uint32_t instance_index: ATTRIB4;
 };
 
 [shader("vertex")]
@@ -73,21 +73,16 @@ Varyings VSMain(uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_Insta
 
     float3 position;
 
-    if (mesh_info.type == 1) {
+    if (mesh_info.type == TYPE_QUANITZED) {
         varyings.material_index = uint32_t(mesh_info.material_indices);
 
-        position = float3(load_value<uint16_t4>(mesh_info.positions, offset).xyz);
+        position = float3(load_uint16_t3(mesh_info.positions, offset));
         MaterialInfo material_info = load_material_info(mesh_info.material_info, varyings.material_index);
         varyings.uv = float2(load_value<uint16_t2>(mesh_info.uvs, offset)) * material_info.albedo_texture_scale + material_info.albedo_texture_offset;
 
-        uint32_t normal_encoded = load_value<uint32_t>(mesh_info.normals, offset);
-
-        // Extract out the values and perform sign extension.
-        varyings.normal = normalize(float3(
-            int16_t(normal_encoded & 255) << 8 >> 8,
-            int16_t((normal_encoded >> 8) & 255) << 8 >> 8,
-            int16_t((normal_encoded >> 16) & 255) << 8 >> 8
-        ) / 128.0);
+        // Load 3 x i8 with a padding byte.
+        int16_t4 normal_unpacked = unpack_s8s16(load_value<int8_t4_packed>(mesh_info.normals, offset));
+        varyings.normal = normalize(float3(normal_unpacked.xyz));
     } else {
         position = load_value<float3>(mesh_info.positions, offset);
         varyings.normal = load_value<float3>(mesh_info.normals, offset);
@@ -162,4 +157,6 @@ void PSMain(
         float3 debug_col = DEBUG_COLOURS[cascade_index];
         target_0 = float4(albedo * debug_col, 1.0);
     }
+
+    //target_0 = float4(normal * 0.5 + 0.5, 1.0);
 }

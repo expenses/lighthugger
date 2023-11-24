@@ -174,12 +174,12 @@ Mesh load_obj(
         .indices = device.getBufferAddress({.buffer = index_buffer.buffer}),
         .normals = device.getBufferAddress({.buffer = normal_buffer.buffer}),
         .uvs = device.getBufferAddress({.buffer = uv_buffer.buffer}),
-        .material_indices =
-            device.getBufferAddress({.buffer = material_id_buffer.buffer}),
         .material_info =
             device.getBufferAddress({.buffer = material_info_buffer.buffer}),
+        .material_indices =
+            device.getBufferAddress({.buffer = material_id_buffer.buffer}),
         .num_indices = static_cast<uint32_t>(indices.size()),
-        .type = 0,
+        .type = TYPE_NORMAL,
         .bounding_sphere_radius = bounding_sphere_radius,
     };
 
@@ -266,6 +266,95 @@ void copy_buffer_to_final(
     );
 }
 
+void calc_bounding_sphere(
+    const vk::raii::Device& device,
+    const vk::raii::CommandBuffer& command_buffer,
+    const AllocatedBuffer& mesh_info_buffer,
+    const Pipelines& pipelines,
+    std::vector<DescriptorPoolAndSet>& temp_descriptor_sets,
+    uint32_t num_vertices
+) {
+    auto pool_sizes = std::array {vk::DescriptorPoolSize {
+        .type = vk::DescriptorType::eStorageBuffer,
+        .descriptorCount = 1}};
+
+    auto descriptor_pool = device.createDescriptorPool(
+        {.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+
+         .maxSets = 1,
+         .poolSizeCount = pool_sizes.size(),
+         .pPoolSizes = pool_sizes.data()}
+    );
+
+    auto descriptor_sets_to_create =
+        std::array {*pipelines.dsl.calc_bounding_sphere};
+
+    std::vector<vk::raii::DescriptorSet> descriptor_sets =
+        device.allocateDescriptorSets(vk::DescriptorSetAllocateInfo {
+            .descriptorPool = *descriptor_pool,
+            .descriptorSetCount =
+                static_cast<uint32_t>(descriptor_sets_to_create.size()),
+            .pSetLayouts = descriptor_sets_to_create.data()});
+
+    auto descriptor_set = std::move(descriptor_sets[0]);
+
+    auto info = buffer_info(mesh_info_buffer);
+
+    device.updateDescriptorSets(
+        {vk::WriteDescriptorSet {
+            .dstSet = *descriptor_set,
+            .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo = &info}},
+        {}
+    );
+
+    command_buffer.bindPipeline(
+        vk::PipelineBindPoint::eCompute,
+        *pipelines.calc_bounding_sphere.pipeline
+    );
+    command_buffer.bindDescriptorSets(
+        vk::PipelineBindPoint::eCompute,
+        *pipelines.calc_bounding_sphere.layout,
+        0,
+        {*descriptor_set},
+        {}
+    );
+    command_buffer.dispatch(dispatch_size(num_vertices, 64), 1, 1);
+
+    temp_descriptor_sets.push_back(DescriptorPoolAndSet {
+        .pool = std::move(descriptor_pool),
+        .set = std::move(descriptor_set)});
+}
+
+void copy_uint16_t4_to_uint16_3(
+    const vk::raii::Device& device,
+    const vk::raii::CommandBuffer& command_buffer,
+    const AllocatedBuffer& copy_dst,
+    const AllocatedBuffer& copy_src,
+    const Pipelines& pipelines,
+    uint32_t count,
+    uint32_t src_offset,
+    bool use_16bit
+) {
+    command_buffer.bindPipeline(
+        vk::PipelineBindPoint::eCompute,
+        *pipelines.copy_quantized_positions.pipeline
+    );
+    command_buffer.pushConstants<CopyQuantizedPositionsConstant>(
+        *pipelines.copy_quantized_positions.layout,
+        vk::ShaderStageFlagBits::eCompute,
+        0,
+        {{.dst = device.getBufferAddress({.buffer = copy_dst.buffer}),
+          .src =
+              device.getBufferAddress({.buffer = copy_src.buffer}) + src_offset,
+
+          .count = count,
+          .use_16bit = use_16bit}}
+    );
+    command_buffer.dispatch(dispatch_size(count, 64), 1, 1);
+}
+
 GltfMesh load_gltf(
     const std::filesystem::path& filepath,
     vma::Allocator allocator,
@@ -273,7 +362,9 @@ GltfMesh load_gltf(
     const vk::raii::CommandBuffer& command_buffer,
     uint32_t graphics_queue_family,
     std::vector<AllocatedBuffer>& temp_buffers,
-    DescriptorSet& descriptor_set
+    DescriptorSet& descriptor_set,
+    const Pipelines& pipelines,
+    std::vector<DescriptorPoolAndSet>& temp_descriptor_sets
 ) {
     fastgltf::Parser parser(fastgltf::Extensions::KHR_mesh_quantization);
     fastgltf::GltfDataBuffer data;
@@ -305,7 +396,8 @@ GltfMesh load_gltf(
             auto staging_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
                 vk::BufferCreateInfo {
                     .size = buffer.byteLength,
-                    .usage = vk::BufferUsageFlagBits::eTransferSrc},
+                    .usage = vk::BufferUsageFlagBits::eTransferSrc
+                        | vk::BufferUsageFlagBits::eShaderDeviceAddress},
                 {
                     .flags = vma::AllocationCreateFlagBits::eMapped
                         | vma::AllocationCreateFlagBits::
@@ -386,6 +478,22 @@ GltfMesh load_gltf(
             auto& mesh = asset.meshes[node.meshIndex.value()];
 
             for (auto& primitive : mesh.primitives) {
+                auto create_buffer = [&](uint64_t size, const char* name) {
+                    return AllocatedBuffer(
+                        vk::BufferCreateInfo {
+                            .size = size,
+                            .usage = vk::BufferUsageFlagBits::eTransferDst
+                                | vk::BufferUsageFlagBits::eStorageBuffer
+                                | vk::BufferUsageFlagBits::
+                                    eShaderDeviceAddress},
+                        {
+                            .usage = vma::MemoryUsage::eAuto,
+                        },
+                        allocator,
+                        std::string(filepath) + " " + name
+                    );
+                };
+
                 auto material_index = primitive.materialIndex.value();
 
                 auto position_it = primitive.findAttribute("POSITION");
@@ -397,46 +505,36 @@ GltfMesh load_gltf(
                     == fastgltf::ComponentType::UnsignedShort
                 );
                 assert(position_accessor.type == fastgltf::AccessorType::Vec3);
-                auto position_buffer = AllocatedBuffer(
-                    vk::BufferCreateInfo {
-                        .size = position_accessor.count * sizeof(uint16_t) * 4,
-                        .usage = vk::BufferUsageFlagBits::eTransferDst
-                            | vk::BufferUsageFlagBits::eStorageBuffer
-                            | vk::BufferUsageFlagBits::eShaderDeviceAddress},
-                    {
-                        .usage = vma::MemoryUsage::eAuto,
-                    },
-                    allocator,
-                    std::string(filepath) + " positions"
+                auto position_buffer = create_buffer(
+                    position_accessor.count * sizeof(uint16_t) * 3,
+                    "positions"
                 );
-                copy_buffer_to_final(
-                    position_accessor,
-                    asset,
-                    staging_buffers,
-                    position_buffer,
-                    command_buffer
-                );
+                {
+                    auto& buffer_view =
+                        asset.bufferViews[position_accessor.bufferViewIndex
+                                              .value()];
+
+                    copy_uint16_t4_to_uint16_3(
+                        device,
+                        command_buffer,
+                        position_buffer,
+                        staging_buffers[buffer_view.bufferIndex].buffer,
+                        pipelines,
+                        position_accessor.count,
+                        buffer_view.byteOffset,
+                        true
+                    );
+                }
 
                 auto& indices =
                     asset.accessors[primitive.indicesAccessor.value()];
-
                 assert(
                     indices.componentType
                     == fastgltf::ComponentType::UnsignedInt
                 );
                 assert(indices.type == fastgltf::AccessorType::Scalar);
-                auto indices_buffer = AllocatedBuffer(
-                    vk::BufferCreateInfo {
-                        .size = indices.count * sizeof(uint32_t),
-                        .usage = vk::BufferUsageFlagBits::eTransferDst
-                            | vk::BufferUsageFlagBits::eStorageBuffer
-                            | vk::BufferUsageFlagBits::eShaderDeviceAddress},
-                    {
-                        .usage = vma::MemoryUsage::eAuto,
-                    },
-                    allocator,
-                    std::string(filepath) + " indices"
-                );
+                auto indices_buffer =
+                    create_buffer(indices.count * sizeof(uint32_t), "indices");
                 copy_buffer_to_final(
                     indices,
                     asset,
@@ -452,18 +550,8 @@ GltfMesh load_gltf(
                     uvs.componentType == fastgltf::ComponentType::UnsignedShort
                 );
                 assert(uvs.type == fastgltf::AccessorType::Vec2);
-                auto uvs_buffer = AllocatedBuffer(
-                    vk::BufferCreateInfo {
-                        .size = uvs.count * sizeof(uint16_t) * 2,
-                        .usage = vk::BufferUsageFlagBits::eTransferDst
-                            | vk::BufferUsageFlagBits::eStorageBuffer
-                            | vk::BufferUsageFlagBits::eShaderDeviceAddress},
-                    {
-                        .usage = vma::MemoryUsage::eAuto,
-                    },
-                    allocator,
-                    std::string(filepath) + " uvs"
-                );
+                auto uvs_buffer =
+                    create_buffer(uvs.count * sizeof(uint16_t) * 2, "uvs");
                 copy_buffer_to_final(
                     uvs,
                     asset,
@@ -477,17 +565,9 @@ GltfMesh load_gltf(
                 auto& normals = asset.accessors[normals_it->second];
                 assert(normals.componentType == fastgltf::ComponentType::Byte);
                 assert(normals.type == fastgltf::AccessorType::Vec3);
-                auto normals_buffer = AllocatedBuffer(
-                    vk::BufferCreateInfo {
-                        .size = normals.count * sizeof(int8_t) * 4,
-                        .usage = vk::BufferUsageFlagBits::eTransferDst
-                            | vk::BufferUsageFlagBits::eStorageBuffer
-                            | vk::BufferUsageFlagBits::eShaderDeviceAddress},
-                    {
-                        .usage = vma::MemoryUsage::eAuto,
-                    },
-                    allocator,
-                    std::string(filepath) + " normals"
+                auto normals_buffer = create_buffer(
+                    normals.count * sizeof(int8_t) * 4,
+                    "normals"
                 );
                 copy_buffer_to_final(
                     normals,
@@ -496,6 +576,24 @@ GltfMesh load_gltf(
                     normals_buffer,
                     command_buffer
                 );
+                /*
+                // See copy_quantized_positions.hlsl.
+                {
+                    auto& buffer_view =
+                        asset.bufferViews[normals.bufferViewIndex
+                                              .value()];
+
+                    copy_uint16_t4_to_uint16_3(
+                        device,
+                        command_buffer,
+                        normals_buffer,
+                        staging_buffers[buffer_view.bufferIndex].buffer,
+                        pipelines,
+                        normals.count,
+                        buffer_view.byteOffset,
+                        false
+                    );
+                }*/
 
                 auto mesh_info = MeshInfo {
                     .positions = device.getBufferAddress(
@@ -509,12 +607,12 @@ GltfMesh load_gltf(
                     ),
                     .uvs =
                         device.getBufferAddress({.buffer = uvs_buffer.buffer}),
-                    .material_indices = material_index,
                     .material_info = device.getBufferAddress(
                         {.buffer = material_info_buffer.buffer}
                     ),
+                    .material_indices = material_index,
                     .num_indices = static_cast<uint32_t>(indices.count),
-                    .type = 1,
+                    .type = TYPE_QUANITZED,
                     .bounding_sphere_radius = 0.0f};
 
                 auto mesh_info_buffer = upload_via_staging_buffer(
@@ -526,6 +624,15 @@ GltfMesh load_gltf(
                     std::string(filepath) + " mesh info buffer",
                     command_buffer,
                     temp_buffers
+                );
+
+                calc_bounding_sphere(
+                    device,
+                    command_buffer,
+                    mesh_info_buffer,
+                    pipelines,
+                    temp_descriptor_sets,
+                    position_accessor.count
                 );
 
                 primitives.push_back(GltfPrimitive {

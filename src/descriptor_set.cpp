@@ -1,12 +1,5 @@
 #include "descriptor_set.h"
 
-vk::DescriptorBufferInfo buffer_info(const AllocatedBuffer& buffer) {
-    return vk::DescriptorBufferInfo {
-        .buffer = buffer.buffer,
-        .offset = 0,
-        .range = VK_WHOLE_SIZE};
-}
-
 uint32_t
 DescriptorSet::write_image(const ImageWithView& image, vk::Device device) {
     auto index = tracker.push();

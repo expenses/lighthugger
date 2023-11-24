@@ -236,6 +236,14 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .stageFlags = vk::ShaderStageFlagBits::eCompute},
     };
 
+    auto calc_bounding_sphere_bindings = std::array {
+        vk::DescriptorSetLayoutBinding {
+            .binding = 0,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute},
+    };
+
     return DescriptorSetLayouts {
         .everything = device.createDescriptorSetLayout({
             .pNext = &flags_create_info,
@@ -245,6 +253,10 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
         .swapchain_storage_image = device.createDescriptorSetLayout({
             .bindingCount = swapchain_storage_image_bindings.size(),
             .pBindings = swapchain_storage_image_bindings.data(),
+        }),
+        .calc_bounding_sphere = device.createDescriptorSetLayout({
+            .bindingCount = calc_bounding_sphere_bindings.size(),
+            .pBindings = calc_bounding_sphere_bindings.data(),
         }),
     };
 }
@@ -275,6 +287,31 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
             .pPushConstantRanges = push_constants.data(),
         });
 
+    auto calc_bounding_sphere_layout_array =
+        std::array {*descriptor_set_layouts.calc_bounding_sphere};
+
+    auto calc_bounding_sphere_pipeline_layout =
+        device.createPipelineLayout(vk::PipelineLayoutCreateInfo {
+            .setLayoutCount = calc_bounding_sphere_layout_array.size(),
+            .pSetLayouts = calc_bounding_sphere_layout_array.data(),
+
+        });
+
+    auto copy_quantized_positions_push_constants =
+        std::array {vk::PushConstantRange {
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+            .offset = 0,
+            .size = sizeof(CopyQuantizedPositionsConstant)}};
+
+    auto copy_quantized_positions_pipeline_layout =
+        device.createPipelineLayout(vk::PipelineLayoutCreateInfo {
+            .pushConstantRangeCount =
+                copy_quantized_positions_push_constants.size(),
+            .pPushConstantRanges =
+                copy_quantized_positions_push_constants.data(),
+
+        });
+
     auto render_geometry =
         create_shader_from_file(device, "compiled_shaders/render_geometry.spv");
 
@@ -289,6 +326,16 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
     auto write_draw_calls = create_shader_from_file(
         device,
         "compiled_shaders/write_draw_calls.spv"
+    );
+
+    auto calc_bounding_sphere = create_shader_from_file(
+        device,
+        "compiled_shaders/calc_bounding_sphere.spv"
+    );
+
+    auto copy_quantized_positions = create_shader_from_file(
+        device,
+        "compiled_shaders/copy_quantized_positions.spv"
     );
 
     auto render_geometry_stages = std::array {
@@ -403,7 +450,23 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
                     .module = *display_transform,
                     .pName = "display_transform",
                 },
-            .layout = *pipeline_layout}};
+            .layout = *pipeline_layout},
+        vk::ComputePipelineCreateInfo {
+            .stage =
+                vk::PipelineShaderStageCreateInfo {
+                    .stage = vk::ShaderStageFlagBits::eCompute,
+                    .module = *calc_bounding_sphere,
+                    .pName = "calc_bounding_sphere",
+                },
+            .layout = *calc_bounding_sphere_pipeline_layout},
+        vk::ComputePipelineCreateInfo {
+            .stage =
+                vk::PipelineShaderStageCreateInfo {
+                    .stage = vk::ShaderStageFlagBits::eCompute,
+                    .module = *copy_quantized_positions,
+                    .pName = "copy_quantized_positions",
+                },
+            .layout = *copy_quantized_positions_pipeline_layout}};
 
     auto graphics_pipelines =
         device.createGraphicsPipelines(nullptr, graphics_pipeline_infos);
@@ -440,6 +503,20 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
             "display_transform_compute"
         ),
         .pipeline_layout = std::move(pipeline_layout),
+        .calc_bounding_sphere =
+            {.pipeline = name_pipeline(
+                 std::move(compute_pipelines[4]),
+                 device,
+                 "calc_bounding_sphere"
+             ),
+             .layout = std::move(calc_bounding_sphere_pipeline_layout)},
+        .copy_quantized_positions =
+            {.pipeline = name_pipeline(
+                 std::move(compute_pipelines[5]),
+                 device,
+                 "copy_quantized_positions"
+             ),
+             .layout = std::move(copy_quantized_positions_pipeline_layout)},
         .dsl = std::move(descriptor_set_layouts),
     };
 }

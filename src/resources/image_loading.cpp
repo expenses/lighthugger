@@ -248,7 +248,7 @@ ImageWithView load_ktx2_image(
 
     std::vector<Ktx2LevelIndex> levels(std::max(1u, header.level_count));
 
-    auto total_size = 0;
+    vk::DeviceSize total_size = 0;
 
     for (size_t i = 0; i < std::max(1u, header.level_count); i++) {
         stream.read((char*)&levels[i], sizeof levels[i]);
@@ -297,10 +297,10 @@ ImageWithView load_ktx2_image(
         std::string(filepath) + " staging buffer"
     ));
 
-    auto offset = 0;
+    vk::DeviceSize offset = 0;
     std::vector<vk::BufferImageCopy> regions(levels.size());
 
-    for (size_t i = 0; i < levels.size(); i++) {
+    for (uint32_t i = 0; i < levels.size(); i++) {
         auto level_width = std::max(header.width >> i, 1u);
         auto level_height = std::max(header.height >> i, 1u);
 

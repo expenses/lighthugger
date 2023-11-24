@@ -29,8 +29,8 @@ MeshInfo load_mesh_info(uint64_t address) {
     info.indices = load_value_offset_zero<uint64_t>(address);
     info.normals = load_value_offset_zero<uint64_t>(address);
     info.uvs = load_value_offset_zero<uint64_t>(address);
-    info.material_indices = load_value_offset_zero<uint64_t>(address);
     info.material_info = load_value_offset_zero<uint64_t>(address);
+    info.material_indices = load_value_offset_zero<uint64_t>(address);
     info.num_indices = load_value_offset_zero<uint32_t>(address);
     info.type = load_value_offset_zero<uint32_t>(address);
     info.bounding_sphere_radius = load_value_offset_zero<float>(address);
@@ -51,4 +51,11 @@ T load_value(RWByteAddressBuffer byte_address_buffer, inout uint32_t offset) {
     // Update the offset by sizeof(T) to help with the loading functions below.
     offset += sizeof(T);
     return byte_address_buffer.Load<T>(load_offset);
+}
+
+uint16_t3 load_uint16_t3(uint64_t address, uint32_t offset) {
+    // The alignment of 2 is necessary here, otherwise it aligns the read to 4
+    // which is wrong. For whatever reason, you can do 3 loads of `uint16_t`s
+    // without specifying the alignment and it works fine.
+    return vk::RawBufferLoad<uint16_t3>(address + sizeof(uint16_t3) * offset, 2);
 }

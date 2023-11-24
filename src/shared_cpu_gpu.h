@@ -12,18 +12,33 @@
     #define VEC2_TYPE glm::vec2
 #endif
 
+const static uint32_t TYPE_NORMAL = 0;
+const static uint32_t TYPE_QUANITZED = 1;
+
 struct MeshInfo {
     uint64_t positions;
     uint64_t indices;
     uint64_t normals;
     uint64_t uvs;
+    uint64_t material_info;
     // Either the address of a material indices buffer
     // or a literal value.
     uint64_t material_indices;
-    uint64_t material_info;
     uint32_t num_indices;
     uint32_t type;
     float bounding_sphere_radius;
+};
+
+struct MeshInfoWithUintBoundingSphereRadius {
+    uint64_t positions;
+    uint64_t indices;
+    uint64_t normals;
+    uint64_t uvs;
+    uint64_t material_info;
+    uint64_t material_indices;
+    uint32_t num_indices;
+    uint32_t type;
+    uint32_t bounding_sphere_radius;
 };
 
 struct DepthInfoBuffer {
@@ -78,6 +93,13 @@ struct DisplayTransformConstant {
 
 struct SetupConstant {
     uint64_t mesh_info_address;
+};
+
+struct CopyQuantizedPositionsConstant {
+    uint64_t dst;
+    uint64_t src;
+    uint32_t count;
+    bool use_16bit;
 };
 
 struct MaterialInfo {

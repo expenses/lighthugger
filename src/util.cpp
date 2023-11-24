@@ -28,3 +28,14 @@ std::vector<vk::raii::ImageView> create_swapchain_image_views(
 
     return views;
 }
+
+vk::DescriptorBufferInfo buffer_info(const AllocatedBuffer& buffer) {
+    return vk::DescriptorBufferInfo {
+        .buffer = buffer.buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE};
+}
+
+uint32_t dispatch_size(uint32_t width, uint32_t workgroup_size) {
+    return ((width - 1) / workgroup_size) + 1;
+}
