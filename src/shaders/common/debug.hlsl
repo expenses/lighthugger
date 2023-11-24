@@ -1,3 +1,4 @@
+#pragma once
 
 const static float3 DEBUG_COLOURS[10] = {
     float3(   0.0f/255.0f,   2.0f/255.0f,  91.0f/255.0f ),

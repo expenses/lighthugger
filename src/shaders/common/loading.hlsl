@@ -1,5 +1,5 @@
 #pragma once
-#include "../../shared_cpu_gpu.h"
+#include <shared_cpu_gpu.h>
 
 template<class T>
 T load_value(uint64_t address, uint32_t offset) {

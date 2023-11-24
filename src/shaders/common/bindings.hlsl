@@ -1,4 +1,5 @@
-#include "../../shared_cpu_gpu.h"
+#pragma once
+#include <shared_cpu_gpu.h>
 #include "loading.hlsl"
 
 [[vk::binding(0)]] Texture2D textures[];

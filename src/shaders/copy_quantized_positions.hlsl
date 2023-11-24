@@ -1,4 +1,4 @@
-#include "../shared_cpu_gpu.h"
+#include <shared_cpu_gpu.h>
 
 [[vk::push_constant]]
 CopyQuantizedPositionsConstant copy;

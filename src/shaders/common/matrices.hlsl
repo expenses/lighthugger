@@ -1,3 +1,4 @@
+#pragma once
 
 // Taken from https://www.geertarien.com/blog/2017/07/30/breakdown-of-the-lookAt-function-in-OpenGL/
 float4x4 lookAt(float3 eye, float3 at, float3 up) {
