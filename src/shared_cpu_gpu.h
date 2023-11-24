@@ -25,6 +25,7 @@ struct MeshInfo {
     // or a literal value.
     uint64_t material_indices;
     uint32_t num_indices;
+    uint32_t num_vertices;
     uint32_t type;
     float bounding_sphere_radius;
 };
@@ -37,6 +38,7 @@ struct MeshInfoWithUintBoundingSphereRadius {
     uint64_t material_info;
     uint64_t material_indices;
     uint32_t num_indices;
+    uint32_t num_vertices;
     uint32_t type;
     uint32_t bounding_sphere_radius;
 };

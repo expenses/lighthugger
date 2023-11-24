@@ -179,6 +179,7 @@ Mesh load_obj(
         .material_indices =
             device.getBufferAddress({.buffer = material_id_buffer.buffer}),
         .num_indices = static_cast<uint32_t>(indices.size()),
+        .num_vertices = static_cast<uint32_t>(attrib.vertices.size() / 3),
         .type = TYPE_NORMAL,
         .bounding_sphere_radius = bounding_sphere_radius,
     };
@@ -493,25 +494,28 @@ GltfMesh load_gltf(
                     );
                 };
 
+                auto get_accessor = [&](const char* name
+                                    ) -> fastgltf::Accessor& {
+                    auto iterator = primitive.findAttribute(name);
+                    assert(iterator != primitive.attributes.end());
+                    return asset.accessors[iterator->second];
+                };
+
                 auto material_index = primitive.materialIndex.value();
 
-                auto position_it = primitive.findAttribute("POSITION");
-                assert(position_it != primitive.attributes.end());
-                auto& position_accessor = asset.accessors[position_it->second];
-
+                auto& positions = get_accessor("POSITION");
                 assert(
-                    position_accessor.componentType
+                    positions.componentType
                     == fastgltf::ComponentType::UnsignedShort
                 );
-                assert(position_accessor.type == fastgltf::AccessorType::Vec3);
+                assert(positions.type == fastgltf::AccessorType::Vec3);
                 auto position_buffer = create_buffer(
-                    position_accessor.count * sizeof(uint16_t) * 3,
+                    positions.count * sizeof(uint16_t) * 3,
                     "positions"
                 );
                 {
                     auto& buffer_view =
-                        asset.bufferViews[position_accessor.bufferViewIndex
-                                              .value()];
+                        asset.bufferViews[positions.bufferViewIndex.value()];
 
                     copy_uint16_t4_to_uint16_3(
                         device,
@@ -519,7 +523,7 @@ GltfMesh load_gltf(
                         position_buffer,
                         staging_buffers[buffer_view.bufferIndex].buffer,
                         pipelines,
-                        position_accessor.count,
+                        positions.count,
                         buffer_view.byteOffset
                     );
                 }
@@ -541,9 +545,7 @@ GltfMesh load_gltf(
                     command_buffer
                 );
 
-                auto uvs_it = primitive.findAttribute("TEXCOORD_0");
-                assert(uvs_it != primitive.attributes.end());
-                auto& uvs = asset.accessors[uvs_it->second];
+                auto& uvs = get_accessor("TEXCOORD_0");
                 assert(
                     uvs.componentType == fastgltf::ComponentType::UnsignedShort
                 );
@@ -558,9 +560,7 @@ GltfMesh load_gltf(
                     command_buffer
                 );
 
-                auto normals_it = primitive.findAttribute("NORMAL");
-                assert(normals_it != primitive.attributes.end());
-                auto& normals = asset.accessors[normals_it->second];
+                auto& normals = get_accessor("NORMAL");
                 assert(normals.componentType == fastgltf::ComponentType::Byte);
                 assert(normals.type == fastgltf::AccessorType::Vec3);
                 auto normals_buffer = create_buffer(
@@ -592,6 +592,7 @@ GltfMesh load_gltf(
                     ),
                     .material_indices = material_index,
                     .num_indices = static_cast<uint32_t>(indices.count),
+                    .num_vertices = static_cast<uint32_t>(positions.count),
                     .type = TYPE_QUANITZED,
                     .bounding_sphere_radius = 0.0f};
 
@@ -612,7 +613,7 @@ GltfMesh load_gltf(
                     mesh_info_buffer,
                     pipelines,
                     temp_descriptor_sets,
-                    position_accessor.count
+                    positions.count
                 );
 
                 primitives.push_back(GltfPrimitive {

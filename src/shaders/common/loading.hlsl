@@ -33,6 +33,7 @@ MeshInfo load_mesh_info(uint64_t address) {
     info.material_info = load_value_and_increment_address<uint64_t>(address);
     info.material_indices = load_value_and_increment_address<uint64_t>(address);
     info.num_indices = load_value_and_increment_address<uint32_t>(address);
+    info.num_vertices = load_value_and_increment_address<uint32_t>(address);
     info.type = load_value_and_increment_address<uint32_t>(address);
     info.bounding_sphere_radius = load_value_and_increment_address<float>(address);
     return info;

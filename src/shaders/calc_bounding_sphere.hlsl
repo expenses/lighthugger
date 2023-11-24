@@ -5,8 +5,14 @@
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void calc_bounding_sphere(uint3 global_id: SV_DispatchThreadID) {
+    uint32_t index = global_id.x;
+
     MeshInfoWithUintBoundingSphereRadius mesh_info = mesh_info_buffer[0];
     float3 position;
+
+    if (index >= mesh_info.num_vertices) {
+        return;
+    }
 
     if (mesh_info.type == TYPE_QUANITZED) {
         position = float3(load_uint16_t3(mesh_info.positions, global_id.x));
