@@ -1,17 +1,6 @@
 #include "common/bindings.hlsl"
 #include "common/debug.hlsl"
-
-template<class T>
-T load_value(uint64_t address, uint32_t offset) {
-    return vk::RawBufferLoad<T>(address + sizeof(T) * offset);
-}
-
-MaterialInfo load_material_info(uint64_t address, uint32_t offset) {
-    uint64_t base_address = address + offset * sizeof(MaterialInfo);
-    MaterialInfo material_info;
-    material_info.albedo_texture_index = load_value<uint32_t>(base_address, 0);
-    return material_info;
-}
+#include "common/loading.hlsl"
 
 [shader("vertex")]
 float4 depth_only(
@@ -19,9 +8,18 @@ float4 depth_only(
 ): SV_Position
 {
     Instance instance = load_instance(instance_id);
+    MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
 
-    uint32_t offset = load_value<uint32_t>(instance.mesh_info.indices, vertex_id);
-    float3 position = load_value<float3>(instance.mesh_info.positions, offset);
+    float3 position;
+
+    uint32_t offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
+
+    if (mesh_info.type == 1) {
+        position = float3(load_value<uint16_t4>(mesh_info.positions, offset).xyz);
+    } else {
+        position = load_value<float3>(mesh_info.positions, offset);
+    }
+
     float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
 
     return mul(uniforms.combined_perspective_view, float4(world_pos, 1.0));
@@ -36,9 +34,18 @@ float4 shadow_pass(
 ): SV_Position
 {
     Instance instance = load_instance(instance_id);
+    MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
 
-    uint32_t offset = load_value<uint32_t>(instance.mesh_info.indices, vertex_id);
-    float3 position = load_value<float3>(instance.mesh_info.positions, offset);
+    float3 position;
+
+    uint32_t offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
+
+    if (mesh_info.type == 1) {
+        position = float3(load_value<uint16_t4>(mesh_info.positions, offset).xyz);
+    } else {
+        position = load_value<float3>(mesh_info.positions, offset);
+    }
+
     float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
 
     return mul(depth_info[0].shadow_rendering_matrices[shadow_constant.cascade_index], float4(world_pos, 1.0));
@@ -57,22 +64,41 @@ struct Varyings {
 Varyings VSMain(uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_InstanceID)
 {
     Instance instance = load_instance(instance_id);
-
-    uint32_t offset = load_value<uint32_t>(instance.mesh_info.indices, vertex_id);
-    uint16_t material_index = load_value<uint16_t>(instance.mesh_info.material_indices, offset);
-    float3 position = load_value<float3>(instance.mesh_info.positions, offset);
-    float3 normal = load_value<float3>(instance.mesh_info.normals, offset);
-
-    float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
-    normal = mul(instance.normal_transform, normal);
+    MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
 
     Varyings varyings;
-    varyings.clip_pos = mul(uniforms.combined_perspective_view, float4(world_pos, 1.0));
-    varyings.world_pos = world_pos;
-    varyings.normal = normal;
-    varyings.material_index = material_index;
-    varyings.uv = load_value<float2>(instance.mesh_info.uvs, offset);
     varyings.instance_index = instance_id;
+
+    uint32_t offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
+
+    float3 position;
+
+    if (mesh_info.type == 1) {
+        varyings.material_index = uint32_t(mesh_info.material_indices);
+
+        position = float3(load_value<uint16_t4>(mesh_info.positions, offset).xyz);
+        MaterialInfo material_info = load_material_info(mesh_info.material_info, varyings.material_index);
+        varyings.uv = float2(load_value<uint16_t2>(mesh_info.uvs, offset)) * material_info.albedo_texture_scale + material_info.albedo_texture_offset;
+
+        uint32_t normal_encoded = load_value<uint32_t>(mesh_info.normals, offset);
+
+        // Extract out the values and perform sign extension.
+        varyings.normal = normalize(float3(
+            int16_t(normal_encoded & 255) << 8 >> 8,
+            int16_t((normal_encoded >> 8) & 255) << 8 >> 8,
+            int16_t((normal_encoded >> 16) & 255) << 8 >> 8
+        ) / 128.0);
+    } else {
+        position = load_value<float3>(mesh_info.positions, offset);
+        varyings.normal = load_value<float3>(mesh_info.normals, offset);
+        varyings.uv = load_value<float2>(mesh_info.uvs, offset);
+        varyings.material_index = load_value<uint16_t>(mesh_info.material_indices, offset);
+    }
+
+    varyings.world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
+    varyings.normal = mul(instance.normal_transform, varyings.normal);
+    varyings.clip_pos = mul(uniforms.combined_perspective_view, float4(varyings.world_pos, 1.0));
+
     return varyings;
 }
 
@@ -89,7 +115,9 @@ void PSMain(
     [[vk::location(0)]] out float4 target_0: SV_Target0
 ) {
     Instance instance = load_instance(input.instance_index);
-    MaterialInfo material_info = load_material_info(instance.mesh_info.material_info, input.material_index);
+    MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
+
+    MaterialInfo material_info = load_material_info(mesh_info.material_info, input.material_index);
     uint32_t cascade_index;
     float4 shadow_coord = float4(0,0,0,0);
     for (cascade_index = 0; cascade_index < 4; cascade_index++) {

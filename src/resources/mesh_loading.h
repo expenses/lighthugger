@@ -24,13 +24,9 @@ struct Mesh {
     AllocatedBuffer material_ids;
     AllocatedBuffer uvs;
     AllocatedBuffer material_info;
+    AllocatedBuffer mesh_info;
     std::vector<ImageWithView> images;
     std::vector<uint32_t> image_indices;
-    uint32_t num_indices;
-    float bounding_sphere_radius;
-    BoundingBox bounding_box;
-
-    MeshInfo get_info(const vk::raii::Device& device);
 };
 
 Mesh load_obj(
@@ -43,8 +39,19 @@ Mesh load_obj(
     DescriptorSet& descriptor_set
 );
 
+struct GltfPrimitive {
+    AllocatedBuffer position;
+    AllocatedBuffer indices;
+    AllocatedBuffer uvs;
+    AllocatedBuffer normals;
+    AllocatedBuffer mesh_info;
+    glm::mat4 transform;
+};
+
 struct GltfMesh {
     std::vector<ImageWithView> images;
+    AllocatedBuffer material_info;
+    std::vector<GltfPrimitive> primitives;
 };
 
 GltfMesh load_gltf(
@@ -53,5 +60,6 @@ GltfMesh load_gltf(
     const vk::raii::Device& device,
     const vk::raii::CommandBuffer& command_buffer,
     uint32_t graphics_queue_family,
-    std::vector<AllocatedBuffer>& temp_buffers
+    std::vector<AllocatedBuffer>& temp_buffers,
+    DescriptorSet& descriptor_set
 );

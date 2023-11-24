@@ -4,10 +4,12 @@
     #define MATRIX4_TYPE float4x4
     #define MATRIX3_TYPE float3x3
     #define VEC3_TYPE float3
+    #define VEC2_TYPE float2
 #else
     #define MATRIX4_TYPE glm::mat4
     #define MATRIX3_TYPE glm::mat3
     #define VEC3_TYPE glm::vec3
+    #define VEC2_TYPE glm::vec2
 #endif
 
 struct MeshInfo {
@@ -15,9 +17,12 @@ struct MeshInfo {
     uint64_t indices;
     uint64_t normals;
     uint64_t uvs;
+    // Either the address of a material indices buffer
+    // or a literal value.
     uint64_t material_indices;
     uint64_t material_info;
     uint32_t num_indices;
+    uint32_t type;
     float bounding_sphere_radius;
 };
 
@@ -50,13 +55,13 @@ struct DrawIndirectCommand {
 
 struct Instance {
     MATRIX4_TYPE transform;
-    MeshInfo mesh_info;
+    uint64_t mesh_info_address;
     MATRIX3_TYPE normal_transform;
 
 #ifndef __HLSL_VERSION
-    Instance(glm::mat4 transform_, MeshInfo mesh_info_) :
+    Instance(glm::mat4 transform_, uint64_t mesh_info_address_) :
         transform(transform_),
-        mesh_info(mesh_info_) {
+        mesh_info_address(mesh_info_address_) {
         // Normally you want to do a transpose for this but for hlsl you don't seem to need to. Not sure why.
         normal_transform = glm::mat3(glm::inverse(transform));
     }
@@ -71,6 +76,14 @@ struct DisplayTransformConstant {
     uint32_t swapchain_image_index;
 };
 
+struct SetupConstant {
+    uint64_t mesh_info_address;
+};
+
 struct MaterialInfo {
     uint32_t albedo_texture_index;
+    VEC2_TYPE albedo_texture_scale;
+    VEC2_TYPE albedo_texture_offset;
 };
+
+enum IndexType { Uint16, Uint32 };

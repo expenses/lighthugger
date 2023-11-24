@@ -168,6 +168,32 @@ Mesh load_obj(
         temp_buffers
     );
 
+    auto mesh_info = MeshInfo {
+        .positions =
+            device.getBufferAddress({.buffer = position_buffer.buffer}),
+        .indices = device.getBufferAddress({.buffer = index_buffer.buffer}),
+        .normals = device.getBufferAddress({.buffer = normal_buffer.buffer}),
+        .uvs = device.getBufferAddress({.buffer = uv_buffer.buffer}),
+        .material_indices =
+            device.getBufferAddress({.buffer = material_id_buffer.buffer}),
+        .material_info =
+            device.getBufferAddress({.buffer = material_info_buffer.buffer}),
+        .num_indices = static_cast<uint32_t>(indices.size()),
+        .type = 0,
+        .bounding_sphere_radius = bounding_sphere_radius,
+    };
+
+    auto mesh_info_buffer = upload_via_staging_buffer(
+        &mesh_info,
+        sizeof(MeshInfo),
+        allocator,
+        vk::BufferUsageFlagBits::eStorageBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        std::string(filepath) + " mesh info buffer",
+        command_buffer,
+        temp_buffers
+    );
+
     return {
         .positions = std::move(position_buffer),
         .indices = std::move(index_buffer),
@@ -175,25 +201,69 @@ Mesh load_obj(
         .material_ids = std::move(material_id_buffer),
         .uvs = std::move(uv_buffer),
         .material_info = std::move(material_info_buffer),
+        .mesh_info = std::move(mesh_info_buffer),
         .images = std::move(images),
-        .image_indices = image_indices,
-        .num_indices = static_cast<uint32_t>(indices.size()),
-        .bounding_sphere_radius = bounding_sphere_radius,
-        .bounding_box = bounding_box};
+        .image_indices = image_indices};
 }
 
-MeshInfo Mesh::get_info(const vk::raii::Device& device) {
-    return {
-        .positions = device.getBufferAddress({.buffer = positions.buffer}),
-        .indices = device.getBufferAddress({.buffer = indices.buffer}),
-        .normals = device.getBufferAddress({.buffer = normals.buffer}),
-        .uvs = device.getBufferAddress({.buffer = uvs.buffer}),
-        .material_indices =
-            device.getBufferAddress({.buffer = material_ids.buffer}),
-        .material_info =
-            device.getBufferAddress({.buffer = material_info.buffer}),
-        .num_indices = num_indices,
-        .bounding_sphere_radius = bounding_sphere_radius};
+struct NodeTreeNode {
+    glm::mat4 transform = glm::mat4(1);
+    size_t parent = std::numeric_limits<size_t>::max();
+};
+
+struct NodeTree {
+    std::vector<NodeTreeNode> inner;
+
+    NodeTree(const fastgltf::Asset& asset) : inner(asset.nodes.size()) {
+        for (size_t i = 0; i < asset.nodes.size(); i++) {
+            auto& gltf_node = asset.nodes[i];
+
+            if (auto* trs =
+                    std::get_if<fastgltf::Node::TRS>(&gltf_node.transform)) {
+                inner[i].transform = glm::translate(
+                    glm::scale(
+                        glm::mat4(1.0),
+                        glm::vec3(trs->scale[0], trs->scale[1], trs->scale[2])
+                    ),
+                    glm::vec3(
+                        trs->translation[0],
+                        trs->translation[1],
+                        trs->translation[2]
+                    )
+                );
+            }
+        }
+    }
+
+    glm::mat4 transform_of(size_t index) {
+        glm::mat4 transform_sum = glm::mat4(1.0);
+
+        while (index != std::numeric_limits<size_t>::max()) {
+            auto node = inner[index];
+            transform_sum = node.transform * transform_sum;
+            index = node.parent;
+        }
+
+        return transform_sum;
+    }
+};
+
+void copy_buffer_to_final(
+    const fastgltf::Accessor& accessor,
+    const fastgltf::Asset& asset,
+    const std::vector<PersistentlyMappedBuffer>& staging_buffers,
+    const AllocatedBuffer& final_buffer,
+    const vk::raii::CommandBuffer& command_buffer
+) {
+    auto& buffer_view = asset.bufferViews[accessor.bufferViewIndex.value()];
+    command_buffer.copyBuffer(
+        staging_buffers[buffer_view.bufferIndex].buffer.buffer,
+        final_buffer.buffer,
+        {vk::BufferCopy {
+            .srcOffset = buffer_view.byteOffset,
+            .dstOffset = 0,
+            .size = buffer_view.byteLength}}
+    );
 }
 
 GltfMesh load_gltf(
@@ -202,7 +272,8 @@ GltfMesh load_gltf(
     const vk::raii::Device& device,
     const vk::raii::CommandBuffer& command_buffer,
     uint32_t graphics_queue_family,
-    std::vector<AllocatedBuffer>& temp_buffers
+    std::vector<AllocatedBuffer>& temp_buffers,
+    DescriptorSet& descriptor_set
 ) {
     fastgltf::Parser parser(fastgltf::Extensions::KHR_mesh_quantization);
     fastgltf::GltfDataBuffer data;
@@ -223,28 +294,257 @@ GltfMesh load_gltf(
     auto error = fastgltf::validate(asset);
     assert(error == fastgltf::Error::None);
 
+    std::vector<PersistentlyMappedBuffer> staging_buffers;
+    staging_buffers.reserve(asset.buffers.size());
+    for (auto& buffer : asset.buffers) {
+        if (auto* uri = std::get_if<fastgltf::sources::URI>(&buffer.data)) {
+            std::ifstream stream(
+                parent_path / uri->uri.fspath(),
+                std::ios::binary
+            );
+            auto staging_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
+                vk::BufferCreateInfo {
+                    .size = buffer.byteLength,
+                    .usage = vk::BufferUsageFlagBits::eTransferSrc},
+                {
+                    .flags = vma::AllocationCreateFlagBits::eMapped
+                        | vma::AllocationCreateFlagBits::
+                            eHostAccessSequentialWrite,
+                    .usage = vma::MemoryUsage::eAuto,
+                },
+                allocator,
+                uri->uri.fspath()
+            ));
+            stream.read(
+                reinterpret_cast<char*>(staging_buffer.mapped_ptr),
+                static_cast<std::streamsize>(buffer.byteLength)
+            );
+            staging_buffers.push_back(std::move(staging_buffer));
+        } else {
+            dbg("here");
+            abort();
+        }
+    }
+
     std::vector<ImageWithView> images;
+    std::vector<uint32_t> image_indices;
+    images.reserve(asset.images.size());
+    image_indices.reserve(asset.images.size());
 
     for (auto& img : asset.images) {
-        std::visit(
-            fastgltf::visitor {
-                [&](fastgltf::sources::URI& filePath) {
-                    auto image_path = parent_path / filePath.uri.fspath();
-                    assert(image_path.extension() == ".ktx2");
-                    images.push_back(load_ktx2_image(
-                        image_path,
-                        allocator,
-                        device,
-                        command_buffer,
-                        graphics_queue_family,
-                        temp_buffers
-                    ));
-                },
-                [](auto&) { assert(false); },
-            },
-            img.data
+        if (auto* uri = std::get_if<fastgltf::sources::URI>(&img.data)) {
+            auto image_path = parent_path / uri->uri.fspath();
+            assert(image_path.extension() == ".ktx2");
+            auto image = load_ktx2_image(
+                image_path,
+                allocator,
+                device,
+                command_buffer,
+                graphics_queue_family,
+                temp_buffers
+            );
+            auto index = descriptor_set.write_image(image, *device);
+            images.push_back(std::move(image));
+            image_indices.push_back(index);
+        }
+    }
+
+    std::vector<MaterialInfo> material_info;
+    material_info.reserve(asset.materials.size());
+
+    for (auto& material : asset.materials) {
+        material_info.push_back(
+            {.albedo_texture_index =
+                 image_indices[material.pbrData.baseColorTexture.value()
+                                   .textureIndex],
+             .albedo_texture_scale = glm::vec2(0.000242184135, 0.000240402936),
+             .albedo_texture_offset = glm::vec2(0.0036249999, 0.00644397736)}
         );
     }
 
-    return {.images = std::move(images)};
+    auto material_info_buffer = upload_via_staging_buffer(
+        material_info.data(),
+        material_info.size() * sizeof(MaterialInfo),
+        allocator,
+        vk::BufferUsageFlagBits::eStorageBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        std::string(filepath) + " material info buffer",
+        command_buffer,
+        temp_buffers
+    );
+
+    auto node_tree = NodeTree(asset);
+
+    std::vector<GltfPrimitive> primitives;
+
+    for (size_t i = 0; i < asset.nodes.size(); i++) {
+        auto& node = asset.nodes[i];
+
+        if (node.meshIndex) {
+            auto transform = node_tree.transform_of(i);
+
+            auto& mesh = asset.meshes[node.meshIndex.value()];
+
+            for (auto& primitive : mesh.primitives) {
+                auto material_index = primitive.materialIndex.value();
+
+                auto position_it = primitive.findAttribute("POSITION");
+                assert(position_it != primitive.attributes.end());
+                auto& position_accessor = asset.accessors[position_it->second];
+
+                assert(
+                    position_accessor.componentType
+                    == fastgltf::ComponentType::UnsignedShort
+                );
+                assert(position_accessor.type == fastgltf::AccessorType::Vec3);
+                auto position_buffer = AllocatedBuffer(
+                    vk::BufferCreateInfo {
+                        .size = position_accessor.count * sizeof(uint16_t) * 4,
+                        .usage = vk::BufferUsageFlagBits::eTransferDst
+                            | vk::BufferUsageFlagBits::eStorageBuffer
+                            | vk::BufferUsageFlagBits::eShaderDeviceAddress},
+                    {
+                        .usage = vma::MemoryUsage::eAuto,
+                    },
+                    allocator,
+                    std::string(filepath) + " positions"
+                );
+                copy_buffer_to_final(
+                    position_accessor,
+                    asset,
+                    staging_buffers,
+                    position_buffer,
+                    command_buffer
+                );
+
+                auto& indices =
+                    asset.accessors[primitive.indicesAccessor.value()];
+
+                assert(
+                    indices.componentType
+                    == fastgltf::ComponentType::UnsignedInt
+                );
+                assert(indices.type == fastgltf::AccessorType::Scalar);
+                auto indices_buffer = AllocatedBuffer(
+                    vk::BufferCreateInfo {
+                        .size = indices.count * sizeof(uint32_t),
+                        .usage = vk::BufferUsageFlagBits::eTransferDst
+                            | vk::BufferUsageFlagBits::eStorageBuffer
+                            | vk::BufferUsageFlagBits::eShaderDeviceAddress},
+                    {
+                        .usage = vma::MemoryUsage::eAuto,
+                    },
+                    allocator,
+                    std::string(filepath) + " indices"
+                );
+                copy_buffer_to_final(
+                    indices,
+                    asset,
+                    staging_buffers,
+                    indices_buffer,
+                    command_buffer
+                );
+
+                auto uvs_it = primitive.findAttribute("TEXCOORD_0");
+                assert(uvs_it != primitive.attributes.end());
+                auto& uvs = asset.accessors[uvs_it->second];
+                assert(
+                    uvs.componentType == fastgltf::ComponentType::UnsignedShort
+                );
+                assert(uvs.type == fastgltf::AccessorType::Vec2);
+                auto uvs_buffer = AllocatedBuffer(
+                    vk::BufferCreateInfo {
+                        .size = uvs.count * sizeof(uint16_t) * 2,
+                        .usage = vk::BufferUsageFlagBits::eTransferDst
+                            | vk::BufferUsageFlagBits::eStorageBuffer
+                            | vk::BufferUsageFlagBits::eShaderDeviceAddress},
+                    {
+                        .usage = vma::MemoryUsage::eAuto,
+                    },
+                    allocator,
+                    std::string(filepath) + " uvs"
+                );
+                copy_buffer_to_final(
+                    uvs,
+                    asset,
+                    staging_buffers,
+                    uvs_buffer,
+                    command_buffer
+                );
+
+                auto normals_it = primitive.findAttribute("NORMAL");
+                assert(normals_it != primitive.attributes.end());
+                auto& normals = asset.accessors[normals_it->second];
+                assert(normals.componentType == fastgltf::ComponentType::Byte);
+                assert(normals.type == fastgltf::AccessorType::Vec3);
+                auto normals_buffer = AllocatedBuffer(
+                    vk::BufferCreateInfo {
+                        .size = normals.count * sizeof(int8_t) * 4,
+                        .usage = vk::BufferUsageFlagBits::eTransferDst
+                            | vk::BufferUsageFlagBits::eStorageBuffer
+                            | vk::BufferUsageFlagBits::eShaderDeviceAddress},
+                    {
+                        .usage = vma::MemoryUsage::eAuto,
+                    },
+                    allocator,
+                    std::string(filepath) + " normals"
+                );
+                copy_buffer_to_final(
+                    normals,
+                    asset,
+                    staging_buffers,
+                    normals_buffer,
+                    command_buffer
+                );
+
+                auto mesh_info = MeshInfo {
+                    .positions = device.getBufferAddress(
+                        {.buffer = position_buffer.buffer}
+                    ),
+                    .indices = device.getBufferAddress(
+                        {.buffer = indices_buffer.buffer}
+                    ),
+                    .normals = device.getBufferAddress(
+                        {.buffer = normals_buffer.buffer}
+                    ),
+                    .uvs =
+                        device.getBufferAddress({.buffer = uvs_buffer.buffer}),
+                    .material_indices = material_index,
+                    .material_info = device.getBufferAddress(
+                        {.buffer = material_info_buffer.buffer}
+                    ),
+                    .num_indices = static_cast<uint32_t>(indices.count),
+                    .type = 1,
+                    .bounding_sphere_radius = 0.0f};
+
+                auto mesh_info_buffer = upload_via_staging_buffer(
+                    &mesh_info,
+                    sizeof(MeshInfo),
+                    allocator,
+                    vk::BufferUsageFlagBits::eStorageBuffer
+                        | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                    std::string(filepath) + " mesh info buffer",
+                    command_buffer,
+                    temp_buffers
+                );
+
+                primitives.push_back(GltfPrimitive {
+                    .position = std::move(position_buffer),
+                    .indices = std::move(indices_buffer),
+                    .uvs = std::move(uvs_buffer),
+                    .normals = std::move(normals_buffer),
+                    .mesh_info = std::move(mesh_info_buffer),
+                    .transform = transform});
+            }
+        }
+    }
+
+    for (auto& staging_buffer : staging_buffers) {
+        temp_buffers.push_back(std::move(staging_buffer.buffer));
+    }
+
+    return {
+        .images = std::move(images),
+        .material_info = std::move(material_info_buffer),
+        .primitives = std::move(primitives)};
 }

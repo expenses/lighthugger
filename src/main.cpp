@@ -299,8 +299,10 @@ int main() {
         device,
         command_buffer,
         graphics_queue_family,
-        temp_buffers
+        temp_buffers,
+        descriptor_set
     );
+    dbg(sizeof(Instance));
 
     // Load all resources
 
@@ -362,22 +364,33 @@ int main() {
         create_shadow_view(2),
         create_shadow_view(3)};
 
-    auto powerplant_info = powerplant.get_info(device);
+    auto powerplant_info_address =
+        device.getBufferAddress({.buffer = powerplant.mesh_info.buffer});
+
     auto instances = std::array {
         Instance(
             glm::translate(glm::mat4(1), glm::vec3(0, 0, 0)),
-            powerplant_info
+            powerplant_info_address
         ),
         Instance(
             glm::translate(glm::mat4(1), glm::vec3(0, 0, 100)),
-            powerplant_info
+            powerplant_info_address
         ),
         Instance(
             glm::translate(
                 glm::rotate(glm::mat4(1), 180.0f, glm::vec3(0, 1, 0)),
                 glm::vec3(200, 0, 0)
             ),
-            powerplant_info
+            powerplant_info_address
+        ),
+        Instance(
+            glm::translate(
+                glm::mat4(1),//glm::scale(helmet.primitives[0].transform, glm::vec3(20)),
+                glm::vec3(0, 50, 0)
+            ) * helmet.primitives[0].transform,
+            device.getBufferAddress(
+                {.buffer = helmet.primitives[0].mesh_info.buffer}
+            )
         )};
 
     auto resources = Resources {
@@ -497,8 +510,10 @@ int main() {
     descriptor_set.write_descriptors(resources, device, swapchain_image_views);
 
     auto camera_params = CameraParams {
-        .position = glm::vec3(-86.5, 15.5, -17.0),
+        .position = glm::vec3(-207.7, 121.7, -94.8),
         .fov = 45.0f,
+        .yaw = 0.74,
+        .pitch = -0.35,
         .sun_latitude = -2.555f,
         .sun_longitude = 0.3f,
     };
@@ -650,10 +665,10 @@ int main() {
             ImGui::Text("sun_latitude: %f", camera_params.sun_latitude);
             ImGui::Text("sun_longitude: %f", camera_params.sun_longitude);
             ImGui::Text("grab_toggled: %u", keyboard_state.grab_toggled);
-            ImGui::Text(
-                "powerplant bounding sphere rad: %f",
-                powerplant.bounding_sphere_radius
-            );
+            //ImGui::Text(
+            //    "powerplant bounding sphere rad: %f",
+            //    powerplant.bounding_sphere_radius
+            //);
         }
         ImGui::Render();
 
