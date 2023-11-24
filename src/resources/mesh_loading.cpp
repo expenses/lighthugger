@@ -335,8 +335,7 @@ void copy_uint16_t4_to_uint16_3(
     const AllocatedBuffer& copy_src,
     const Pipelines& pipelines,
     uint32_t count,
-    uint32_t src_offset,
-    bool use_16bit
+    uint32_t src_offset
 ) {
     command_buffer.bindPipeline(
         vk::PipelineBindPoint::eCompute,
@@ -350,8 +349,7 @@ void copy_uint16_t4_to_uint16_3(
           .src =
               device.getBufferAddress({.buffer = copy_src.buffer}) + src_offset,
 
-          .count = count,
-          .use_16bit = use_16bit}}
+          .count = count}}
     );
     command_buffer.dispatch(dispatch_size(count, 64), 1, 1);
 }
@@ -522,8 +520,7 @@ GltfMesh load_gltf(
                         staging_buffers[buffer_view.bufferIndex].buffer,
                         pipelines,
                         position_accessor.count,
-                        buffer_view.byteOffset,
-                        true
+                        buffer_view.byteOffset
                     );
                 }
 
@@ -577,24 +574,6 @@ GltfMesh load_gltf(
                     normals_buffer,
                     command_buffer
                 );
-                /*
-                // See copy_quantized_positions.hlsl.
-                {
-                    auto& buffer_view =
-                        asset.bufferViews[normals.bufferViewIndex
-                                              .value()];
-
-                    copy_uint16_t4_to_uint16_3(
-                        device,
-                        command_buffer,
-                        normals_buffer,
-                        staging_buffers[buffer_view.bufferIndex].buffer,
-                        pipelines,
-                        normals.count,
-                        buffer_view.byteOffset,
-                        false
-                    );
-                }*/
 
                 auto mesh_info = MeshInfo {
                     .positions = device.getBufferAddress(

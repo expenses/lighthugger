@@ -95,7 +95,6 @@ struct CopyQuantizedPositionsConstant {
     uint64_t dst;
     uint64_t src;
     uint32_t count;
-    bool use_16bit;
 };
 
 struct MaterialInfo {
