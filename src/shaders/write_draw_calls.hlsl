@@ -35,7 +35,7 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
 
     // Cull any objects completely behind the camera.
     if (sphere_center.z + bounding_sphere_radius <= z_near) {
-        //return;
+        return;
     }
 
     // todo: cull on vertical and horizontal planes.

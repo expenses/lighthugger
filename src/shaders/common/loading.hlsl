@@ -1,3 +1,4 @@
+#pragma once
 #include "../../shared_cpu_gpu.h"
 
 template<class T>
@@ -6,7 +7,7 @@ T load_value(uint64_t address, uint32_t offset) {
 }
 
 template<class T>
-T load_value_offset_zero(inout uint64_t address) {
+T load_value_and_increment_address(inout uint64_t address) {
     uint64_t load_address = address;
     // Update the address by sizeof(T) to help with the loading functions below.
     address += sizeof(T);
@@ -17,28 +18,28 @@ T load_value_offset_zero(inout uint64_t address) {
 MaterialInfo load_material_info(uint64_t address, uint32_t offset) {
     address += offset * sizeof(MaterialInfo);
     MaterialInfo material_info;
-    material_info.albedo_texture_index = load_value_offset_zero<uint32_t>(address);
-    material_info.albedo_texture_scale = load_value_offset_zero<float2>(address);
-    material_info.albedo_texture_offset = load_value_offset_zero<float2>(address);
+    material_info.albedo_texture_index = load_value_and_increment_address<uint32_t>(address);
+    material_info.albedo_texture_scale = load_value_and_increment_address<float2>(address);
+    material_info.albedo_texture_offset = load_value_and_increment_address<float2>(address);
     return material_info;
 }
 
 MeshInfo load_mesh_info(uint64_t address) {
     MeshInfo info;
-    info.positions = load_value_offset_zero<uint64_t>(address);
-    info.indices = load_value_offset_zero<uint64_t>(address);
-    info.normals = load_value_offset_zero<uint64_t>(address);
-    info.uvs = load_value_offset_zero<uint64_t>(address);
-    info.material_info = load_value_offset_zero<uint64_t>(address);
-    info.material_indices = load_value_offset_zero<uint64_t>(address);
-    info.num_indices = load_value_offset_zero<uint32_t>(address);
-    info.type = load_value_offset_zero<uint32_t>(address);
-    info.bounding_sphere_radius = load_value_offset_zero<float>(address);
+    info.positions = load_value_and_increment_address<uint64_t>(address);
+    info.indices = load_value_and_increment_address<uint64_t>(address);
+    info.normals = load_value_and_increment_address<uint64_t>(address);
+    info.uvs = load_value_and_increment_address<uint64_t>(address);
+    info.material_info = load_value_and_increment_address<uint64_t>(address);
+    info.material_indices = load_value_and_increment_address<uint64_t>(address);
+    info.num_indices = load_value_and_increment_address<uint32_t>(address);
+    info.type = load_value_and_increment_address<uint32_t>(address);
+    info.bounding_sphere_radius = load_value_and_increment_address<float>(address);
     return info;
 }
 
 template<class T>
-T load_value(ByteAddressBuffer byte_address_buffer, inout uint32_t offset) {
+T load_value_and_increment_offset(ByteAddressBuffer byte_address_buffer, inout uint32_t offset) {
     uint32_t load_offset = offset;
     // Update the offset by sizeof(T) to help with the loading functions below.
     offset += sizeof(T);
@@ -46,7 +47,7 @@ T load_value(ByteAddressBuffer byte_address_buffer, inout uint32_t offset) {
 }
 
 template<class T>
-T load_value(RWByteAddressBuffer byte_address_buffer, inout uint32_t offset) {
+T load_value_and_increment_offset(RWByteAddressBuffer byte_address_buffer, inout uint32_t offset) {
     uint32_t load_offset = offset;
     // Update the offset by sizeof(T) to help with the loading functions below.
     offset += sizeof(T);

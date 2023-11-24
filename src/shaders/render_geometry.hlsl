@@ -157,6 +157,4 @@ void PSMain(
         float3 debug_col = DEBUG_COLOURS[cascade_index];
         target_0 = float4(albedo * debug_col, 1.0);
     }
-
-    //target_0 = float4(normal * 0.5 + 0.5, 1.0);
 }

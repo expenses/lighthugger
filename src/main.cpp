@@ -669,10 +669,6 @@ int main() {
             ImGui::Text("sun_latitude: %f", camera_params.sun_latitude);
             ImGui::Text("sun_longitude: %f", camera_params.sun_longitude);
             ImGui::Text("grab_toggled: %u", keyboard_state.grab_toggled);
-            //ImGui::Text(
-            //    "powerplant bounding sphere rad: %f",
-            //    powerplant.bounding_sphere_radius
-            //);
         }
         ImGui::Render();
 

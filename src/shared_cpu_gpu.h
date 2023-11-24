@@ -91,10 +91,6 @@ struct DisplayTransformConstant {
     uint32_t swapchain_image_index;
 };
 
-struct SetupConstant {
-    uint64_t mesh_info_address;
-};
-
 struct CopyQuantizedPositionsConstant {
     uint64_t dst;
     uint64_t src;
@@ -107,5 +103,3 @@ struct MaterialInfo {
     VEC2_TYPE albedo_texture_scale;
     VEC2_TYPE albedo_texture_offset;
 };
-
-enum IndexType { Uint16, Uint32 };

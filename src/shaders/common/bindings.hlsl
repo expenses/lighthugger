@@ -1,4 +1,5 @@
 #include "../../shared_cpu_gpu.h"
+#include "loading.hlsl"
 
 [[vk::binding(0)]] Texture2D textures[];
 [[vk::binding(1)]] ByteAddressBuffer instances;
@@ -21,15 +22,13 @@
 Instance load_instance(uint32_t offset) {
     uint32_t packed_instance_size = 112;
     offset = offset * packed_instance_size;
-    Instance instance;// = instances.Load<Instance>(offset);
-    instance.transform = instances.Load<float4x4>(offset);
-    offset += sizeof(float4x4);
-    instance.mesh_info_address = instances.Load<uint64_t>(offset);
-    offset += sizeof(uint64_t);
+    Instance instance;
+    instance.transform = load_value_and_increment_offset<float4x4>(instances, offset);
+    instance.mesh_info_address = load_value_and_increment_offset<uint64_t>(instances, offset);
     instance.normal_transform = float3x3(
-        instances.Load<float3>(offset),
-        instances.Load<float3>(offset + sizeof(float3)),
-        instances.Load<float3>(offset + sizeof(float3) * 2)
+        load_value_and_increment_offset<float3>(instances, offset),
+        load_value_and_increment_offset<float3>(instances, offset),
+        load_value_and_increment_offset<float3>(instances, offset)
     );
     return instance;
 }

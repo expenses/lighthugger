@@ -49,11 +49,6 @@ struct GltfPrimitive {
     glm::mat4 transform;
 };
 
-struct DescriptorPoolAndSet {
-    vk::raii::DescriptorPool pool;
-    vk::raii::DescriptorSet set;
-};
-
 struct GltfMesh {
     std::vector<ImageWithView> images;
     AllocatedBuffer material_info;

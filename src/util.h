@@ -29,3 +29,8 @@ std::vector<vk::raii::ImageView> create_swapchain_image_views(
 vk::DescriptorBufferInfo buffer_info(const AllocatedBuffer& buffer);
 
 uint32_t dispatch_size(uint32_t width, uint32_t workgroup_size);
+
+struct DescriptorPoolAndSet {
+    vk::raii::DescriptorPool pool;
+    vk::raii::DescriptorSet set;
+};
