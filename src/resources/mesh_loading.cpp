@@ -220,6 +220,7 @@ struct NodeTree {
 
             if (auto* trs =
                     std::get_if<fastgltf::Node::TRS>(&gltf_node.transform)) {
+                // todo: these are probably not correct.
                 inner[i].transform = glm::translate(
                     glm::scale(
                         glm::mat4(1.0),
