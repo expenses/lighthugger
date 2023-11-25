@@ -55,7 +55,7 @@ void render(
         );
         // Zero out both the max depth and the draw call counts.
         command_buffer
-            .fillBuffer(resources.misc_storage_buffer.buffer, offset + 4, 8, 0);
+            .fillBuffer(resources.misc_storage_buffer.buffer, offset + 4, 12, 0);
     }
 
     set_scissor_and_viewport(command_buffer, extent.width, extent.height);
@@ -163,6 +163,14 @@ void render(
             resources.max_num_draws,
             sizeof(vk::DrawIndirectCommand)
         );
+        command_buffer.drawIndirectCount(
+            resources.draw_calls_buffer.buffer,
+            512 * sizeof(vk::DrawIndirectCommand),
+            resources.misc_storage_buffer.buffer,
+            draw_call_counts_offset + 4,
+            resources.max_num_draws,
+            sizeof(vk::DrawIndirectCommand)
+        );
         command_buffer.endRendering();
     }
 
@@ -243,6 +251,14 @@ void render(
                 resources.max_num_draws,
                 sizeof(vk::DrawIndirectCommand)
             );
+            command_buffer.drawIndirectCount(
+                resources.draw_calls_buffer.buffer,
+                512 * sizeof(vk::DrawIndirectCommand),
+                resources.misc_storage_buffer.buffer,
+                draw_call_counts_offset + 4,
+                resources.max_num_draws,
+                sizeof(vk::DrawIndirectCommand)
+            );
             command_buffer.endRendering();
         }
     }
@@ -305,6 +321,14 @@ void render(
             0,
             resources.misc_storage_buffer.buffer,
             draw_call_counts_offset,
+            resources.max_num_draws,
+            sizeof(vk::DrawIndirectCommand)
+        );
+        command_buffer.drawIndirectCount(
+            resources.draw_calls_buffer.buffer,
+            512 * sizeof(vk::DrawIndirectCommand),
+            resources.misc_storage_buffer.buffer,
+            draw_call_counts_offset + 4,
             resources.max_num_draws,
             sizeof(vk::DrawIndirectCommand)
         );

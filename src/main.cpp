@@ -435,7 +435,7 @@ int main() {
             allocator,
             "draw_calls_buffer"
         ),
-        .max_num_draws = 1024,
+        .max_num_draws = 1024 / 2,
         .shadowmap_layer_views = std::move(shadowmap_layer_views),
         .display_transform_lut = load_dds(
             "external/tony-mc-mapface/shader/tony_mc_mapface.dds",
