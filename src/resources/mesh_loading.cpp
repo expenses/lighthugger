@@ -633,6 +633,7 @@ GltfMesh load_gltf(
 
     return {
         .images = std::move(images),
+        .image_indices = std::move(image_indices),
         .material_info = std::move(material_info_buffer),
         .primitives = std::move(primitives)};
 }

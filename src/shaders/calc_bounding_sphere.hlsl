@@ -1,5 +1,7 @@
 #include "common/loading.hlsl"
 
+// Todo: can we use atomic max with buffer device address
+// and get rid of this binding?
 [[vk::binding(0)]] RWStructuredBuffer<MeshInfoWithUintBoundingSphereRadius> mesh_info_buffer;
 
 [shader("compute")]

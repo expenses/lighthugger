@@ -51,6 +51,7 @@ struct GltfPrimitive {
 
 struct GltfMesh {
     std::vector<ImageWithView> images;
+    std::vector<uint32_t> image_indices;
     AllocatedBuffer material_info;
     std::vector<GltfPrimitive> primitives;
 };
