@@ -12,9 +12,15 @@ float4 depth_only(
 
     float3 position;
 
-    uint32_t offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
+    uint32_t offset;
 
-    if (mesh_info.type == TYPE_QUANITZED) {
+    if (mesh_info.type & MESH_INFO_FLAGS_32_BIT_INDICES) {
+        offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
+    } else {
+        offset = load_value<uint16_t>(mesh_info.indices, vertex_id);
+    }
+
+    if (mesh_info.type & MESH_INFO_FLAGS_QUANTIZED) {
         position = float3(load_uint16_t3(mesh_info.positions, offset));
     } else {
         position = load_value<float3>(mesh_info.positions, offset);
@@ -38,9 +44,15 @@ float4 shadow_pass(
 
     float3 position;
 
-    uint32_t offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
+    uint32_t offset;
 
-    if (mesh_info.type == TYPE_QUANITZED) {
+    if (mesh_info.type & MESH_INFO_FLAGS_32_BIT_INDICES) {
+        offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
+    } else {
+        offset = load_value<uint16_t>(mesh_info.indices, vertex_id);
+    }
+
+    if (mesh_info.type & MESH_INFO_FLAGS_QUANTIZED) {
         position = float3(load_uint16_t3(mesh_info.positions, offset));
     } else {
         position = load_value<float3>(mesh_info.positions, offset);
@@ -69,11 +81,17 @@ Varyings VSMain(uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_Insta
     Varyings varyings;
     varyings.instance_index = instance_id;
 
-    uint32_t offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
+    uint32_t offset;
+
+    if (mesh_info.type & MESH_INFO_FLAGS_32_BIT_INDICES) {
+        offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
+    } else {
+        offset = load_value<uint16_t>(mesh_info.indices, vertex_id);
+    }
 
     float3 position;
 
-    if (mesh_info.type == TYPE_QUANITZED) {
+    if (mesh_info.type & MESH_INFO_FLAGS_QUANTIZED) {
         varyings.material_index = uint32_t(mesh_info.material_indices);
 
         position = float3(load_uint16_t3(mesh_info.positions, offset));
@@ -104,6 +122,12 @@ static const float4x4 bias_matrix = float4x4(
     0.0, 0.0, 0.0, 1.0
 );
 
+struct Material {
+    float3 albedo;
+    float metallic;
+    float roughness;
+};
+
 [shader("pixel")]
 void PSMain(
     Varyings input,
@@ -112,7 +136,6 @@ void PSMain(
     Instance instance = load_instance(input.instance_index);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
 
-    MaterialInfo material_info = load_material_info(mesh_info.material_info, input.material_index);
     uint32_t cascade_index;
     float4 shadow_coord = float4(0,0,0,0);
     for (cascade_index = 0; cascade_index < 4; cascade_index++) {
@@ -140,21 +163,31 @@ void PSMain(
     }
     shadow_sum /= 9.0;
 
+    if (shadow_view_coord.z > 1) {
+        shadow_sum = 1.0;
+    }
+
+    MaterialInfo material_info = load_material_info(mesh_info.material_info, input.material_index);
+    Material material;
+
     float3 normal = normalize(input.normal);
 
     float n_dot_l = max(dot(uniforms.sun_dir, normal), 0.0);
-    float3 albedo = textures[material_info.albedo_texture_index].Sample(repeat_sampler, input.uv).rgb;
+    material.albedo = textures[material_info.albedo_texture_index].Sample(repeat_sampler, input.uv).rgb;
+    float2 metallic_roughness = textures[material_info.metallic_roughness_texture_index].Sample(repeat_sampler, input.uv).yx;
+    material.roughness = metallic_roughness.x;
+    material.metallic = metallic_roughness.y;
 
     float ambient = 0.05;
 
     float3 lighting = max(n_dot_l * shadow_sum * uniforms.sun_intensity, ambient);
 
-    float3 diffuse = albedo * lighting;
+    float3 diffuse = material.albedo * lighting;
 
     target_0 = float4(diffuse, 1.0);
 
     if (uniforms.debug_cascades) {
         float3 debug_col = DEBUG_COLOURS[cascade_index];
-        target_0 = float4(albedo * debug_col, 1.0);
+        target_0 = float4(material.albedo * debug_col, 1.0);
     }
 }

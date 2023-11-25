@@ -180,7 +180,7 @@ Mesh load_obj(
             device.getBufferAddress({.buffer = material_id_buffer.buffer}),
         .num_indices = static_cast<uint32_t>(indices.size()),
         .num_vertices = static_cast<uint32_t>(attrib.vertices.size() / 3),
-        .type = TYPE_NORMAL,
+        .type = MESH_INFO_FLAGS_32_BIT_INDICES,
         .bounding_sphere_radius = bounding_sphere_radius,
     };
 
@@ -255,16 +255,17 @@ void copy_buffer_to_final(
     const fastgltf::Asset& asset,
     const std::vector<PersistentlyMappedBuffer>& staging_buffers,
     const AllocatedBuffer& final_buffer,
-    const vk::raii::CommandBuffer& command_buffer
+    const vk::raii::CommandBuffer& command_buffer,
+    const uint32_t buffer_size
 ) {
     auto& buffer_view = asset.bufferViews[accessor.bufferViewIndex.value()];
     command_buffer.copyBuffer(
         staging_buffers[buffer_view.bufferIndex].buffer.buffer,
         final_buffer.buffer,
         {vk::BufferCopy {
-            .srcOffset = buffer_view.byteOffset,
+            .srcOffset = buffer_view.byteOffset + accessor.byteOffset,
             .dstOffset = 0,
-            .size = buffer_view.byteLength}}
+            .size = buffer_size}}
     );
 }
 
@@ -366,7 +367,10 @@ GltfMesh load_gltf(
     const Pipelines& pipelines,
     std::vector<DescriptorPoolAndSet>& temp_descriptor_sets
 ) {
-    fastgltf::Parser parser(fastgltf::Extensions::KHR_mesh_quantization);
+    fastgltf::Parser parser(
+        fastgltf::Extensions::KHR_mesh_quantization
+        | fastgltf::Extensions::KHR_texture_transform
+    );
     fastgltf::GltfDataBuffer data;
     data.loadFromFile(filepath);
 
@@ -445,13 +449,40 @@ GltfMesh load_gltf(
     material_info.reserve(asset.materials.size());
 
     for (auto& material : asset.materials) {
-        material_info.push_back(
-            {.albedo_texture_index =
-                 image_indices[material.pbrData.baseColorTexture.value()
-                                   .textureIndex],
-             .albedo_texture_scale = glm::vec2(0.000242184135, 0.000240402936),
-             .albedo_texture_offset = glm::vec2(0.0036249999, 0.00644397736)}
-        );
+        MaterialInfo info;
+        info.albedo_texture_index = 0;
+        info.metallic_roughness_texture_index = 0;
+        info.albedo_texture_scale = glm::vec2(1.0);
+        info.albedo_texture_offset = glm::vec2(0.0);
+
+        if (material.pbrData.baseColorTexture) {
+            auto& base = material.pbrData.baseColorTexture.value();
+
+            info.albedo_texture_index =
+                image_indices[asset.textures[base.textureIndex]
+                                  .imageIndex.value()];
+
+            if (base.transform != nullptr) {
+                info.albedo_texture_scale = glm::vec2(
+                    (*base.transform).uvScale[0],
+                    (*base.transform).uvScale[1]
+                );
+                info.albedo_texture_offset = glm::vec2(
+                    (*base.transform).uvOffset[0],
+                    (*base.transform).uvOffset[1]
+                );
+            }
+        }
+
+        if (material.pbrData.metallicRoughnessTexture) {
+            info.metallic_roughness_texture_index = image_indices
+                [asset
+                     .textures[material.pbrData.metallicRoughnessTexture.value()
+                                   .textureIndex]
+                     .imageIndex.value()];
+        }
+
+        material_info.push_back(info);
     }
 
     auto material_info_buffer = upload_via_staging_buffer(
@@ -477,7 +508,12 @@ GltfMesh load_gltf(
 
             auto& mesh = asset.meshes[node.meshIndex.value()];
 
-            for (auto& primitive : mesh.primitives) {
+            for (size_t i = 0; i < mesh.primitives.size(); i++) {
+                auto& primitive = mesh.primitives[i];
+
+                auto primitive_name =
+                    std::string(filepath) + " primitive " + std::to_string(i);
+
                 auto create_buffer = [&](uint64_t size, const char* name) {
                     return AllocatedBuffer(
                         vk::BufferCreateInfo {
@@ -490,7 +526,7 @@ GltfMesh load_gltf(
                             .usage = vma::MemoryUsage::eAuto,
                         },
                         allocator,
-                        std::string(filepath) + " " + name
+                        primitive_name + " " + name
                     );
                 };
 
@@ -524,25 +560,34 @@ GltfMesh load_gltf(
                         staging_buffers[buffer_view.bufferIndex].buffer,
                         pipelines,
                         positions.count,
-                        buffer_view.byteOffset
+                        buffer_view.byteOffset + positions.byteOffset
                     );
                 }
 
                 auto& indices =
                     asset.accessors[primitive.indicesAccessor.value()];
-                assert(
-                    indices.componentType
-                    == fastgltf::ComponentType::UnsignedInt
-                );
+
+                bool uses_32_bit_indices = indices.componentType
+                    == fastgltf::ComponentType::UnsignedInt;
+                if (!uses_32_bit_indices) {
+                    assert(
+                        indices.componentType
+                        == fastgltf::ComponentType::UnsignedShort
+                    );
+                }
                 assert(indices.type == fastgltf::AccessorType::Scalar);
+                auto indices_buffer_size = indices.count
+                    * (uses_32_bit_indices ? sizeof(uint32_t) : sizeof(uint16_t)
+                    );
                 auto indices_buffer =
-                    create_buffer(indices.count * sizeof(uint32_t), "indices");
+                    create_buffer(indices_buffer_size, "indices");
                 copy_buffer_to_final(
                     indices,
                     asset,
                     staging_buffers,
                     indices_buffer,
-                    command_buffer
+                    command_buffer,
+                    indices_buffer_size
                 );
 
                 auto& uvs = get_accessor("TEXCOORD_0");
@@ -550,6 +595,7 @@ GltfMesh load_gltf(
                     uvs.componentType == fastgltf::ComponentType::UnsignedShort
                 );
                 assert(uvs.type == fastgltf::AccessorType::Vec2);
+                auto uvs_buffer_size = uvs.count * sizeof(uint16_t) * 2;
                 auto uvs_buffer =
                     create_buffer(uvs.count * sizeof(uint16_t) * 2, "uvs");
                 copy_buffer_to_final(
@@ -557,12 +603,14 @@ GltfMesh load_gltf(
                     asset,
                     staging_buffers,
                     uvs_buffer,
-                    command_buffer
+                    command_buffer,
+                    uvs_buffer_size
                 );
 
                 auto& normals = get_accessor("NORMAL");
                 assert(normals.componentType == fastgltf::ComponentType::Byte);
                 assert(normals.type == fastgltf::AccessorType::Vec3);
+                auto normals_buffer_size = normals.count * sizeof(int8_t) * 4;
                 auto normals_buffer = create_buffer(
                     normals.count * sizeof(int8_t) * 4,
                     "normals"
@@ -572,7 +620,8 @@ GltfMesh load_gltf(
                     asset,
                     staging_buffers,
                     normals_buffer,
-                    command_buffer
+                    command_buffer,
+                    normals_buffer_size
                 );
 
                 auto mesh_info = MeshInfo {
@@ -593,7 +642,9 @@ GltfMesh load_gltf(
                     .material_indices = material_index,
                     .num_indices = static_cast<uint32_t>(indices.count),
                     .num_vertices = static_cast<uint32_t>(positions.count),
-                    .type = TYPE_QUANITZED,
+                    .type = MESH_INFO_FLAGS_QUANTIZED
+                        | (uses_32_bit_indices ? MESH_INFO_FLAGS_32_BIT_INDICES
+                                               : 0),
                     .bounding_sphere_radius = 0.0f};
 
                 auto mesh_info_buffer = upload_via_staging_buffer(
@@ -602,7 +653,7 @@ GltfMesh load_gltf(
                     allocator,
                     vk::BufferUsageFlagBits::eStorageBuffer
                         | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-                    std::string(filepath) + " mesh info buffer",
+                    primitive_name + " mesh info buffer",
                     command_buffer,
                     temp_buffers
                 );

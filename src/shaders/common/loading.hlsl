@@ -21,6 +21,7 @@ MaterialInfo load_material_info(uint64_t address, uint32_t offset) {
     material_info.albedo_texture_index = load_value_and_increment_address<uint32_t>(address);
     material_info.albedo_texture_scale = load_value_and_increment_address<float2>(address);
     material_info.albedo_texture_offset = load_value_and_increment_address<float2>(address);
+    material_info.metallic_roughness_texture_index = load_value_and_increment_address<uint32_t>(address);
     return material_info;
 }
 

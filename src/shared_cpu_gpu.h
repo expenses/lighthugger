@@ -12,8 +12,8 @@
     #define VEC2_TYPE glm::vec2
 #endif
 
-const static uint32_t TYPE_NORMAL = 0;
-const static uint32_t TYPE_QUANITZED = 1;
+const static uint32_t MESH_INFO_FLAGS_QUANTIZED = 1 << 0;
+const static uint32_t MESH_INFO_FLAGS_32_BIT_INDICES = 1 << 1;
 
 struct MeshInfo {
     uint64_t positions;
@@ -103,4 +103,5 @@ struct MaterialInfo {
     uint32_t albedo_texture_index;
     VEC2_TYPE albedo_texture_scale;
     VEC2_TYPE albedo_texture_offset;
+    uint32_t metallic_roughness_texture_index;
 };

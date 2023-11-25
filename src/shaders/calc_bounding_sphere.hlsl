@@ -16,7 +16,7 @@ void calc_bounding_sphere(uint3 global_id: SV_DispatchThreadID) {
         return;
     }
 
-    if (mesh_info.type == TYPE_QUANITZED) {
+    if (mesh_info.type & MESH_INFO_FLAGS_QUANTIZED) {
         position = float3(load_uint16_t3(mesh_info.positions, global_id.x));
     } else {
         position = load_value<float3>(mesh_info.positions, global_id.x);
