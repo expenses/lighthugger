@@ -308,7 +308,7 @@ int main() {
     );
 
     auto sponza = load_gltf(
-        "Sponza/glTF/out_packed.gltf",
+        "Sponza/glTF/hmm.gltf",
         allocator,
         device,
         command_buffer,
@@ -321,16 +321,6 @@ int main() {
     dbg(sizeof(Instance));
 
     // Load all resources
-
-    auto powerplant = load_obj(
-        "powerplant/Powerplant.obj",
-        allocator,
-        device,
-        command_buffer,
-        graphics_queue_family,
-        temp_buffers,
-        descriptor_set
-    );
 
     auto shadowmap = ImageWithView(
         {.imageType = vk::ImageType::e2D,
@@ -380,9 +370,6 @@ int main() {
         create_shadow_view(2),
         create_shadow_view(3)};
 
-    auto powerplant_info_address =
-        device.getBufferAddress({.buffer = powerplant.mesh_info.buffer});
-
     std::vector<Instance> instances;
 
     for (auto& primitive : sponza.primitives) {
@@ -416,16 +403,17 @@ int main() {
             "uniform_buffer"
         )),
         .shadowmap = std::move(shadowmap),
-        .depth_info_buffer = AllocatedBuffer(
+        .misc_storage_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
-                .size = sizeof(DepthInfoBuffer),
+                .size = sizeof(MiscStorageBuffer),
                 .usage = vk::BufferUsageFlagBits::eStorageBuffer
-                    | vk::BufferUsageFlagBits::eTransferDst},
+                    | vk::BufferUsageFlagBits::eTransferDst
+                    | vk::BufferUsageFlagBits::eIndirectBuffer},
             {
                 .usage = vma::MemoryUsage::eAuto,
             },
             allocator,
-            "depth_info_buffer"
+            "misc_storage_buffer"
         ),
         .instance_buffer = upload_via_staging_buffer(
             instances.data(),
@@ -446,18 +434,6 @@ int main() {
             },
             allocator,
             "draw_calls_buffer"
-        ),
-        .draw_counts_buffer = AllocatedBuffer(
-            vk::BufferCreateInfo {
-                .size = sizeof(uint32_t),
-                .usage = vk::BufferUsageFlagBits::eIndirectBuffer
-                    | vk::BufferUsageFlagBits::eStorageBuffer
-                    | vk::BufferUsageFlagBits::eTransferDst},
-            {
-                .usage = vma::MemoryUsage::eAuto,
-            },
-            allocator,
-            "draw_counts_buffer"
         ),
         .max_num_draws = 1024,
         .shadowmap_layer_views = std::move(shadowmap_layer_views),

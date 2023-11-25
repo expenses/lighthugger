@@ -47,7 +47,7 @@ void read_depth(uint3 global_id: SV_DispatchThreadID){
         // Note: naming is ambiguous but this means the first
         // _active_ lane.
         if (WaveIsFirstLane()) {
-            InterlockedMin(depth_info[0].min_depth, subgroup_min);
+            InterlockedMin(misc_storage[0].min_depth, subgroup_min);
         }
     }
 
@@ -55,7 +55,7 @@ void read_depth(uint3 global_id: SV_DispatchThreadID){
     uint32_t subgroup_max = WaveActiveMax(depth_max);
 
     if (WaveIsFirstLane()) {
-        InterlockedMax(depth_info[0].max_depth, subgroup_max);
+        InterlockedMax(misc_storage[0].max_depth, subgroup_max);
     }
 }
 
@@ -65,12 +65,10 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
 {
     // https://github.com/SaschaWillems/Vulkan/blob/master/examples/shadowmappingcascade/shadowmappingcascade.cpp#L650-L663
 
-    DepthInfoBuffer info = depth_info[0];
-
     // Note: these values are misleading. As 0.0 is the infinite plane,
     // the max_depth is actually the closer value!
-    float min_depth = asfloat(info.min_depth);
-    float max_depth = asfloat(info.max_depth);
+    float min_depth = asfloat(misc_storage[0].min_depth);
+    float max_depth = asfloat(misc_storage[0].max_depth);
 
     float4x4 invCam = uniforms.inv_perspective_view;
 
@@ -154,5 +152,5 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
     float4x4 shadowView = lookAt(shadow_cam_distance * uniforms.sun_dir + frustumCenter, frustumCenter, float3(0,1,0));
 	float4x4 shadowProj = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, shadow_cam_distance * 2.0);
 
-    depth_info[0].shadow_rendering_matrices[cascade_index] = mul(shadowProj, shadowView);
+    misc_storage[0].shadow_rendering_matrices[cascade_index] = mul(shadowProj, shadowView);
 }

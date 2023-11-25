@@ -40,17 +40,22 @@ void render(
     ZoneScoped;
     TracyVkZone(tracy_ctx, *command_buffer, "main");
 
+    auto draw_call_counts_offset = sizeof(glm::mat4) * 4 + 8;
+
     {
         TracyVkZone(tracy_ctx, *command_buffer, "buffer clears");
 
         // Clear the depth min/max values.
         auto offset = sizeof(glm::mat4) * 4;
+        command_buffer.fillBuffer(
+            resources.misc_storage_buffer.buffer,
+            offset,
+            4,
+            u32_max
+        );
+        // Zero out both the max depth and the draw call counts.
         command_buffer
-            .fillBuffer(resources.depth_info_buffer.buffer, offset, 4, u32_max);
-        command_buffer
-            .fillBuffer(resources.depth_info_buffer.buffer, offset + 4, 4, 0);
-        // Clear draw counts.
-        command_buffer.fillBuffer(resources.draw_counts_buffer.buffer, 0, 4, 0);
+            .fillBuffer(resources.misc_storage_buffer.buffer, offset + 4, 8, 0);
     }
 
     set_scissor_and_viewport(command_buffer, extent.width, extent.height);
@@ -153,8 +158,8 @@ void render(
         command_buffer.drawIndirectCount(
             resources.draw_calls_buffer.buffer,
             0,
-            resources.draw_counts_buffer.buffer,
-            0,
+            resources.misc_storage_buffer.buffer,
+            draw_call_counts_offset,
             resources.max_num_draws,
             sizeof(vk::DrawIndirectCommand)
         );
@@ -233,8 +238,8 @@ void render(
             command_buffer.drawIndirectCount(
                 resources.draw_calls_buffer.buffer,
                 0,
-                resources.draw_counts_buffer.buffer,
-                0,
+                resources.misc_storage_buffer.buffer,
+                draw_call_counts_offset,
                 resources.max_num_draws,
                 sizeof(vk::DrawIndirectCommand)
             );
@@ -298,8 +303,8 @@ void render(
         command_buffer.drawIndirectCount(
             resources.draw_calls_buffer.buffer,
             0,
-            resources.draw_counts_buffer.buffer,
-            0,
+            resources.misc_storage_buffer.buffer,
+            draw_call_counts_offset,
             resources.max_num_draws,
             sizeof(vk::DrawIndirectCommand)
         );

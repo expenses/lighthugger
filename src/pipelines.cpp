@@ -212,12 +212,6 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
-        // draw counts buffer
-        vk::DescriptorSetLayoutBinding {
-            .binding = 12,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute},
     };
 
     std::vector<vk::DescriptorBindingFlags> flags(everything_bindings.size());

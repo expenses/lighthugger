@@ -3,210 +3,6 @@
 #include "../allocations/staging.h"
 #include "image_loading.h"
 
-Mesh load_obj(
-    const char* filepath,
-    vma::Allocator allocator,
-    const vk::raii::Device& device,
-    const vk::raii::CommandBuffer& command_buffer,
-    uint32_t graphics_queue_family,
-    std::vector<AllocatedBuffer>& temp_buffers,
-    DescriptorSet& descriptor_set
-) {
-    tinyobj::ObjReader reader;
-
-    assert(reader.ParseFromFile(filepath));
-    if (!reader.Warning().empty()) {
-        std::cout << "TinyObjReader: " << reader.Warning();
-    }
-
-    auto& attrib = reader.GetAttrib();
-    auto& shapes = reader.GetShapes();
-    auto& materials = reader.GetMaterials();
-
-    auto str_filepath = std::string(filepath);
-
-    std::vector<ImageWithView> images;
-
-    auto base_path = str_filepath.substr(0, str_filepath.rfind("/") + 1);
-
-    std::vector<uint32_t> image_indices;
-    std::vector<MaterialInfo> material_info;
-    std::unordered_map<std::string, uint32_t> material_filenames;
-
-    for (auto& material : materials) {
-        MaterialInfo info;
-
-        if (material_filenames.contains(material.diffuse_texname)) {
-            info.albedo_texture_index =
-                material_filenames[material.diffuse_texname];
-        } else {
-            auto albedo_texture_filepath = base_path + material.diffuse_texname;
-            auto albedo_image = load_dds(
-                albedo_texture_filepath.data(),
-                allocator,
-                device,
-                command_buffer,
-                graphics_queue_family,
-                temp_buffers
-            );
-            auto index = descriptor_set.write_image(albedo_image, *device);
-            images.push_back(std::move(albedo_image));
-            image_indices.push_back(index);
-            info.albedo_texture_index = index;
-            material_filenames[material.diffuse_texname] = index;
-        }
-
-        material_info.push_back(info);
-    }
-
-    assert(materials.size() <= 1 << 16);
-
-    std::vector<uint32_t> indices;
-    std::vector<uint16_t> material_ids(attrib.vertices.size() / 3);
-    for (auto& shape : shapes) {
-        for (auto& index : shape.mesh.indices) {
-            assert(index.vertex_index == index.normal_index);
-            indices.push_back(static_cast<uint32_t>(index.vertex_index));
-        }
-
-        // :( material ids are stored unindexed so we need to reindex them.
-        // This could cause visual problems if a vertex is reused but with different materials.
-        assert(shape.mesh.indices.size() / 3 == shape.mesh.material_ids.size());
-
-        for (size_t i = 0; i < shape.mesh.material_ids.size(); i++) {
-            auto material_id =
-                static_cast<uint16_t>(shape.mesh.material_ids[i]);
-            material_ids[shape.mesh.indices[i * 3].vertex_index] = material_id;
-            material_ids[shape.mesh.indices[i * 3 + 1].vertex_index] =
-                material_id;
-            material_ids[shape.mesh.indices[i * 3 + 2].vertex_index] =
-                material_id;
-        }
-    }
-
-    BoundingBox bounding_box;
-
-    float bounding_sphere_radius = 0.0;
-    for (uint32_t i = 0; i < attrib.vertices.size() / 3; i++) {
-        auto position = glm::vec3(
-            attrib.vertices[i * 3],
-            attrib.vertices[i * 3 + 1],
-            attrib.vertices[i * 3 + 2]
-        );
-        bounding_sphere_radius =
-            std::max(bounding_sphere_radius, glm::length2(position));
-
-        bounding_box.insert(position);
-    }
-    bounding_sphere_radius = sqrtf(bounding_sphere_radius);
-
-    // Todo: should use staging buffers instead of host-accessible storage buffers.
-
-    auto index_buffer = upload_via_staging_buffer(
-        indices.data(),
-        indices.size() * sizeof(uint32_t),
-        allocator,
-        vk::BufferUsageFlagBits::eStorageBuffer
-            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-        std::string(filepath) + " index buffer",
-        command_buffer,
-        temp_buffers
-    );
-
-    auto position_buffer = upload_via_staging_buffer(
-        attrib.vertices.data(),
-        attrib.vertices.size() * sizeof(float),
-        allocator,
-        vk::BufferUsageFlagBits::eStorageBuffer
-            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-        std::string(filepath) + " position buffer",
-        command_buffer,
-        temp_buffers
-    );
-
-    auto normal_buffer = upload_via_staging_buffer(
-        attrib.normals.data(),
-        attrib.normals.size() * sizeof(float),
-        allocator,
-        vk::BufferUsageFlagBits::eStorageBuffer
-            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-        std::string(filepath) + " normal buffer",
-        command_buffer,
-        temp_buffers
-    );
-
-    auto uv_buffer = upload_via_staging_buffer(
-        attrib.texcoords.data(),
-        attrib.texcoords.size() * sizeof(float),
-        allocator,
-        vk::BufferUsageFlagBits::eStorageBuffer
-            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-        std::string(filepath) + " uv buffer",
-        command_buffer,
-        temp_buffers
-    );
-
-    auto material_id_buffer = upload_via_staging_buffer(
-        material_ids.data(),
-        material_ids.size() * sizeof(uint16_t),
-        allocator,
-        vk::BufferUsageFlagBits::eStorageBuffer
-            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-        std::string(filepath) + " material id buffer",
-        command_buffer,
-        temp_buffers
-    );
-
-    auto material_info_buffer = upload_via_staging_buffer(
-        material_info.data(),
-        material_info.size() * sizeof(MaterialInfo),
-        allocator,
-        vk::BufferUsageFlagBits::eStorageBuffer
-            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-        std::string(filepath) + " material info buffer",
-        command_buffer,
-        temp_buffers
-    );
-
-    auto mesh_info = MeshInfo {
-        .positions =
-            device.getBufferAddress({.buffer = position_buffer.buffer}),
-        .indices = device.getBufferAddress({.buffer = index_buffer.buffer}),
-        .normals = device.getBufferAddress({.buffer = normal_buffer.buffer}),
-        .uvs = device.getBufferAddress({.buffer = uv_buffer.buffer}),
-        .material_info =
-            device.getBufferAddress({.buffer = material_info_buffer.buffer}),
-        .material_indices =
-            device.getBufferAddress({.buffer = material_id_buffer.buffer}),
-        .num_indices = static_cast<uint32_t>(indices.size()),
-        .num_vertices = static_cast<uint32_t>(attrib.vertices.size() / 3),
-        .type = MESH_INFO_FLAGS_32_BIT_INDICES,
-        .bounding_sphere_radius = bounding_sphere_radius,
-    };
-
-    auto mesh_info_buffer = upload_via_staging_buffer(
-        &mesh_info,
-        sizeof(MeshInfo),
-        allocator,
-        vk::BufferUsageFlagBits::eStorageBuffer
-            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-        std::string(filepath) + " mesh info buffer",
-        command_buffer,
-        temp_buffers
-    );
-
-    return {
-        .positions = std::move(position_buffer),
-        .indices = std::move(index_buffer),
-        .normals = std::move(normal_buffer),
-        .material_ids = std::move(material_id_buffer),
-        .uvs = std::move(uv_buffer),
-        .material_info = std::move(material_info_buffer),
-        .mesh_info = std::move(mesh_info_buffer),
-        .images = std::move(images),
-        .image_indices = image_indices};
-}
-
 struct NodeTreeNode {
     glm::mat4 transform = glm::mat4(1);
     size_t parent = std::numeric_limits<size_t>::max();
@@ -445,57 +241,6 @@ GltfMesh load_gltf(
         }
     }
 
-    std::vector<MaterialInfo> material_info;
-    material_info.reserve(asset.materials.size());
-
-    for (auto& material : asset.materials) {
-        MaterialInfo info;
-        info.albedo_texture_index = 0;
-        info.metallic_roughness_texture_index = 0;
-        info.albedo_texture_scale = glm::vec2(1.0);
-        info.albedo_texture_offset = glm::vec2(0.0);
-
-        if (material.pbrData.baseColorTexture) {
-            auto& base = material.pbrData.baseColorTexture.value();
-
-            info.albedo_texture_index =
-                image_indices[asset.textures[base.textureIndex]
-                                  .imageIndex.value()];
-
-            if (base.transform != nullptr) {
-                info.albedo_texture_scale = glm::vec2(
-                    (*base.transform).uvScale[0],
-                    (*base.transform).uvScale[1]
-                );
-                info.albedo_texture_offset = glm::vec2(
-                    (*base.transform).uvOffset[0],
-                    (*base.transform).uvOffset[1]
-                );
-            }
-        }
-
-        if (material.pbrData.metallicRoughnessTexture) {
-            info.metallic_roughness_texture_index = image_indices
-                [asset
-                     .textures[material.pbrData.metallicRoughnessTexture.value()
-                                   .textureIndex]
-                     .imageIndex.value()];
-        }
-
-        material_info.push_back(info);
-    }
-
-    auto material_info_buffer = upload_via_staging_buffer(
-        material_info.data(),
-        material_info.size() * sizeof(MaterialInfo),
-        allocator,
-        vk::BufferUsageFlagBits::eStorageBuffer
-            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-        std::string(filepath) + " material info buffer",
-        command_buffer,
-        temp_buffers
-    );
-
     auto node_tree = NodeTree(asset);
 
     std::vector<GltfPrimitive> primitives;
@@ -536,8 +281,6 @@ GltfMesh load_gltf(
                     assert(iterator != primitive.attributes.end());
                     return asset.accessors[iterator->second];
                 };
-
-                auto material_index = primitive.materialIndex.value();
 
                 auto& positions = get_accessor("POSITION");
                 assert(
@@ -624,6 +367,9 @@ GltfMesh load_gltf(
                     normals_buffer_size
                 );
 
+                auto material_index = primitive.materialIndex.value();
+                auto& material = asset.materials[material_index];
+
                 auto mesh_info = MeshInfo {
                     .positions = device.getBufferAddress(
                         {.buffer = position_buffer.buffer}
@@ -636,16 +382,57 @@ GltfMesh load_gltf(
                     ),
                     .uvs =
                         device.getBufferAddress({.buffer = uvs_buffer.buffer}),
-                    .material_info = device.getBufferAddress(
-                        {.buffer = material_info_buffer.buffer}
-                    ),
-                    .material_indices = material_index,
                     .num_indices = static_cast<uint32_t>(indices.count),
                     .num_vertices = static_cast<uint32_t>(positions.count),
-                    .type = MESH_INFO_FLAGS_QUANTIZED
-                        | (uses_32_bit_indices ? MESH_INFO_FLAGS_32_BIT_INDICES
-                                               : 0),
+                    .flags =
+                        (uses_32_bit_indices ? MESH_INFO_FLAGS_32_BIT_INDICES
+                                             : 0)
+                        | (material.alphaMode == fastgltf::AlphaMode::Mask
+                               ? MESH_INFO_FLAGS_ALPHA_CLIP
+                               : 0),
                     .bounding_sphere_radius = 0.0f};
+
+                if (material.pbrData.baseColorTexture) {
+                    auto& tex = material.pbrData.baseColorTexture.value();
+
+                    mesh_info.albedo_texture_index =
+                        image_indices[asset.textures[tex.textureIndex]
+                                          .imageIndex.value()];
+
+                    if (tex.transform != nullptr) {
+                        mesh_info.texture_scale = glm::vec2(
+                            (*tex.transform).uvScale[0],
+                            (*tex.transform).uvScale[1]
+                        );
+                        mesh_info.texture_offset = glm::vec2(
+                            (*tex.transform).uvOffset[0],
+                            (*tex.transform).uvOffset[1]
+                        );
+                    }
+                }
+
+                if (material.pbrData.metallicRoughnessTexture) {
+                    auto& tex =
+                        material.pbrData.metallicRoughnessTexture.value();
+                    mesh_info.metallic_roughness_texture_index =
+                        image_indices[asset.textures[tex.textureIndex]
+                                          .imageIndex.value()];
+
+                    if (tex.transform != nullptr) {
+                        mesh_info.texture_scale = glm::vec2(
+                            (*tex.transform).uvScale[0],
+                            (*tex.transform).uvScale[1]
+                        );
+                        mesh_info.texture_offset = glm::vec2(
+                            (*tex.transform).uvOffset[0],
+                            (*tex.transform).uvOffset[1]
+                        );
+                    }
+                }
+
+                if (uvs.normalized) {
+                    mesh_info.texture_scale /= float((1 << 16) - 1);
+                }
 
                 auto mesh_info_buffer = upload_via_staging_buffer(
                     &mesh_info,
@@ -685,6 +472,5 @@ GltfMesh load_gltf(
     return {
         .images = std::move(images),
         .image_indices = std::move(image_indices),
-        .material_info = std::move(material_info_buffer),
         .primitives = std::move(primitives)};
 }

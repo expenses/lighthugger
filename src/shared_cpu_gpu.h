@@ -12,22 +12,22 @@
     #define VEC2_TYPE glm::vec2
 #endif
 
-const static uint32_t MESH_INFO_FLAGS_QUANTIZED = 1 << 0;
-const static uint32_t MESH_INFO_FLAGS_32_BIT_INDICES = 1 << 1;
+const static uint32_t MESH_INFO_FLAGS_32_BIT_INDICES = 1 << 0;
+const static uint32_t MESH_INFO_FLAGS_ALPHA_CLIP = 1 << 1;
 
 struct MeshInfo {
     uint64_t positions;
     uint64_t indices;
     uint64_t normals;
     uint64_t uvs;
-    uint64_t material_info;
-    // Either the address of a material indices buffer
-    // or a literal value.
-    uint64_t material_indices;
     uint32_t num_indices;
     uint32_t num_vertices;
-    uint32_t type;
+    uint32_t flags;
     float bounding_sphere_radius;
+    VEC2_TYPE texture_scale;
+    VEC2_TYPE texture_offset;
+    uint32_t albedo_texture_index;
+    uint32_t metallic_roughness_texture_index;
 };
 
 struct MeshInfoWithUintBoundingSphereRadius {
@@ -35,18 +35,23 @@ struct MeshInfoWithUintBoundingSphereRadius {
     uint64_t indices;
     uint64_t normals;
     uint64_t uvs;
-    uint64_t material_info;
-    uint64_t material_indices;
     uint32_t num_indices;
     uint32_t num_vertices;
-    uint32_t type;
+    uint32_t flags;
     uint32_t bounding_sphere_radius;
+    VEC2_TYPE texture_scale;
+    VEC2_TYPE texture_offset;
+    uint32_t albedo_texture_index;
+    uint32_t metallic_roughness_texture_index;
 };
 
-struct DepthInfoBuffer {
+// Stores depth info and draw call counts.
+struct MiscStorageBuffer {
     MATRIX4_TYPE shadow_rendering_matrices[4];
     uint32_t min_depth;
     uint32_t max_depth;
+    uint32_t num_opaque_draws;
+    uint32_t num_alpha_clip_draws;
 };
 
 struct Uniforms {
@@ -97,11 +102,4 @@ struct CopyQuantizedPositionsConstant {
     uint64_t dst;
     uint64_t src;
     uint32_t count;
-};
-
-struct MaterialInfo {
-    uint32_t albedo_texture_index;
-    VEC2_TYPE albedo_texture_scale;
-    VEC2_TYPE albedo_texture_offset;
-    uint32_t metallic_roughness_texture_index;
 };

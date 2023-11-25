@@ -99,10 +99,9 @@ void DescriptorSet::write_descriptors(
         .sampler = *resources.shadowmap_comparison_sampler};
 
     auto uniform_buffer_info = buffer_info(resources.uniform_buffer.buffer);
-    auto depth_info_buffer_info = buffer_info(resources.depth_info_buffer);
+    auto misc_storage_buffer_info = buffer_info(resources.misc_storage_buffer);
     auto draw_calls_buffer_info = buffer_info(resources.draw_calls_buffer);
     auto instance_buffer_info = buffer_info(resources.instance_buffer);
-    auto draw_counts_buffer = buffer_info(resources.draw_counts_buffer);
 
     // Write initial descriptor sets.
     device.updateDescriptorSets(
@@ -142,7 +141,7 @@ void DescriptorSet::write_descriptors(
                 .dstBinding = 8,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eStorageBuffer,
-                .pBufferInfo = &depth_info_buffer_info},
+                .pBufferInfo = &misc_storage_buffer_info},
             vk::WriteDescriptorSet {
                 .dstSet = *set,
                 .dstBinding = 9,
@@ -161,12 +160,6 @@ void DescriptorSet::write_descriptors(
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eStorageBuffer,
                 .pBufferInfo = &draw_calls_buffer_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *set,
-                .dstBinding = 12,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eStorageBuffer,
-                .pBufferInfo = &draw_counts_buffer},
         },
         {}
     );

@@ -54,10 +54,9 @@ struct Resources {
     ResizingResources resizing;
     PersistentlyMappedBuffer uniform_buffer;
     ImageWithView shadowmap;
-    AllocatedBuffer depth_info_buffer;
+    AllocatedBuffer misc_storage_buffer;
     AllocatedBuffer instance_buffer;
     AllocatedBuffer draw_calls_buffer;
-    AllocatedBuffer draw_counts_buffer;
     uint32_t max_num_draws;
     std::array<vk::raii::ImageView, 4> shadowmap_layer_views;
     ImageWithView display_transform_lut;

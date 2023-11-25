@@ -18,28 +18,6 @@ struct BoundingBox {
     }
 };
 
-struct Mesh {
-    AllocatedBuffer positions;
-    AllocatedBuffer indices;
-    AllocatedBuffer normals;
-    AllocatedBuffer material_ids;
-    AllocatedBuffer uvs;
-    AllocatedBuffer material_info;
-    AllocatedBuffer mesh_info;
-    std::vector<ImageWithView> images;
-    std::vector<uint32_t> image_indices;
-};
-
-Mesh load_obj(
-    const char* filepath,
-    vma::Allocator allocator,
-    const vk::raii::Device& device,
-    const vk::raii::CommandBuffer& command_buffer,
-    uint32_t graphics_queue_family,
-    std::vector<AllocatedBuffer>& temp_buffers,
-    DescriptorSet& descriptor_set
-);
-
 struct GltfPrimitive {
     AllocatedBuffer position;
     AllocatedBuffer indices;
@@ -52,7 +30,6 @@ struct GltfPrimitive {
 struct GltfMesh {
     std::vector<ImageWithView> images;
     std::vector<uint32_t> image_indices;
-    AllocatedBuffer material_info;
     std::vector<GltfPrimitive> primitives;
 };
 

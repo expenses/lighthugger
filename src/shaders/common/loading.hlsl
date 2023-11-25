@@ -14,29 +14,20 @@ T load_value_and_increment_address(inout uint64_t address) {
     return vk::RawBufferLoad<T>(load_address);
 }
 
-
-MaterialInfo load_material_info(uint64_t address, uint32_t offset) {
-    address += offset * sizeof(MaterialInfo);
-    MaterialInfo material_info;
-    material_info.albedo_texture_index = load_value_and_increment_address<uint32_t>(address);
-    material_info.albedo_texture_scale = load_value_and_increment_address<float2>(address);
-    material_info.albedo_texture_offset = load_value_and_increment_address<float2>(address);
-    material_info.metallic_roughness_texture_index = load_value_and_increment_address<uint32_t>(address);
-    return material_info;
-}
-
 MeshInfo load_mesh_info(uint64_t address) {
     MeshInfo info;
     info.positions = load_value_and_increment_address<uint64_t>(address);
     info.indices = load_value_and_increment_address<uint64_t>(address);
     info.normals = load_value_and_increment_address<uint64_t>(address);
     info.uvs = load_value_and_increment_address<uint64_t>(address);
-    info.material_info = load_value_and_increment_address<uint64_t>(address);
-    info.material_indices = load_value_and_increment_address<uint64_t>(address);
     info.num_indices = load_value_and_increment_address<uint32_t>(address);
     info.num_vertices = load_value_and_increment_address<uint32_t>(address);
-    info.type = load_value_and_increment_address<uint32_t>(address);
+    info.flags = load_value_and_increment_address<uint32_t>(address);
     info.bounding_sphere_radius = load_value_and_increment_address<float>(address);
+    info.texture_scale = load_value_and_increment_address<float2>(address);
+    info.texture_offset = load_value_and_increment_address<float2>(address);
+    info.albedo_texture_index = load_value_and_increment_address<uint32_t>(address);
+    info.metallic_roughness_texture_index = load_value_and_increment_address<uint32_t>(address);
     return info;
 }
 
