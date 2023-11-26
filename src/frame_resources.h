@@ -4,6 +4,7 @@
 struct ResizingResources {
     ImageWithView scene_referred_framebuffer;
     ImageWithView depthbuffer;
+    ImageWithView visbuffer;
 
     ResizingResources(
         const vk::raii::Device& device,
@@ -22,7 +23,7 @@ struct ResizingResources {
                     },
                 .mipLevels = 1,
                 .arrayLayers = 1,
-                .usage = vk::ImageUsageFlagBits::eColorAttachment
+                .usage = vk::ImageUsageFlagBits::eStorage
                     | vk::ImageUsageFlagBits::eSampled,
             },
             allocator,
@@ -47,6 +48,24 @@ struct ResizingResources {
             device,
             "depthbuffer",
             DEPTH_SUBRESOURCE_RANGE
+        )),
+        visbuffer(ImageWithView(
+            {.imageType = vk::ImageType::e2D,
+             .format = vk::Format::eR32Uint,
+             .extent =
+                 vk::Extent3D {
+                     .width = extent.width,
+                     .height = extent.height,
+                     .depth = 1,
+                 },
+             .mipLevels = 1,
+             .arrayLayers = 1,
+             .usage = vk::ImageUsageFlagBits::eColorAttachment
+                 | vk::ImageUsageFlagBits::eSampled},
+            allocator,
+            device,
+            "visbuffer",
+            COLOR_SUBRESOURCE_RANGE
         )) {}
 };
 

@@ -1,5 +1,6 @@
 #include "common/bindings.hlsl"
 #include "common/loading.hlsl"
+#include "common/geometry.hlsl"
 
 [shader("compute")]
 [numthreads(64, 1, 1)]

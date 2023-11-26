@@ -11,11 +11,6 @@ const auto FILL_RASTERIZATION = vk::PipelineRasterizationStateCreateInfo {
     .cullMode = vk::CullModeFlagBits::eBack,
     .lineWidth = 1.0f};
 
-const auto NO_CULL = vk::PipelineRasterizationStateCreateInfo {
-    .polygonMode = vk::PolygonMode::eFill,
-    .cullMode = vk::CullModeFlagBits::eNone,
-    .lineWidth = 1.0f};
-
 const auto NO_MULTISAMPLING = vk::PipelineMultisampleStateCreateInfo {
     .rasterizationSamples = vk::SampleCountFlagBits::e1,
     .sampleShadingEnable = false,
@@ -66,12 +61,6 @@ const auto DEPTH_WRITE_LESS = vk::PipelineDepthStencilStateCreateInfo {
     .depthTestEnable = true,
     .depthWriteEnable = true,
     .depthCompareOp = vk::CompareOp::eLess,
-};
-
-const auto DEPTH_TEST_EQUAL = vk::PipelineDepthStencilStateCreateInfo {
-    .depthTestEnable = true,
-    .depthWriteEnable = false,
-    .depthCompareOp = vk::CompareOp::eEqual,
 };
 
 std::vector<uint8_t> read_file_to_bytes(const char* filepath) {
@@ -126,7 +115,7 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .binding = 0,
             .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 512,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eFragment,
         },
         // instance buffer
         vk::DescriptorSetLayoutBinding {
@@ -143,7 +132,6 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .descriptorType = vk::DescriptorType::eUniformBuffer,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eVertex
-                | vk::ShaderStageFlagBits::eFragment
                 | vk::ShaderStageFlagBits::eCompute,
         },
         // hdr framebuffer
@@ -172,7 +160,7 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .binding = 6,
             .descriptorType = vk::DescriptorType::eSampler,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eFragment,
         },
         // depthbuffer
         vk::DescriptorSetLayoutBinding {
@@ -181,34 +169,45 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
-        // depth info buffer
+        // misc storage (depth info etc.) buffer
         vk::DescriptorSetLayoutBinding {
             .binding = 8,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute
-                | vk::ShaderStageFlagBits::eVertex
-                | vk::ShaderStageFlagBits::eFragment,
+                | vk::ShaderStageFlagBits::eVertex,
         },
         // shadow map
         vk::DescriptorSetLayoutBinding {
             .binding = 9,
             .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment
-                | vk::ShaderStageFlagBits::eCompute,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
         // Shadowmap comparison sampler
         vk::DescriptorSetLayoutBinding {
             .binding = 10,
             .descriptorType = vk::DescriptorType::eSampler,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
         // draw calls buffer
         vk::DescriptorSetLayoutBinding {
             .binding = 11,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        },
+        // rw scene referred framebuffer
+        vk::DescriptorSetLayoutBinding {
+            .binding = 12,
+            .descriptorType = vk::DescriptorType::eStorageImage,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        },
+        vk::DescriptorSetLayoutBinding {
+            .binding = 13,
+            .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
@@ -322,6 +321,11 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
         "compiled_shaders/write_draw_calls.spv"
     );
 
+    auto shadows = create_shader_from_file(
+        device,
+        "compiled_shaders/shadows.spv"
+    );
+
     auto calc_bounding_sphere = create_shader_from_file(
         device,
         "compiled_shaders/calc_bounding_sphere.spv"
@@ -332,85 +336,94 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
         "compiled_shaders/copy_quantized_positions.spv"
     );
 
-    auto render_geometry_stages = std::array {
+    auto alpha_clip =
+        create_shader_from_file(device, "compiled_shaders/alpha_clip.spv");
+
+    auto visbuffer_stages = std::array {
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eVertex,
             .module = *render_geometry,
-            .pName = "VSMain",
+            .pName = "vertex",
         },
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eFragment,
             .module = *render_geometry,
-            .pName = "PSMain"}};
+            .pName = "pixel"}};
 
-    auto depth_pre_pass_stage = std::array {vk::PipelineShaderStageCreateInfo {
-        .stage = vk::ShaderStageFlagBits::eVertex,
-        .module = *render_geometry,
-        .pName = "depth_only",
-    }};
+    auto visbuffer_alpha_clip_stages = std::array {
+        vk::PipelineShaderStageCreateInfo {
+            .stage = vk::ShaderStageFlagBits::eVertex,
+            .module = *alpha_clip,
+            .pName = "vertex",
+        },
+        vk::PipelineShaderStageCreateInfo {
+            .stage = vk::ShaderStageFlagBits::eFragment,
+            .module = *alpha_clip,
+            .pName = "pixel"}};
 
     auto shadow_pass_stage = std::array {vk::PipelineShaderStageCreateInfo {
         .stage = vk::ShaderStageFlagBits::eVertex,
-        .module = *render_geometry,
-        .pName = "shadow_pass",
+        .module = *shadows,
+        .pName = "vertex",
     }};
 
-    auto rgba16f = vk::Format::eR16G16B16A16Sfloat;
+    auto u32 = vk::Format::eR32Uint;
 
-    auto rgba16f_format_rendering_info = vk::PipelineRenderingCreateInfoKHR {
+    auto u32_format_rendering_info = vk::PipelineRenderingCreateInfoKHR {
         .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &rgba16f,
+        .pColorAttachmentFormats = &u32,
         .depthAttachmentFormat = vk::Format::eD32Sfloat};
 
     auto depth_only_rendering_info = vk::PipelineRenderingCreateInfoKHR {
         .depthAttachmentFormat = vk::Format::eD32Sfloat};
 
-    auto graphics_pipeline_infos =
-        std::array {// render_geometry
-                    vk::GraphicsPipelineCreateInfo {
-                        .pNext = &rgba16f_format_rendering_info,
-                        .stageCount = render_geometry_stages.size(),
-                        .pStages = render_geometry_stages.data(),
-                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
-                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
-                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
-                        .pRasterizationState = &FILL_RASTERIZATION,
-                        .pMultisampleState = &NO_MULTISAMPLING,
-                        .pDepthStencilState = &DEPTH_TEST_EQUAL,
-                        .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
-                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
-                        .layout = *pipeline_layout,
-                    },
-                    // geometry depth pre pass
-                    vk::GraphicsPipelineCreateInfo {
-                        .pNext = &depth_only_rendering_info,
-                        .stageCount = depth_pre_pass_stage.size(),
-                        .pStages = depth_pre_pass_stage.data(),
-                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
-                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
-                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
-                        .pRasterizationState = &FILL_RASTERIZATION,
-                        .pMultisampleState = &NO_MULTISAMPLING,
-                        .pDepthStencilState = &DEPTH_WRITE_GREATER,
-                        .pColorBlendState = &EMPTY_BLEND_STATE,
-                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
-                        .layout = *pipeline_layout,
-                    },
-                    // Shadow pass
-                    vk::GraphicsPipelineCreateInfo {
-                        .pNext = &depth_only_rendering_info,
-                        .stageCount = shadow_pass_stage.size(),
-                        .pStages = shadow_pass_stage.data(),
-                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
-                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
-                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
-                        .pRasterizationState = &FILL_RASTERIZATION,
-                        .pMultisampleState = &NO_MULTISAMPLING,
-                        .pDepthStencilState = &DEPTH_WRITE_LESS,
-                        .pColorBlendState = &EMPTY_BLEND_STATE,
-                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
-                        .layout = *pipeline_layout,
-                    }};
+    auto graphics_pipeline_infos = std::array {
+        // Shadow pass
+        vk::GraphicsPipelineCreateInfo {
+            .pNext = &depth_only_rendering_info,
+            .stageCount = shadow_pass_stage.size(),
+            .pStages = shadow_pass_stage.data(),
+            .pVertexInputState = &EMPTY_VERTEX_INPUT,
+            .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+            .pViewportState = &DEFAULT_VIEWPORT_STATE,
+            .pRasterizationState = &FILL_RASTERIZATION,
+            .pMultisampleState = &NO_MULTISAMPLING,
+            .pDepthStencilState = &DEPTH_WRITE_LESS,
+            .pColorBlendState = &EMPTY_BLEND_STATE,
+            .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+            .layout = *pipeline_layout,
+        },
+        // visibility buffer pass
+        vk::GraphicsPipelineCreateInfo {
+            .pNext = &u32_format_rendering_info,
+            .stageCount = visbuffer_stages.size(),
+            .pStages = visbuffer_stages.data(),
+            .pVertexInputState = &EMPTY_VERTEX_INPUT,
+            .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+            .pViewportState = &DEFAULT_VIEWPORT_STATE,
+            .pRasterizationState = &FILL_RASTERIZATION,
+            .pMultisampleState = &NO_MULTISAMPLING,
+            .pDepthStencilState = &DEPTH_WRITE_GREATER,
+            .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
+            .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+            .layout = *pipeline_layout,
+        },
+        // visibility alpha clip buffer pass
+        vk::GraphicsPipelineCreateInfo {
+            .pNext = &u32_format_rendering_info,
+            .stageCount = visbuffer_alpha_clip_stages.size(),
+            .pStages = visbuffer_alpha_clip_stages.data(),
+            .pVertexInputState = &EMPTY_VERTEX_INPUT,
+            .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+            .pViewportState = &DEFAULT_VIEWPORT_STATE,
+            .pRasterizationState = &FILL_RASTERIZATION,
+            .pMultisampleState = &NO_MULTISAMPLING,
+            .pDepthStencilState = &DEPTH_WRITE_GREATER,
+            .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
+            .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+            .layout = *pipeline_layout,
+        },
+    };
 
     auto compute_pipeline_infos = std::array {
         vk::ComputePipelineCreateInfo {
@@ -449,6 +462,14 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
             .stage =
                 vk::PipelineShaderStageCreateInfo {
                     .stage = vk::ShaderStageFlagBits::eCompute,
+                    .module = *render_geometry,
+                    .pName = "render_geometry",
+                },
+            .layout = *pipeline_layout},
+        vk::ComputePipelineCreateInfo {
+            .stage =
+                vk::PipelineShaderStageCreateInfo {
+                    .stage = vk::ShaderStageFlagBits::eCompute,
                     .module = *calc_bounding_sphere,
                     .pName = "calc_bounding_sphere",
                 },
@@ -469,10 +490,8 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
         device.createComputePipelines(nullptr, compute_pipeline_infos);
 
     return Pipelines {
-        .render_geometry = std::move(graphics_pipelines[0]),
-        .geometry_depth_prepass = std::move(graphics_pipelines[1]),
         .shadow_pass = name_pipeline(
-            std::move(graphics_pipelines[2]),
+            std::move(graphics_pipelines[0]),
             device,
             "shadow_pass"
         ),
@@ -496,17 +515,20 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
             device,
             "display_transform_compute"
         ),
+        .write_visbuffer = std::move(graphics_pipelines[1]),
+        .render_geometry = std::move(compute_pipelines[4]),
+        .write_visbuffer_alphaclip = std::move(graphics_pipelines[2]),
         .pipeline_layout = std::move(pipeline_layout),
         .calc_bounding_sphere =
             {.pipeline = name_pipeline(
-                 std::move(compute_pipelines[4]),
+                 std::move(compute_pipelines[5]),
                  device,
                  "calc_bounding_sphere"
              ),
              .layout = std::move(calc_bounding_sphere_pipeline_layout)},
         .copy_quantized_positions =
             {.pipeline = name_pipeline(
-                 std::move(compute_pipelines[5]),
+                 std::move(compute_pipelines[6]),
                  device,
                  "copy_quantized_positions"
              ),

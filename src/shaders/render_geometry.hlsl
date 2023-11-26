@@ -2,63 +2,7 @@
 #include "common/debug.hlsl"
 #include "common/loading.hlsl"
 #include "common/vbuffer.hlsl"
-
-uint32_t load_index(MeshInfo mesh_info, uint32_t vertex_id) {
-    if (mesh_info.flags & MESH_INFO_FLAGS_32_BIT_INDICES) {
-        return load_value<uint32_t>(mesh_info.indices, vertex_id);
-    } else {
-        return load_value<uint16_t>(mesh_info.indices, vertex_id);
-    }
-}
-
-float4 calculate_view_pos_position(
-    Instance instance,
-    MeshInfo mesh_info,
-    uint32_t index,
-    float4x4 perspective_view_matrix
-) {
-    float3 position = float3(load_uint16_t3(mesh_info.positions, index));
-    float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
-    return mul(perspective_view_matrix, float4(world_pos, 1.0));
-}
-
-
-float4 calculate_view_pos_position(
-    Instance instance,
-    MeshInfo mesh_info,
-    uint32_t index
-) {
-    return calculate_view_pos_position(instance, mesh_info, index, uniforms.combined_perspective_view);
-}
-
-[shader("vertex")]
-float4 depth_only(
-    uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_InstanceID
-): SV_Position
-{
-    Instance instance = load_instance(instance_id);
-    MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
-    return calculate_view_pos_position(instance, mesh_info, load_index(mesh_info, vertex_id));
-}
-
-[[vk::push_constant]]
-ShadowPassConstant shadow_constant;
-
-[shader("vertex")]
-float4 shadow_pass(
-    uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_InstanceID
-): SV_Position
-{
-    Instance instance = load_instance(instance_id);
-    MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
-
-    return calculate_view_pos_position(
-        instance,
-        mesh_info,
-        load_index(mesh_info, vertex_id),
-        misc_storage[0].shadow_rendering_matrices[shadow_constant.cascade_index]
-    );
-}
+#include "common/geometry.hlsl"
 
 struct Varyings {
     [[vk::location(0)]] float4 clip_pos : SV_Position;
@@ -66,16 +10,23 @@ struct Varyings {
 };
 
 [shader("vertex")]
-Varyings VSMain(uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_InstanceID)
-{
-    Instance instance = load_instance(instance_id);
+Varyings vertex(
+    uint32_t vertex_index : SV_VertexID, uint32_t instance_index: SV_InstanceID
+) {
+    Instance instance = load_instance(instance_index);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
-
     Varyings varyings;
-    varyings.clip_pos = calculate_view_pos_position(instance, mesh_info, load_index(mesh_info, vertex_id));
-    varyings.packed = instance_id << 16 | (vertex_id / 3);
-
+    varyings.clip_pos =  calculate_view_pos_position(instance, mesh_info, load_index(mesh_info, vertex_index));
+    varyings.packed = (vertex_index / 3) << 16 | instance_index;
     return varyings;
+}
+
+[shader("pixel")]
+void pixel(
+    Varyings input,
+    [[vk::location(0)]] out uint32_t packed: SV_Target0
+) {
+    packed = input.packed;
 }
 
 static const float4x4 bias_matrix = float4x4(
@@ -91,13 +42,18 @@ struct Material {
     float roughness;
 };
 
-[shader("pixel")]
-void PSMain(
-    Varyings input,
-    [[vk::location(0)]] out float4 target_0: SV_Target0
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void render_geometry(
+    uint3 global_id: SV_DispatchThreadID
 ) {
-    uint32_t instance_index = input.packed >> 16;
-    uint32_t triangle_index = input.packed & ((1 << 16) - 1);
+    if (global_id.x >= uniforms.window_size.x || global_id.y >= uniforms.window_size.y) {
+        return;
+    }
+
+    uint32_t packed = visibility_buffer[global_id.xy];
+    uint32_t instance_index = packed & ((1 << 16) - 1);
+    uint32_t triangle_index = packed >> 16;
 
     Instance instance = load_instance(instance_index);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
@@ -108,7 +64,7 @@ void PSMain(
         load_index(mesh_info, triangle_index * 3 + 2)
     );
 
-    float2 ndc = (input.clip_pos.xy * 2.0) / uniforms.window_size - 1.0;
+    float2 ndc = float2(global_id.xy) / float2(uniforms.window_size) * 2.0 - 1.0;
 
     BarycentricDeriv bary = CalcFullBary(
         calculate_view_pos_position(instance, mesh_info, indices.x),
@@ -175,8 +131,8 @@ void PSMain(
     Material material;
 
     float n_dot_l = max(dot(uniforms.sun_dir, normal), 0.0);
-    material.albedo = textures[mesh_info.albedo_texture_index].SampleGrad(repeat_sampler, uv.value, uv.dx, uv.dy).rgb;
-    float2 metallic_roughness = textures[mesh_info.metallic_roughness_texture_index].SampleGrad(repeat_sampler, uv.value, uv.dx, uv.dy).yx;
+    material.albedo = textures[NonUniformResourceIndex(mesh_info.albedo_texture_index)].SampleGrad(repeat_sampler, uv.value, uv.dx, uv.dy).rgb;
+    float2 metallic_roughness = textures[NonUniformResourceIndex(mesh_info.metallic_roughness_texture_index)].SampleGrad(repeat_sampler, uv.value, uv.dx, uv.dy).yx;
     material.roughness = metallic_roughness.x;
     material.metallic = metallic_roughness.y;
 
@@ -186,13 +142,14 @@ void PSMain(
 
     float3 diffuse = material.albedo * lighting;
 
-    target_0 = float4(diffuse, 1.0);
+    rw_scene_referred_framebuffer[global_id.xy] = float4(diffuse, 1.0);
 
-    if (uniforms.debug_cascades) {
+    if (uniforms.debug == UNIFORMS_DEBUG_CASCADES) {
         float3 debug_col = DEBUG_COLOURS[cascade_index];
-        target_0 = float4(material.albedo * debug_col, 1.0);
+        rw_scene_referred_framebuffer[global_id.xy] = float4(material.albedo * debug_col, 1.0);
+    } else if (uniforms.debug == UNIFORMS_DEBUG_TRIANGLE_INDEX) {
+        rw_scene_referred_framebuffer[global_id.xy] = float4(DEBUG_COLOURS[triangle_index % 10], 1.0);
+    } else if (uniforms.debug == UNIFORMS_DEBUG_INSTANCE_INDEX) {
+        rw_scene_referred_framebuffer[global_id.xy] = float4(DEBUG_COLOURS[instance_index % 10], 1.0);
     }
-
-    //target_0 = input.clip_pos;//float4(input.clip_pos.xy / 2.0 / uniforms.window_size, 0.0, 1.0);
-    //target_0 = float4(ndc, 0.0, 1.0);
 }

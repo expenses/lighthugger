@@ -457,6 +457,12 @@ GltfMesh load_gltf(
                     temp_buffers
                 );
 
+                auto triangle_count = indices.count / 3;
+                if (triangle_count >= (1 << 16)) {
+                    dbg(triangle_count);
+                    abort();
+                }
+
                 calc_bounding_sphere(
                     device,
                     command_buffer,

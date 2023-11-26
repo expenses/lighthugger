@@ -29,18 +29,17 @@ DisplayTransformConstant display_transform_constant;
 void display_transform(
     uint3 global_id: SV_DispatchThreadID
 ) {
-    uint32_t width;
-    uint32_t height;
-    scene_referred_framebuffer.GetDimensions(width, height);
+    if (global_id.x >= uniforms.window_size.x || global_id.y >= uniforms.window_size.y) {
+        return;
+    }
 
-    float2 pixel_size = 1.0 / float2(width, height);
-    float2 uv = (float2(global_id.xy) + 0.5) * pixel_size;
-
-    float3 stimulus = scene_referred_framebuffer.SampleLevel(clamp_sampler, uv, 0.0);
+    float3 stimulus = scene_referred_framebuffer[global_id.xy];
 
     float3 linear_display_referred_value = tony_mc_mapface(stimulus);
 
     if (uniforms.debug_shadowmaps) {
+        float2 uv = (float2(global_id.xy) + 0.5) / float2(uniforms.window_size);
+
         float shadow_screen_percentage = 0.3;
 
         if (uv.x < shadow_screen_percentage && uv.y < shadow_screen_percentage) {

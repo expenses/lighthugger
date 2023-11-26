@@ -56,6 +56,11 @@ struct MiscStorageBuffer {
     uint32_t num_alpha_clip_draws;
 };
 
+const static int32_t UNIFORMS_DEBUG_OFF = 0;
+const static int32_t UNIFORMS_DEBUG_CASCADES = 1;
+const static int32_t UNIFORMS_DEBUG_TRIANGLE_INDEX = 2;
+const static int32_t UNIFORMS_DEBUG_INSTANCE_INDEX = 3;
+
 struct Uniforms {
     MATRIX4_TYPE combined_perspective_view;
     MATRIX4_TYPE inv_perspective_view;
@@ -65,7 +70,7 @@ struct Uniforms {
     VEC3_TYPE sun_intensity;
     uint32_t num_instances;
     UVEC2_TYPE window_size;
-    bool debug_cascades;
+    int32_t debug;
     uint32_t _padding;
     bool debug_shadowmaps;
 };

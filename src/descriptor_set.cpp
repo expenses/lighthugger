@@ -35,21 +35,39 @@ void DescriptorSet::write_resizing_descriptors(
         .imageView = *resizing_resources.depthbuffer.view,
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
 
+    auto rw_scene_referred_framebuffer_info = vk::DescriptorImageInfo {
+        .imageView = *resizing_resources.scene_referred_framebuffer.view,
+        .imageLayout = vk::ImageLayout::eGeneral};
+
+    auto visbuffer_image_info = vk::DescriptorImageInfo {
+        .imageView = *resizing_resources.visbuffer.view,
+        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
+
     device.updateDescriptorSets(
-        {
-            vk::WriteDescriptorSet {
-                .dstSet = *set,
-                .dstBinding = 3,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampledImage,
-                .pImageInfo = &image_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *set,
-                .dstBinding = 7,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampledImage,
-                .pImageInfo = &depthbuffer_image_info},
-        },
+        {vk::WriteDescriptorSet {
+             .dstSet = *set,
+             .dstBinding = 3,
+             .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eSampledImage,
+             .pImageInfo = &image_info},
+         vk::WriteDescriptorSet {
+             .dstSet = *set,
+             .dstBinding = 7,
+             .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eSampledImage,
+             .pImageInfo = &depthbuffer_image_info},
+         vk::WriteDescriptorSet {
+             .dstSet = *set,
+             .dstBinding = 12,
+             .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eStorageImage,
+             .pImageInfo = &rw_scene_referred_framebuffer_info},
+         vk::WriteDescriptorSet {
+             .dstSet = *set,
+             .dstBinding = 13,
+             .descriptorCount = 1,
+             .descriptorType = vk::DescriptorType::eSampledImage,
+             .pImageInfo = &visbuffer_image_info}},
         {}
     );
 

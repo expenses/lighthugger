@@ -35,7 +35,7 @@ struct RaiiAllocator {
 int main() {
     glfwInit();
 
-    auto vulkan_version = VK_API_VERSION_1_2;
+    auto vulkan_version = VK_API_VERSION_1_3;
 
     vk::ApplicationInfo appInfo = {
         .pApplicationName = "Hello Triangle",
@@ -113,6 +113,7 @@ int main() {
     auto vulkan_1_2_features = vk::PhysicalDeviceVulkan12Features {
         .drawIndirectCount = true,
         .shaderInt8 = true,
+        .shaderSampledImageArrayNonUniformIndexing = true,
         .descriptorBindingPartiallyBound = true,
         .runtimeDescriptorArray = true,
         .bufferDeviceAddress = true,
@@ -120,7 +121,8 @@ int main() {
 
     vk::PhysicalDeviceDynamicRenderingFeatures dyn_rendering_features = {
         .pNext = &vulkan_1_2_features,
-        .dynamicRendering = true};
+        .dynamicRendering = true,
+    };
 
     auto vulkan_1_0_features = vk::PhysicalDeviceFeatures {
         .multiDrawIndirect = true,
@@ -630,7 +632,6 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         {
-            ImGui::Checkbox("debug cascades", &uniforms->debug_cascades);
             ImGui::Checkbox("debug shadowmaps", &uniforms->debug_shadowmaps);
             ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
             ImGui::SliderFloat(
@@ -650,6 +651,26 @@ int main() {
             ImGui::Text("sun_latitude: %f", camera_params.sun_latitude);
             ImGui::Text("sun_longitude: %f", camera_params.sun_longitude);
             ImGui::Text("grab_toggled: %u", keyboard_state.grab_toggled);
+            ImGui::RadioButton(
+                "Debug: Off",
+                &uniforms->debug,
+                UNIFORMS_DEBUG_OFF
+            );
+            ImGui::RadioButton(
+                "Debug: Cascades",
+                &uniforms->debug,
+                UNIFORMS_DEBUG_CASCADES
+            );
+            ImGui::RadioButton(
+                "Debug: Triangle index",
+                &uniforms->debug,
+                UNIFORMS_DEBUG_TRIANGLE_INDEX
+            );
+            ImGui::RadioButton(
+                "Debug: Instance Index",
+                &uniforms->debug,
+                UNIFORMS_DEBUG_INSTANCE_INDEX
+            );
         }
         ImGui::Render();
 

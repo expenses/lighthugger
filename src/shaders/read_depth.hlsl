@@ -1,6 +1,7 @@
 #include "common/bindings.hlsl"
 #include "common/matrices.hlsl"
 #include "common/loading.hlsl"
+#include "common/geometry.hlsl"
 
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38
@@ -22,10 +23,11 @@ uint32_t min4(uint4 values) {
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void read_depth(uint3 global_id: SV_DispatchThreadID){
-    uint32_t width;
-    uint32_t height;
-    depth_buffer.GetDimensions(width, height);
-    float2 pixel_size = 1.0 / float2(width, height);
+    if (global_id.x >= uniforms.window_size.x || global_id.y >= uniforms.window_size.y) {
+        return;
+    }
+
+    float2 pixel_size = 1.0 / float2(uniforms.window_size);
 
     // Sample the depth values for a 4x4 block.
     uint2 coord = global_id.xy * 4;

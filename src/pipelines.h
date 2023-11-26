@@ -12,13 +12,14 @@ struct PipelineAndLayout {
 };
 
 struct Pipelines {
-    vk::raii::Pipeline render_geometry;
-    vk::raii::Pipeline geometry_depth_prepass;
     vk::raii::Pipeline shadow_pass;
     vk::raii::Pipeline read_depth;
     vk::raii::Pipeline generate_matrices;
     vk::raii::Pipeline write_draw_calls;
     vk::raii::Pipeline display_transform;
+    vk::raii::Pipeline write_visbuffer;
+    vk::raii::Pipeline render_geometry;
+    vk::raii::Pipeline write_visbuffer_alphaclip;
     vk::raii::PipelineLayout pipeline_layout;
 
     PipelineAndLayout calc_bounding_sphere;

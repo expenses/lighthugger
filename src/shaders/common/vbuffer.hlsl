@@ -1,3 +1,5 @@
+#pragma once
+
 // Copied from http://filmicworlds.com/blog/visibility-buffer-rendering-with-material-graphs/.
 // Edits are marked.
 
