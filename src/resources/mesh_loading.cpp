@@ -46,6 +46,43 @@ struct NodeTree {
     }
 };
 
+uint32_t size_for_accessor(const fastgltf::Accessor& accessor, bool pad) {
+    uint32_t num_components;
+    uint32_t component_size;
+    switch (accessor.type) {
+        case fastgltf::AccessorType::Scalar:
+            num_components = 1;
+            break;
+        case fastgltf::AccessorType::Vec2:
+            num_components = 2;
+            break;
+        case fastgltf::AccessorType::Vec3:
+            num_components = pad ? 4 : 3;
+            break;
+        case fastgltf::AccessorType::Vec4:
+            num_components = 4;
+            break;
+        default:
+            abort();
+    }
+    switch (accessor.componentType) {
+        case fastgltf::ComponentType::Byte:
+        case fastgltf::ComponentType::UnsignedByte:
+            component_size = 1;
+            break;
+        case fastgltf::ComponentType::Short:
+        case fastgltf::ComponentType::UnsignedShort:
+            component_size = 2;
+            break;
+        case fastgltf::ComponentType::Int:
+        case fastgltf::ComponentType::UnsignedInt:
+            component_size = 4;
+            break;
+    }
+
+    return num_components * component_size * accessor.count;
+}
+
 void copy_buffer_to_final(
     const fastgltf::Accessor& accessor,
     const fastgltf::Asset& asset,
