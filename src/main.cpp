@@ -131,9 +131,7 @@ int main() {
     };
 
     auto device_extensions = std::array {
-        "VK_KHR_swapchain",
-        "VK_KHR_dynamic_rendering",
-        "VK_KHR_shader_non_semantic_info"};
+        "VK_KHR_swapchain"};
 
     vk::raii::Device device = phys_device.createDevice(
         {
@@ -251,10 +249,16 @@ int main() {
             .descriptorCount = 1024},
         vk::DescriptorPoolSize {
             .type = vk::DescriptorType::eSampler,
-            .descriptorCount = 1024},
+            .descriptorCount = 10},
         vk::DescriptorPoolSize {
             .type = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1024}};
+            .descriptorCount = 10},
+        vk::DescriptorPoolSize {
+            .type = vk::DescriptorType::eStorageImage,
+            .descriptorCount = 10},
+            vk::DescriptorPoolSize {
+            .type = vk::DescriptorType::eUniformBuffer,
+            .descriptorCount = 1}};
 
     auto descriptor_pool = device.createDescriptorPool(
         {.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
@@ -453,6 +457,7 @@ int main() {
             .addressModeU = vk::SamplerAddressMode::eRepeat,
             .addressModeV = vk::SamplerAddressMode::eRepeat,
             .addressModeW = vk::SamplerAddressMode::eRepeat,
+            .minLod = 0.0f,
             .maxLod = VK_LOD_CLAMP_NONE}),
         .clamp_sampler = device.createSampler(vk::SamplerCreateInfo {
             .magFilter = vk::Filter::eLinear,
@@ -460,6 +465,7 @@ int main() {
             .addressModeU = vk::SamplerAddressMode::eClampToEdge,
             .addressModeV = vk::SamplerAddressMode::eClampToEdge,
             .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+            .minLod = 0.0f,
             .maxLod = VK_LOD_CLAMP_NONE}),
         .shadowmap_comparison_sampler =
             device.createSampler(vk::SamplerCreateInfo {
@@ -470,6 +476,7 @@ int main() {
                 .addressModeW = vk::SamplerAddressMode::eClampToEdge,
                 .compareEnable = true,
                 .compareOp = vk::CompareOp::eLess,
+                .minLod = 0.0f,
                 .maxLod = VK_LOD_CLAMP_NONE})};
 
     command_buffer.end();

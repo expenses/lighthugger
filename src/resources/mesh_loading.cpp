@@ -419,6 +419,17 @@ GltfMesh load_gltf(
                     texture_scale /= float((1 << 16) - 1);
                 }
 
+                uint32_t flags = 0;
+                if (uses_32_bit_indices) {
+                    flags |= MESH_INFO_FLAGS_32_BIT_INDICES;
+                }
+                if (material.alphaMode == fastgltf::AlphaMode::Mask) {
+                    flags |= MESH_INFO_FLAGS_ALPHA_CLIP;
+                }
+                if (material.doubleSided) {
+                    flags |= MESH_INFO_FLAGS_DOUBLE_SIDED;
+                }
+
                 auto mesh_info = MeshInfo {
                     .positions = device.getBufferAddress(
                         {.buffer = position_buffer.buffer}
@@ -433,12 +444,7 @@ GltfMesh load_gltf(
                         device.getBufferAddress({.buffer = uvs_buffer.buffer}),
                     .num_indices = static_cast<uint32_t>(indices.count),
                     .num_vertices = static_cast<uint32_t>(positions.count),
-                    .flags =
-                        (uses_32_bit_indices ? MESH_INFO_FLAGS_32_BIT_INDICES
-                                             : 0)
-                        | (material.alphaMode == fastgltf::AlphaMode::Mask
-                               ? MESH_INFO_FLAGS_ALPHA_CLIP
-                               : 0),
+                    .flags = flags,
                     .bounding_sphere_radius = 0.0f,
                     .texture_scale = texture_scale,
                     .texture_offset = texture_offset,

@@ -115,7 +115,8 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .binding = 0,
             .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 512,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eFragment,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute
+                | vk::ShaderStageFlagBits::eFragment,
         },
         // instance buffer
         vk::DescriptorSetLayoutBinding {
@@ -160,7 +161,8 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .binding = 6,
             .descriptorType = vk::DescriptorType::eSampler,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eFragment,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute
+                | vk::ShaderStageFlagBits::eFragment,
         },
         // depthbuffer
         vk::DescriptorSetLayoutBinding {
@@ -321,10 +323,8 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
         "compiled_shaders/write_draw_calls.spv"
     );
 
-    auto shadows = create_shader_from_file(
-        device,
-        "compiled_shaders/shadows.spv"
-    );
+    auto shadows =
+        create_shader_from_file(device, "compiled_shaders/shadows.spv");
 
     auto calc_bounding_sphere = create_shader_from_file(
         device,

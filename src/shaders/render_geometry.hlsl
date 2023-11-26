@@ -109,6 +109,9 @@ void render_geometry(
         }
     }
 
+    // Use the tiniest shadow bias for double sided meshes.
+    float shadow_bias = (mesh_info.flags & MESH_INFO_FLAGS_DOUBLE_SIDED) ? 0.000001 : 0.0;
+
     float4 shadow_view_coord = mul(bias_matrix, shadow_coord);
     shadow_view_coord /= shadow_view_coord.w;
     float shadow_sum = 0.0;
@@ -118,7 +121,7 @@ void render_geometry(
             shadow_sum += shadowmap.SampleCmpLevelZero(
                 shadowmap_comparison_sampler,
                 float3(shadow_view_coord.xy + offset, cascade_index),
-                shadow_view_coord.z
+                shadow_view_coord.z - shadow_bias
             );
         }
     }
