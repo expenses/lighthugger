@@ -1,6 +1,6 @@
-#include "common/geometry.hlsl"
+#include "../common/geometry.hlsl"
 
-struct VaryingsAlphaClip {
+struct Varyings {
     [[vk::location(0)]] float4 clip_pos : SV_Position;
     [[vk::location(1)]] uint32_t packed: ATTRIB0;
     [[vk::location(2)]] float2 uv: ATTRIB1;
@@ -8,12 +8,12 @@ struct VaryingsAlphaClip {
 };
 
 [shader("vertex")]
-VaryingsAlphaClip vertex(
+Varyings vertex(
     uint32_t vertex_index : SV_VertexID, uint32_t instance_index: SV_InstanceID
 ) {
     Instance instance = load_instance(instance_index);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
-    VaryingsAlphaClip varyings;
+    Varyings varyings;
     uint32_t index = load_index(mesh_info, vertex_index);
     varyings.clip_pos =  calculate_view_pos_position(instance, mesh_info, index);
     varyings.packed = (vertex_index / 3) << 16 | instance_index;
@@ -24,7 +24,7 @@ VaryingsAlphaClip vertex(
 
 [shader("pixel")]
 void pixel(
-    VaryingsAlphaClip input,
+    Varyings input,
     [[vk::location(0)]] out uint32_t packed: SV_Target0
 ) {
     if (textures[input.albedo_texture_index].Sample(repeat_sampler, input.uv).a < 0.5) {

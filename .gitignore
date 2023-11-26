@@ -1,5 +1,5 @@
 build
-compiled_shaders/*.spv
+compiled_shaders
 *.tracy
 imgui.ini
 traces

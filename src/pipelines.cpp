@@ -332,6 +332,16 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
     auto shadows =
         create_shader_from_file(device, "compiled_shaders/shadows.spv");
 
+    auto visbuffer_opaque = create_shader_from_file(
+        device,
+        "compiled_shaders/visbuffer_rasterization/opaque.spv"
+    );
+
+    auto visbuffer_alpha_clip = create_shader_from_file(
+        device,
+        "compiled_shaders/visbuffer_rasterization/alpha_clip.spv"
+    );
+
     auto calc_bounding_sphere = create_shader_from_file(
         device,
         "compiled_shaders/calc_bounding_sphere.spv"
@@ -342,29 +352,26 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
         "compiled_shaders/copy_quantized_positions.spv"
     );
 
-    auto alpha_clip =
-        create_shader_from_file(device, "compiled_shaders/alpha_clip.spv");
-
     auto visbuffer_stages = std::array {
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eVertex,
-            .module = *render_geometry,
+            .module = *visbuffer_opaque,
             .pName = "vertex",
         },
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eFragment,
-            .module = *render_geometry,
+            .module = *visbuffer_opaque,
             .pName = "pixel"}};
 
     auto visbuffer_alpha_clip_stages = std::array {
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eVertex,
-            .module = *alpha_clip,
+            .module = *visbuffer_alpha_clip,
             .pName = "vertex",
         },
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eFragment,
-            .module = *alpha_clip,
+            .module = *visbuffer_alpha_clip,
             .pName = "pixel"}};
 
     auto opaque_shadow_stage = std::array {vk::PipelineShaderStageCreateInfo {

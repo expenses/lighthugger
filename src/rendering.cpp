@@ -38,56 +38,7 @@ void render(
     uint32_t swapchain_image_index
 ) {
     ZoneScoped;
-    TracyVkZone(tracy_ctx, *command_buffer, "main");
-
-    auto draw_call_counts_offset = sizeof(glm::mat4) * 4 + 8;
-
-    {
-        TracyVkZone(tracy_ctx, *command_buffer, "buffer clears");
-
-        // Clear the depth min/max values.
-        auto offset = sizeof(glm::mat4) * 4;
-        command_buffer.fillBuffer(
-            resources.misc_storage_buffer.buffer,
-            offset,
-            4,
-            u32_max
-        );
-        // Zero out both the max depth and the draw call counts.
-        command_buffer.fillBuffer(
-            resources.misc_storage_buffer.buffer,
-            offset + 4,
-            12,
-            0
-        );
-    }
-
-    set_scissor_and_viewport(command_buffer, extent.width, extent.height);
-    command_buffer.bindDescriptorSets(
-        vk::PipelineBindPoint::eGraphics,
-        *pipelines.pipeline_layout,
-        0,
-        {*descriptor_set.set},
-        {}
-    );
-    command_buffer.bindDescriptorSets(
-        vk::PipelineBindPoint::eCompute,
-        *pipelines.pipeline_layout,
-        0,
-        {*descriptor_set.set,
-         *descriptor_set.swapchain_image_sets[swapchain_image_index]},
-        {}
-    );
-
-    {
-        TracyVkZone(tracy_ctx, *command_buffer, "write draw calls");
-
-        command_buffer.bindPipeline(
-            vk::PipelineBindPoint::eCompute,
-            *pipelines.write_draw_calls
-        );
-        command_buffer.dispatch(1, 1, 1);
-    }
+    TracyVkZone(tracy_ctx, *command_buffer, "render");
 
     insert_color_image_barriers(
         command_buffer,
@@ -143,9 +94,58 @@ void render(
         }
     );
 
-    // Depth pre-pass
+    auto draw_call_counts_offset = sizeof(glm::mat4) * 4 + 8;
+
     {
-        TracyVkZone(tracy_ctx, *command_buffer, "depth pre pass");
+        TracyVkZone(tracy_ctx, *command_buffer, "buffer clears");
+
+        // Clear the depth min/max values.
+        auto offset = sizeof(glm::mat4) * 4;
+        command_buffer.fillBuffer(
+            resources.misc_storage_buffer.buffer,
+            offset,
+            4,
+            u32_max
+        );
+        // Zero out both the max depth and the draw call counts.
+        command_buffer.fillBuffer(
+            resources.misc_storage_buffer.buffer,
+            offset + 4,
+            12,
+            0
+        );
+    }
+
+    command_buffer.bindDescriptorSets(
+        vk::PipelineBindPoint::eCompute,
+        *pipelines.pipeline_layout,
+        0,
+        {*descriptor_set.set,
+         *descriptor_set.swapchain_image_sets[swapchain_image_index]},
+        {}
+    );
+
+    {
+        TracyVkZone(tracy_ctx, *command_buffer, "write draw calls");
+
+        command_buffer.bindPipeline(
+            vk::PipelineBindPoint::eCompute,
+            *pipelines.write_draw_calls
+        );
+        command_buffer.dispatch(1, 1, 1);
+    }
+
+    set_scissor_and_viewport(command_buffer, extent.width, extent.height);
+    command_buffer.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics,
+        *pipelines.pipeline_layout,
+        0,
+        {*descriptor_set.set},
+        {}
+    );
+
+    {
+        TracyVkZone(tracy_ctx, *command_buffer, "visbuffer rendering");
 
         vk::RenderingAttachmentInfoKHR visbuffer_attachment_info = {
             .imageView = *resources.resizing.visbuffer.view,
@@ -175,26 +175,42 @@ void render(
             vk::PipelineBindPoint::eGraphics,
             *pipelines.render_visbuffer.opaque
         );
-        command_buffer.drawIndirectCount(
-            resources.draw_calls_buffer.buffer,
-            0,
-            resources.misc_storage_buffer.buffer,
-            draw_call_counts_offset,
-            MAX_OPAQUE_DRAWS,
-            sizeof(vk::DrawIndirectCommand)
-        );
+        {
+            TracyVkZone(
+                tracy_ctx,
+                *command_buffer,
+                "visbuffer: opaque geometry"
+            );
+
+            command_buffer.drawIndirectCount(
+                resources.draw_calls_buffer.buffer,
+                0,
+                resources.misc_storage_buffer.buffer,
+                draw_call_counts_offset,
+                MAX_OPAQUE_DRAWS,
+                sizeof(vk::DrawIndirectCommand)
+            );
+        }
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eGraphics,
             *pipelines.render_visbuffer.alpha_clip
         );
-        command_buffer.drawIndirectCount(
-            resources.draw_calls_buffer.buffer,
-            ALPHA_CLIP_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
-            resources.misc_storage_buffer.buffer,
-            draw_call_counts_offset + 4,
-            MAX_ALPHA_CLIP_DRAWS,
-            sizeof(vk::DrawIndirectCommand)
-        );
+        {
+            TracyVkZone(
+                tracy_ctx,
+                *command_buffer,
+                "visbuffer: alpha clip geometry"
+            );
+
+            command_buffer.drawIndirectCount(
+                resources.draw_calls_buffer.buffer,
+                ALPHA_CLIP_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
+                resources.misc_storage_buffer.buffer,
+                draw_call_counts_offset + 4,
+                MAX_ALPHA_CLIP_DRAWS,
+                sizeof(vk::DrawIndirectCommand)
+            );
+        }
         command_buffer.endRendering();
     }
 
@@ -274,26 +290,42 @@ void render(
                 vk::PipelineBindPoint::eGraphics,
                 *pipelines.render_shadowmap.opaque
             );
-            command_buffer.drawIndirectCount(
-                resources.draw_calls_buffer.buffer,
-                0,
-                resources.misc_storage_buffer.buffer,
-                draw_call_counts_offset,
-                MAX_OPAQUE_DRAWS,
-                sizeof(vk::DrawIndirectCommand)
-            );
+            {
+                TracyVkZone(
+                    tracy_ctx,
+                    *command_buffer,
+                    "shadowmap: opaque geometry"
+                );
+
+                command_buffer.drawIndirectCount(
+                    resources.draw_calls_buffer.buffer,
+                    0,
+                    resources.misc_storage_buffer.buffer,
+                    draw_call_counts_offset,
+                    MAX_OPAQUE_DRAWS,
+                    sizeof(vk::DrawIndirectCommand)
+                );
+            }
             command_buffer.bindPipeline(
                 vk::PipelineBindPoint::eGraphics,
                 *pipelines.render_shadowmap.alpha_clip
             );
-            command_buffer.drawIndirectCount(
-                resources.draw_calls_buffer.buffer,
-                ALPHA_CLIP_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
-                resources.misc_storage_buffer.buffer,
-                draw_call_counts_offset + 4,
-                MAX_ALPHA_CLIP_DRAWS,
-                sizeof(vk::DrawIndirectCommand)
-            );
+            {
+                TracyVkZone(
+                    tracy_ctx,
+                    *command_buffer,
+                    "shadowmap: alpha clip geometry"
+                );
+
+                command_buffer.drawIndirectCount(
+                    resources.draw_calls_buffer.buffer,
+                    ALPHA_CLIP_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
+                    resources.misc_storage_buffer.buffer,
+                    draw_call_counts_offset + 4,
+                    MAX_ALPHA_CLIP_DRAWS,
+                    sizeof(vk::DrawIndirectCommand)
+                );
+            }
             command_buffer.endRendering();
         }
     }
