@@ -17,6 +17,19 @@ Instance load_instance(uint32_t offset) {
 }
 
 uint32_t load_index(MeshInfo mesh_info, uint32_t vertex_id) {
+    // If we're rendering a double-sided mesh then twice the number of
+    // vertex shader invocations are run. We need to flip the winding order
+    // of the triangles in the second invocation.
+    if (vertex_id > mesh_info.num_indices) {
+        vertex_id -= mesh_info.num_indices;
+
+        uint32_t base_id = (vertex_id / 3) * 3;
+        uint32_t corner = vertex_id % 3;
+
+        // flip the winding order.
+        vertex_id = base_id + (2 - corner);
+    }
+
     if (mesh_info.flags & MESH_INFO_FLAGS_32_BIT_INDICES) {
         return load_value<uint32_t>(mesh_info.indices, vertex_id);
     } else {

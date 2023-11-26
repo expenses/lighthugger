@@ -53,7 +53,8 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
 
     // Todo: merge draw calls that use the same mesh.
 
-    draw_calls[current_draw].vertexCount = mesh_info.num_indices;
+    // Double-sided meshes use twice the number of vertex shader invocations.
+    draw_calls[current_draw].vertexCount = mesh_info.num_indices * (mesh_info.flags & MESH_INFO_FLAGS_DOUBLE_SIDED ? 2 : 1);
     draw_calls[current_draw].instanceCount = 1;
     draw_calls[current_draw].firstVertex = 0;
     draw_calls[current_draw].firstInstance = id;
