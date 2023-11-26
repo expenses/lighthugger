@@ -22,15 +22,11 @@ struct Material {
 void render_geometry(
     uint3 global_id: SV_DispatchThreadID
 ) {
-    uint64_t start_time = 0;
-
-    if (uniforms.debug == UNIFORMS_DEBUG_SHADER_CLOCK) {
-        start_time = vk::ReadClock(vk::SubgroupScope);
-    }
-
     if (global_id.x >= uniforms.window_size.x || global_id.y >= uniforms.window_size.y) {
         return;
     }
+
+    uint64_t start_time = vk::ReadClock(vk::SubgroupScope);
 
     uint32_t packed = visibility_buffer[global_id.xy];
     uint32_t instance_index = packed & ((1 << 16) - 1);
@@ -59,12 +55,9 @@ void render_geometry(
         uniforms.window_size
     );
 
-    // Reconstruct the world position from ndc (without reinterpolating)
-    // See https://github.com/ConfettiFX/The-Forge/tree/master/Examples_3/Visibility_Buffer/Documentation.
-    // 'Reconstruct the Z value at this screen point performing only the necessary matrix * vector multiplication
-    // operations that involve computing Z'
-    float z = bary.interpW * uniforms.combined_perspective_view[2][2] + uniforms.combined_perspective_view[2][3];
-    float3 world_pos = mul(uniforms.inv_perspective_view, float4(ndc * bary.interpW, z, bary.interpW)).xyz;
+    float3 world_pos = interpolate(
+        bary, pos_a, pos_b, pos_c
+    ).value;
 
     InterpolatedVector<float2> uv = interpolate(
         bary,
@@ -84,21 +77,16 @@ void render_geometry(
     ).value;
     normal = normalize(mul(instance.normal_transform, normal));
 
-    if (mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP) {
-        // Calculate whether the triangle is back facing using the (unnormalized) geometric normal.
-        // I tried getting this with the code from
-        // https://registry.khronos.org/vulkan/specs/1.3-khr-extensions/html/chap22.html#tessellation-vertex-winding-order
-        // but I had problems with large triangles that go over the edges of the screen.
-        float3 geometric_normal = cross(pos_b - pos_a, pos_c - pos_a);
-        bool is_back_facing = dot(geometric_normal, view_vector) > 0;
+    // Calculate whether the triangle is back facing using the (unnormalized) geometric normal.
+    // I tried getting this with the code from
+    // https://registry.khronos.org/vulkan/specs/1.3-khr-extensions/html/chap22.html#tessellation-vertex-winding-order
+    // but I had problems with large triangles that go over the edges of the screen.
+    float3 geometric_normal = cross(pos_b - pos_a, pos_c - pos_a);
+    bool is_back_facing = dot(geometric_normal, view_vector) > 0;
 
-        // For leaves etc, we shouldn't treat them as totally opaque by just flipping
-        // the normals like this. But it's fine for now.
-
-        if (is_back_facing) {
-            normal = -normal;
-        }
-    }
+    // For leaves etc, we shouldn't treat them as totally opaque by just flipping
+    // the normals like this. But it's fine for now.
+    normal = select(is_back_facing, -normal, normal);
 
     uint32_t cascade_index;
     float4 shadow_coord = float4(0,0,0,0);
@@ -130,9 +118,9 @@ void render_geometry(
     }
     shadow_sum /= 9.0;
 
-    if (shadow_view_coord.z > 1) {
-        shadow_sum = 1.0;
-    }
+    // If the shadow coord clips the far plane of the shadow frustum
+    // then just ignore any shadow values.
+    shadow_sum = select(shadow_view_coord.z > 1, 1.0, shadow_sum);
 
     Material material;
 

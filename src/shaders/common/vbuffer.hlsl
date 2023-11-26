@@ -8,8 +8,6 @@ struct BarycentricDeriv
   float3 m_lambda;
   float3 m_ddx;
   float3 m_ddy;
-  // EDIT: Added in order to derive the position.
-  float interpW;
 };
 
 BarycentricDeriv CalcFullBary(float4 pt0, float4 pt1, float4 pt2, float2 pixelNdc, float2 winSize)
@@ -50,9 +48,6 @@ BarycentricDeriv CalcFullBary(float4 pt0, float4 pt1, float4 pt2, float2 pixelNd
 
   ret.m_ddx = interpW_ddx*(ret.m_lambda*interpInvW + ret.m_ddx) - ret.m_lambda;
   ret.m_ddy = interpW_ddy*(ret.m_lambda*interpInvW + ret.m_ddy) - ret.m_lambda;
-
-  // EDIT: See comment above.
-  ret.interpW = interpW;
 
   return ret;
 }
