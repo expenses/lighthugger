@@ -62,11 +62,7 @@ float4 shadow_pass(
 
 struct Varyings {
     [[vk::location(0)]] float4 clip_pos : SV_Position;
-    [[vk::location(1)]] float3 world_pos : ATTRIB0;
-    [[vk::location(2)]] float3 normal: ATTRIB1;
-    [[vk::location(3)]] float2 uv: ATTRIB2;
-    [[vk::location(4)]] uint32_t instance_index: ATTRIB3;
-    //[[vk::location(5)]] float2 barycentrics: ATTRIB4;
+    [[vk::location(1)]] uint32_t packed: ATTRIB0;
 };
 
 [shader("vertex")]
@@ -76,28 +72,8 @@ Varyings VSMain(uint32_t vertex_id : SV_VertexID, uint32_t instance_id: SV_Insta
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
 
     Varyings varyings;
-    varyings.instance_index = instance_id;
-
-    //varyings.barycentrics = float2(vertex_id % 3 == 0, vertex_id % 3 == 1);
-
-    uint32_t offset;
-
-    if (mesh_info.flags & MESH_INFO_FLAGS_32_BIT_INDICES) {
-        offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
-    } else {
-        offset = load_value<uint16_t>(mesh_info.indices, vertex_id);
-    }
-    float3 position = float3(load_uint16_t3(mesh_info.positions, offset));
-    varyings.uv = float2(load_value<uint16_t2>(mesh_info.uvs, offset));
-    varyings.uv = varyings.uv * mesh_info.texture_scale + mesh_info.texture_offset;
-
-    // Load 3 x i8 with a padding byte.
-    int16_t4 normal_unpacked = unpack_s8s16(load_value<int8_t4_packed>(mesh_info.normals, offset));
-    varyings.normal = normalize(float3(normal_unpacked.xyz));
-
-    varyings.world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
-    varyings.normal = mul(instance.normal_transform, varyings.normal);
-    varyings.clip_pos = mul(uniforms.combined_perspective_view, float4(varyings.world_pos, 1.0));
+    varyings.clip_pos = calculate_view_pos_position(instance, mesh_info, load_index(mesh_info, vertex_id));
+    varyings.packed = instance_id << 16 | (vertex_id / 3);
 
     return varyings;
 }
@@ -120,14 +96,56 @@ void PSMain(
     Varyings input,
     [[vk::location(0)]] out float4 target_0: SV_Target0
 ) {
-    Instance instance = load_instance(input.instance_index);
+    uint32_t instance_index = input.packed >> 16;
+    uint32_t triangle_index = input.packed & ((1 << 16) - 1);
+
+    Instance instance = load_instance(instance_index);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
+
+    uint3 indices = uint3(
+        load_index(mesh_info, triangle_index * 3),
+        load_index(mesh_info, triangle_index * 3 + 1),
+        load_index(mesh_info, triangle_index * 3 + 2)
+    );
+
+    float2 ndc = (input.clip_pos.xy * 2.0) / uniforms.window_size - 1.0;
+
+    BarycentricDeriv bary = CalcFullBary(
+        calculate_view_pos_position(instance, mesh_info, indices.x),
+        calculate_view_pos_position(instance, mesh_info, indices.y),
+        calculate_view_pos_position(instance, mesh_info, indices.z),
+        ndc,
+        uniforms.window_size
+    );
+
+    // Reconstruct the world position from ndc (without reinterpolating)
+    // See https://github.com/ConfettiFX/The-Forge/tree/master/Examples_3/Visibility_Buffer/Documentation.
+    // 'Reconstruct the Z value at this screen point performing only the necessary matrix * vector multiplication
+    // operations that involve computing Z'
+    float z = bary.interpW * uniforms.combined_perspective_view[2][2] + uniforms.combined_perspective_view[2][3];
+    float3 world_pos = mul(uniforms.inv_perspective_view, float4(ndc * bary.interpW, z, bary.interpW)).xyz;
+
+    InterpolatedVector<float2> uv = interpolate(
+        bary,
+        float2(load_value<uint16_t2>(mesh_info.uvs, indices.x)) * mesh_info.texture_scale + mesh_info.texture_offset,
+        float2(load_value<uint16_t2>(mesh_info.uvs, indices.y)) * mesh_info.texture_scale + mesh_info.texture_offset,
+        float2(load_value<uint16_t2>(mesh_info.uvs, indices.z)) * mesh_info.texture_scale + mesh_info.texture_offset
+    );
+
+    // Load 3 x i8 with a padding byte.
+    float3 normal = interpolate(
+        bary,
+        normalize(float3(unpack_s8s16(load_value<int8_t4_packed>(mesh_info.normals, indices.x)).xyz)),
+        normalize(float3(unpack_s8s16(load_value<int8_t4_packed>(mesh_info.normals, indices.y)).xyz)),
+        normalize(float3(unpack_s8s16(load_value<int8_t4_packed>(mesh_info.normals, indices.z)).xyz))
+    ).value;
+    normal = normalize(mul(instance.normal_transform, normal));
 
     uint32_t cascade_index;
     float4 shadow_coord = float4(0,0,0,0);
     for (cascade_index = 0; cascade_index < 4; cascade_index++) {
         // Get the coordinate in shadow view space.
-        shadow_coord = mul(misc_storage[0].shadow_rendering_matrices[cascade_index], float4(input.world_pos, 1.0));
+        shadow_coord = mul(misc_storage[0].shadow_rendering_matrices[cascade_index], float4(world_pos, 1.0));
         // If it's inside the cascade view space (which is NDC so -1 to 1) then stop as
         // this is the highest quality cascade for the fragment.
         if (abs(shadow_coord.x) < 1.0 && abs(shadow_coord.y) < 1.0) {
@@ -156,11 +174,9 @@ void PSMain(
 
     Material material;
 
-    float3 normal = normalize(input.normal);
-
     float n_dot_l = max(dot(uniforms.sun_dir, normal), 0.0);
-    material.albedo = textures[mesh_info.albedo_texture_index].Sample(repeat_sampler, input.uv).rgb;
-    float2 metallic_roughness = textures[mesh_info.metallic_roughness_texture_index].Sample(repeat_sampler, input.uv).yx;
+    material.albedo = textures[mesh_info.albedo_texture_index].SampleGrad(repeat_sampler, uv.value, uv.dx, uv.dy).rgb;
+    float2 metallic_roughness = textures[mesh_info.metallic_roughness_texture_index].SampleGrad(repeat_sampler, uv.value, uv.dx, uv.dy).yx;
     material.roughness = metallic_roughness.x;
     material.metallic = metallic_roughness.y;
 
@@ -177,5 +193,6 @@ void PSMain(
         target_0 = float4(material.albedo * debug_col, 1.0);
     }
 
-    //target_0 = float4(input.barycentrics.x, input.barycentrics.y, 1.0 - input.barycentrics.x - input.barycentrics.y, 1.0);
+    //target_0 = input.clip_pos;//float4(input.clip_pos.xy / 2.0 / uniforms.window_size, 0.0, 1.0);
+    //target_0 = float4(ndc, 0.0, 1.0);
 }
