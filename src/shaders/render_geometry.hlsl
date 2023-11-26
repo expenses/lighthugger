@@ -1,6 +1,35 @@
 #include "common/bindings.hlsl"
 #include "common/debug.hlsl"
 #include "common/loading.hlsl"
+#include "common/vbuffer.hlsl"
+
+uint32_t load_index(MeshInfo mesh_info, uint32_t vertex_id) {
+    if (mesh_info.flags & MESH_INFO_FLAGS_32_BIT_INDICES) {
+        return load_value<uint32_t>(mesh_info.indices, vertex_id);
+    } else {
+        return load_value<uint16_t>(mesh_info.indices, vertex_id);
+    }
+}
+
+float4 calculate_view_pos_position(
+    Instance instance,
+    MeshInfo mesh_info,
+    uint32_t index,
+    float4x4 perspective_view_matrix
+) {
+    float3 position = float3(load_uint16_t3(mesh_info.positions, index));
+    float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
+    return mul(perspective_view_matrix, float4(world_pos, 1.0));
+}
+
+
+float4 calculate_view_pos_position(
+    Instance instance,
+    MeshInfo mesh_info,
+    uint32_t index
+) {
+    return calculate_view_pos_position(instance, mesh_info, index, uniforms.combined_perspective_view);
+}
 
 [shader("vertex")]
 float4 depth_only(
@@ -9,20 +38,7 @@ float4 depth_only(
 {
     Instance instance = load_instance(instance_id);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
-
-    uint32_t offset;
-
-    if (mesh_info.flags & MESH_INFO_FLAGS_32_BIT_INDICES) {
-        offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
-    } else {
-        offset = load_value<uint16_t>(mesh_info.indices, vertex_id);
-    }
-
-    float3 position = float3(load_uint16_t3(mesh_info.positions, offset));
-
-    float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
-
-    return mul(uniforms.combined_perspective_view, float4(world_pos, 1.0));
+    return calculate_view_pos_position(instance, mesh_info, load_index(mesh_info, vertex_id));
 }
 
 [[vk::push_constant]]
@@ -36,19 +52,12 @@ float4 shadow_pass(
     Instance instance = load_instance(instance_id);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
 
-    uint32_t offset;
-
-    if (mesh_info.flags & MESH_INFO_FLAGS_32_BIT_INDICES) {
-        offset = load_value<uint32_t>(mesh_info.indices, vertex_id);
-    } else {
-        offset = load_value<uint16_t>(mesh_info.indices, vertex_id);
-    }
-
-    float3 position = float3(load_uint16_t3(mesh_info.positions, offset));
-
-    float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
-
-    return mul(misc_storage[0].shadow_rendering_matrices[shadow_constant.cascade_index], float4(world_pos, 1.0));
+    return calculate_view_pos_position(
+        instance,
+        mesh_info,
+        load_index(mesh_info, vertex_id),
+        misc_storage[0].shadow_rendering_matrices[shadow_constant.cascade_index]
+    );
 }
 
 struct Varyings {

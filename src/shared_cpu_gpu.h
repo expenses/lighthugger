@@ -5,11 +5,13 @@
     #define MATRIX3_TYPE float3x3
     #define VEC3_TYPE float3
     #define VEC2_TYPE float2
+    #define UVEC2_TYPE uint32_t2
 #else
     #define MATRIX4_TYPE glm::mat4
     #define MATRIX3_TYPE glm::mat3
     #define VEC3_TYPE glm::vec3
     #define VEC2_TYPE glm::vec2
+    #define UVEC2_TYPE glm::uvec2
 #endif
 
 const static uint32_t MESH_INFO_FLAGS_32_BIT_INDICES = 1 << 0;
@@ -62,6 +64,7 @@ struct Uniforms {
     uint32_t _padding0;
     VEC3_TYPE sun_intensity;
     uint32_t num_instances;
+    UVEC2_TYPE window_size;
     bool debug_cascades;
     uint32_t _padding;
     bool debug_shadowmaps;

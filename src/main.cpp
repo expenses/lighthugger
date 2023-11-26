@@ -674,6 +674,7 @@ int main() {
                 0.01f
             );
 
+            uniforms->window_size = glm::uvec2(extent.width, extent.height);
             uniforms->sun_dir = camera_params.sun_dir();
             uniforms->view = view;
             uniforms->combined_perspective_view = perspective * view;
