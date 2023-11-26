@@ -130,8 +130,7 @@ int main() {
         .shaderInt16 = true,
     };
 
-    auto device_extensions = std::array {
-        "VK_KHR_swapchain"};
+    auto device_extensions = std::array {"VK_KHR_swapchain"};
 
     vk::raii::Device device = phys_device.createDevice(
         {
@@ -256,7 +255,7 @@ int main() {
         vk::DescriptorPoolSize {
             .type = vk::DescriptorType::eStorageImage,
             .descriptorCount = 10},
-            vk::DescriptorPoolSize {
+        vk::DescriptorPoolSize {
             .type = vk::DescriptorType::eUniformBuffer,
             .descriptorCount = 1}};
 
@@ -432,7 +431,9 @@ int main() {
         ),
         .draw_calls_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
-                .size = sizeof(vk::DrawIndirectCommand) * 1024,
+                .size = sizeof(vk::DrawIndirectCommand)
+                    * (MAX_OPAQUE_DRAWS + MAX_SINGLE_SIDED_ALPHA_CLIP_DRAWS
+                       + MAX_DOUBLE_SIDED_ALPHA_CLIP_DRAWS),
                 .usage = vk::BufferUsageFlagBits::eIndirectBuffer
                     | vk::BufferUsageFlagBits::eStorageBuffer},
             {
@@ -441,7 +442,6 @@ int main() {
             allocator,
             "draw_calls_buffer"
         ),
-        .max_num_draws = 1024 / 2,
         .shadowmap_layer_views = std::move(shadowmap_layer_views),
         .display_transform_lut = load_dds(
             "external/tony-mc-mapface/shader/tony_mc_mapface.dds",

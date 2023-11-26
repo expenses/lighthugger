@@ -11,6 +11,12 @@ const auto FILL_RASTERIZATION = vk::PipelineRasterizationStateCreateInfo {
     .cullMode = vk::CullModeFlagBits::eBack,
     .lineWidth = 1.0f};
 
+const auto FILL_RASTERIZATION_DOUBLE_SIDED =
+    vk::PipelineRasterizationStateCreateInfo {
+        .polygonMode = vk::PolygonMode::eFill,
+        .cullMode = vk::CullModeFlagBits::eNone,
+        .lineWidth = 1.0f};
+
 const auto NO_MULTISAMPLING = vk::PipelineMultisampleStateCreateInfo {
     .rasterizationSamples = vk::SampleCountFlagBits::e1,
     .sampleShadingEnable = false,
@@ -393,6 +399,21 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
             .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
             .layout = *pipeline_layout,
         },
+        // Shadow pass double sided
+        vk::GraphicsPipelineCreateInfo {
+            .pNext = &depth_only_rendering_info,
+            .stageCount = shadow_pass_stage.size(),
+            .pStages = shadow_pass_stage.data(),
+            .pVertexInputState = &EMPTY_VERTEX_INPUT,
+            .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+            .pViewportState = &DEFAULT_VIEWPORT_STATE,
+            .pRasterizationState = &FILL_RASTERIZATION_DOUBLE_SIDED,
+            .pMultisampleState = &NO_MULTISAMPLING,
+            .pDepthStencilState = &DEPTH_WRITE_LESS,
+            .pColorBlendState = &EMPTY_BLEND_STATE,
+            .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+            .layout = *pipeline_layout,
+        },
         // visibility buffer pass
         vk::GraphicsPipelineCreateInfo {
             .pNext = &u32_format_rendering_info,
@@ -495,6 +516,11 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
             device,
             "shadow_pass"
         ),
+        .shadow_pass_double_sided = name_pipeline(
+            std::move(graphics_pipelines[1]),
+            device,
+            "shadow_pass_double_sided"
+        ),
         .read_depth = name_pipeline(
             std::move(compute_pipelines[0]),
             device,
@@ -515,9 +541,9 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
             device,
             "display_transform_compute"
         ),
-        .write_visbuffer = std::move(graphics_pipelines[1]),
+        .write_visbuffer = std::move(graphics_pipelines[2]),
         .render_geometry = std::move(compute_pipelines[4]),
-        .write_visbuffer_alphaclip = std::move(graphics_pipelines[2]),
+        .write_visbuffer_alphaclip = std::move(graphics_pipelines[3]),
         .pipeline_layout = std::move(pipeline_layout),
         .calc_bounding_sphere =
             {.pipeline = name_pipeline(

@@ -43,9 +43,12 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
 
     uint32_t current_draw;
 
-    if (mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP) {
+    if (bitflags_contains_all(mesh_info.flags, MESH_INFO_FLAGS_ALPHA_CLIP | MESH_INFO_FLAGS_DOUBLE_SIDED)) {
+        InterlockedAdd(misc_storage[0].num_double_sided_alpha_clip_draws, 1, current_draw);
+        current_draw += DOUBLE_SIDED_DRAWS_OFFSET;
+    } else if (mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP) {
         InterlockedAdd(misc_storage[0].num_alpha_clip_draws, 1, current_draw);
-        current_draw += 512;
+        current_draw += SINGLE_SIDED_DRAWS_OFFSET;
     } else {
         InterlockedAdd(misc_storage[0].num_opaque_draws, 1, current_draw);
     }

@@ -13,6 +13,7 @@ struct PipelineAndLayout {
 
 struct Pipelines {
     vk::raii::Pipeline shadow_pass;
+    vk::raii::Pipeline shadow_pass_double_sided;
     vk::raii::Pipeline read_depth;
     vk::raii::Pipeline generate_matrices;
     vk::raii::Pipeline write_draw_calls;

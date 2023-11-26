@@ -18,6 +18,12 @@ const static uint32_t MESH_INFO_FLAGS_32_BIT_INDICES = 1 << 0;
 const static uint32_t MESH_INFO_FLAGS_ALPHA_CLIP = 1 << 1;
 const static uint32_t MESH_INFO_FLAGS_DOUBLE_SIDED = 1 << 2;
 
+#ifdef __HLSL_VERSION
+bool bitflags_contains_all(uint32_t flags, uint32_t mask) {
+    return (flags & mask) == mask;
+}
+#endif
+
 struct MeshInfo {
     uint64_t positions;
     uint64_t indices;
@@ -55,6 +61,8 @@ struct MiscStorageBuffer {
     uint32_t max_depth;
     uint32_t num_opaque_draws;
     uint32_t num_alpha_clip_draws;
+    // I'm not seeing a usecase for double sided opaque draws yet.
+    uint32_t num_double_sided_alpha_clip_draws;
 };
 
 const static int32_t UNIFORMS_DEBUG_OFF = 0;
@@ -112,3 +120,12 @@ struct CopyQuantizedPositionsConstant {
     uint64_t src;
     uint32_t count;
 };
+
+const static uint32_t MAX_OPAQUE_DRAWS = 512;
+const static uint32_t MAX_SINGLE_SIDED_ALPHA_CLIP_DRAWS = 512;
+const static uint32_t MAX_DOUBLE_SIDED_ALPHA_CLIP_DRAWS = 512;
+
+const static uint32_t SINGLE_SIDED_DRAWS_OFFSET =
+    MAX_SINGLE_SIDED_ALPHA_CLIP_DRAWS;
+const static uint32_t DOUBLE_SIDED_DRAWS_OFFSET =
+    SINGLE_SIDED_DRAWS_OFFSET + MAX_SINGLE_SIDED_ALPHA_CLIP_DRAWS;

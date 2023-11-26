@@ -57,7 +57,7 @@ void render(
         command_buffer.fillBuffer(
             resources.misc_storage_buffer.buffer,
             offset + 4,
-            12,
+            16,
             0
         );
     }
@@ -180,7 +180,7 @@ void render(
             0,
             resources.misc_storage_buffer.buffer,
             draw_call_counts_offset,
-            resources.max_num_draws,
+            MAX_OPAQUE_DRAWS,
             sizeof(vk::DrawIndirectCommand)
         );
         command_buffer.bindPipeline(
@@ -189,10 +189,18 @@ void render(
         );
         command_buffer.drawIndirectCount(
             resources.draw_calls_buffer.buffer,
-            512 * sizeof(vk::DrawIndirectCommand),
+            SINGLE_SIDED_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
             resources.misc_storage_buffer.buffer,
             draw_call_counts_offset + 4,
-            resources.max_num_draws,
+            MAX_SINGLE_SIDED_ALPHA_CLIP_DRAWS,
+            sizeof(vk::DrawIndirectCommand)
+        );
+        command_buffer.drawIndirectCount(
+            resources.draw_calls_buffer.buffer,
+            DOUBLE_SIDED_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
+            resources.misc_storage_buffer.buffer,
+            draw_call_counts_offset + 8,
+            MAX_DOUBLE_SIDED_ALPHA_CLIP_DRAWS,
             sizeof(vk::DrawIndirectCommand)
         );
         command_buffer.endRendering();
@@ -245,10 +253,6 @@ void render(
 
         set_scissor_and_viewport(command_buffer, 1024, 1024);
 
-        command_buffer.bindPipeline(
-            vk::PipelineBindPoint::eGraphics,
-            *pipelines.shadow_pass
-        );
         for (uint32_t i = 0; i < resources.shadowmap_layer_views.size(); i++) {
             TracyVkZone(tracy_ctx, *command_buffer, "shadowmap inner");
 
@@ -274,20 +278,36 @@ void render(
                 0,
                 {{.cascade_index = i}}
             );
+            command_buffer.bindPipeline(
+                vk::PipelineBindPoint::eGraphics,
+                *pipelines.shadow_pass
+            );
             command_buffer.drawIndirectCount(
                 resources.draw_calls_buffer.buffer,
                 0,
                 resources.misc_storage_buffer.buffer,
                 draw_call_counts_offset,
-                resources.max_num_draws,
+                MAX_OPAQUE_DRAWS,
                 sizeof(vk::DrawIndirectCommand)
             );
             command_buffer.drawIndirectCount(
                 resources.draw_calls_buffer.buffer,
-                512 * sizeof(vk::DrawIndirectCommand),
+                SINGLE_SIDED_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
                 resources.misc_storage_buffer.buffer,
                 draw_call_counts_offset + 4,
-                resources.max_num_draws,
+                MAX_SINGLE_SIDED_ALPHA_CLIP_DRAWS,
+                sizeof(vk::DrawIndirectCommand)
+            );
+            command_buffer.bindPipeline(
+                vk::PipelineBindPoint::eGraphics,
+                *pipelines.shadow_pass_double_sided
+            );
+            command_buffer.drawIndirectCount(
+                resources.draw_calls_buffer.buffer,
+                DOUBLE_SIDED_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
+                resources.misc_storage_buffer.buffer,
+                draw_call_counts_offset + 8,
+                MAX_DOUBLE_SIDED_ALPHA_CLIP_DRAWS,
                 sizeof(vk::DrawIndirectCommand)
             );
             command_buffer.endRendering();
