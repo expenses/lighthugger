@@ -370,6 +370,55 @@ GltfMesh load_gltf(
                 auto material_index = primitive.materialIndex.value();
                 auto& material = asset.materials[material_index];
 
+                auto texture_scale = glm::vec2(1.0);
+                auto texture_offset = glm::vec2(0.0);
+                auto albedo_texture_index =
+                    std::numeric_limits<uint32_t>::max();
+                auto metallic_roughness_texture_index =
+                    std::numeric_limits<uint32_t>::max();
+
+                if (material.pbrData.baseColorTexture) {
+                    auto& tex = material.pbrData.baseColorTexture.value();
+
+                    albedo_texture_index =
+                        image_indices[asset.textures[tex.textureIndex]
+                                          .imageIndex.value()];
+
+                    if (tex.transform != nullptr) {
+                        texture_scale = glm::vec2(
+                            (*tex.transform).uvScale[0],
+                            (*tex.transform).uvScale[1]
+                        );
+                        texture_offset = glm::vec2(
+                            (*tex.transform).uvOffset[0],
+                            (*tex.transform).uvOffset[1]
+                        );
+                    }
+                }
+
+                if (material.pbrData.metallicRoughnessTexture) {
+                    auto& tex =
+                        material.pbrData.metallicRoughnessTexture.value();
+                    metallic_roughness_texture_index =
+                        image_indices[asset.textures[tex.textureIndex]
+                                          .imageIndex.value()];
+
+                    if (tex.transform != nullptr) {
+                        texture_scale = glm::vec2(
+                            (*tex.transform).uvScale[0],
+                            (*tex.transform).uvScale[1]
+                        );
+                        texture_offset = glm::vec2(
+                            (*tex.transform).uvOffset[0],
+                            (*tex.transform).uvOffset[1]
+                        );
+                    }
+                }
+
+                if (uvs.normalized) {
+                    texture_scale /= float((1 << 16) - 1);
+                }
+
                 auto mesh_info = MeshInfo {
                     .positions = device.getBufferAddress(
                         {.buffer = position_buffer.buffer}
@@ -390,49 +439,12 @@ GltfMesh load_gltf(
                         | (material.alphaMode == fastgltf::AlphaMode::Mask
                                ? MESH_INFO_FLAGS_ALPHA_CLIP
                                : 0),
-                    .bounding_sphere_radius = 0.0f};
-
-                if (material.pbrData.baseColorTexture) {
-                    auto& tex = material.pbrData.baseColorTexture.value();
-
-                    mesh_info.albedo_texture_index =
-                        image_indices[asset.textures[tex.textureIndex]
-                                          .imageIndex.value()];
-
-                    if (tex.transform != nullptr) {
-                        mesh_info.texture_scale = glm::vec2(
-                            (*tex.transform).uvScale[0],
-                            (*tex.transform).uvScale[1]
-                        );
-                        mesh_info.texture_offset = glm::vec2(
-                            (*tex.transform).uvOffset[0],
-                            (*tex.transform).uvOffset[1]
-                        );
-                    }
-                }
-
-                if (material.pbrData.metallicRoughnessTexture) {
-                    auto& tex =
-                        material.pbrData.metallicRoughnessTexture.value();
-                    mesh_info.metallic_roughness_texture_index =
-                        image_indices[asset.textures[tex.textureIndex]
-                                          .imageIndex.value()];
-
-                    if (tex.transform != nullptr) {
-                        mesh_info.texture_scale = glm::vec2(
-                            (*tex.transform).uvScale[0],
-                            (*tex.transform).uvScale[1]
-                        );
-                        mesh_info.texture_offset = glm::vec2(
-                            (*tex.transform).uvOffset[0],
-                            (*tex.transform).uvOffset[1]
-                        );
-                    }
-                }
-
-                if (uvs.normalized) {
-                    mesh_info.texture_scale /= float((1 << 16) - 1);
-                }
+                    .bounding_sphere_radius = 0.0f,
+                    .texture_scale = texture_scale,
+                    .texture_offset = texture_offset,
+                    .albedo_texture_index = albedo_texture_index,
+                    .metallic_roughness_texture_index =
+                        metallic_roughness_texture_index};
 
                 auto mesh_info_buffer = upload_via_staging_buffer(
                     &mesh_info,
