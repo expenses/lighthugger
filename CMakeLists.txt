@@ -26,7 +26,7 @@ target_sources(vkcpptest PRIVATE
     "external/imgui/backends/imgui_impl_vulkan.cpp"
 )
 
-target_include_directories(vkcpptest PRIVATE src external/simple_vulkan_synchronization external/VulkanMemoryAllocator-Hpp/include external/tinyobjloader external/dbg-macro external/tracy/public external/imgui)
+target_include_directories(vkcpptest PRIVATE src external/simple_vulkan_synchronization external/VulkanMemoryAllocator-Hpp/include external/dbg-macro external/tracy/public external/imgui)
 target_link_libraries(vkcpptest glfw Vulkan::Vulkan fastgltf)
 target_precompile_headers(vkcpptest PRIVATE src/pch.h)
 target_compile_features(vkcpptest PUBLIC cxx_std_20)

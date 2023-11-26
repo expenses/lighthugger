@@ -54,8 +54,12 @@ void render(
             u32_max
         );
         // Zero out both the max depth and the draw call counts.
-        command_buffer
-            .fillBuffer(resources.misc_storage_buffer.buffer, offset + 4, 12, 0);
+        command_buffer.fillBuffer(
+            resources.misc_storage_buffer.buffer,
+            offset + 4,
+            12,
+            0
+        );
     }
 
     set_scissor_and_viewport(command_buffer, extent.width, extent.height);
