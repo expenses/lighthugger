@@ -45,7 +45,7 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
 
     if (mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP) {
         InterlockedAdd(misc_storage[0].num_alpha_clip_draws, 1, current_draw);
-        current_draw += 512;
+        current_draw += ALPHA_CLIP_DRAWS_OFFSET;
     } else {
         InterlockedAdd(misc_storage[0].num_opaque_draws, 1, current_draw);
     }

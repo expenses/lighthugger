@@ -426,8 +426,14 @@ GltfMesh load_gltf(
                 if (material.alphaMode == fastgltf::AlphaMode::Mask) {
                     flags |= MESH_INFO_FLAGS_ALPHA_CLIP;
                 }
-                if (material.doubleSided) {
-                    flags |= MESH_INFO_FLAGS_DOUBLE_SIDED;
+
+                // Assume that all alpha clipped geometry is double-sided
+                // and that all opaque geometry is single sided.
+                if ((material.alphaMode == fastgltf::AlphaMode::Mask)
+                    != material.doubleSided) {
+                    dbg((material.alphaMode == fastgltf::AlphaMode::Mask),
+                        material.doubleSided);
+                    abort();
                 }
 
                 auto mesh_info = MeshInfo {

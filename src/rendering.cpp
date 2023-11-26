@@ -173,26 +173,26 @@ void render(
 
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eGraphics,
-            *pipelines.write_visbuffer
+            *pipelines.render_visbuffer.opaque
         );
         command_buffer.drawIndirectCount(
             resources.draw_calls_buffer.buffer,
             0,
             resources.misc_storage_buffer.buffer,
             draw_call_counts_offset,
-            resources.max_num_draws,
+            MAX_OPAQUE_DRAWS,
             sizeof(vk::DrawIndirectCommand)
         );
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eGraphics,
-            *pipelines.write_visbuffer_alphaclip
+            *pipelines.render_visbuffer.alpha_clip
         );
         command_buffer.drawIndirectCount(
             resources.draw_calls_buffer.buffer,
-            512 * sizeof(vk::DrawIndirectCommand),
+            ALPHA_CLIP_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
             resources.misc_storage_buffer.buffer,
             draw_call_counts_offset + 4,
-            resources.max_num_draws,
+            MAX_ALPHA_CLIP_DRAWS,
             sizeof(vk::DrawIndirectCommand)
         );
         command_buffer.endRendering();
@@ -245,10 +245,6 @@ void render(
 
         set_scissor_and_viewport(command_buffer, 1024, 1024);
 
-        command_buffer.bindPipeline(
-            vk::PipelineBindPoint::eGraphics,
-            *pipelines.shadow_pass
-        );
         for (uint32_t i = 0; i < resources.shadowmap_layer_views.size(); i++) {
             TracyVkZone(tracy_ctx, *command_buffer, "shadowmap inner");
 
@@ -274,20 +270,28 @@ void render(
                 0,
                 {{.cascade_index = i}}
             );
+            command_buffer.bindPipeline(
+                vk::PipelineBindPoint::eGraphics,
+                *pipelines.render_shadowmap.opaque
+            );
             command_buffer.drawIndirectCount(
                 resources.draw_calls_buffer.buffer,
                 0,
                 resources.misc_storage_buffer.buffer,
                 draw_call_counts_offset,
-                resources.max_num_draws,
+                MAX_OPAQUE_DRAWS,
                 sizeof(vk::DrawIndirectCommand)
+            );
+            command_buffer.bindPipeline(
+                vk::PipelineBindPoint::eGraphics,
+                *pipelines.render_shadowmap.alpha_clip
             );
             command_buffer.drawIndirectCount(
                 resources.draw_calls_buffer.buffer,
-                512 * sizeof(vk::DrawIndirectCommand),
+                ALPHA_CLIP_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
                 resources.misc_storage_buffer.buffer,
                 draw_call_counts_offset + 4,
-                resources.max_num_draws,
+                MAX_ALPHA_CLIP_DRAWS,
                 sizeof(vk::DrawIndirectCommand)
             );
             command_buffer.endRendering();

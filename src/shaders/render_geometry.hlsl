@@ -109,8 +109,8 @@ void render_geometry(
         }
     }
 
-    // Use the tiniest shadow bias for double sided meshes.
-    float shadow_bias = (mesh_info.flags & MESH_INFO_FLAGS_DOUBLE_SIDED) ? 0.000001 : 0.0;
+    // Use the tiniest shadow bias for alpha clipped meshes as they're double sided..
+    float shadow_bias = (mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP) ? 0.000001 : 0.0;
 
     float4 shadow_view_coord = mul(bias_matrix, shadow_coord);
     shadow_view_coord /= shadow_view_coord.w;

@@ -76,7 +76,6 @@ struct Resources {
     AllocatedBuffer misc_storage_buffer;
     AllocatedBuffer instance_buffer;
     AllocatedBuffer draw_calls_buffer;
-    uint32_t max_num_draws;
     std::array<vk::raii::ImageView, 4> shadowmap_layer_views;
     ImageWithView display_transform_lut;
     vk::raii::Sampler repeat_sampler;

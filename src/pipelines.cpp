@@ -11,6 +11,12 @@ const auto FILL_RASTERIZATION = vk::PipelineRasterizationStateCreateInfo {
     .cullMode = vk::CullModeFlagBits::eBack,
     .lineWidth = 1.0f};
 
+const auto FILL_RASTERIZATION_DOUBLE_SIDED =
+    vk::PipelineRasterizationStateCreateInfo {
+        .polygonMode = vk::PolygonMode::eFill,
+        .cullMode = vk::CullModeFlagBits::eNone,
+        .lineWidth = 1.0f};
+
 const auto NO_MULTISAMPLING = vk::PipelineMultisampleStateCreateInfo {
     .rasterizationSamples = vk::SampleCountFlagBits::e1,
     .sampleShadingEnable = false,
@@ -361,11 +367,24 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
             .module = *alpha_clip,
             .pName = "pixel"}};
 
-    auto shadow_pass_stage = std::array {vk::PipelineShaderStageCreateInfo {
+    auto opaque_shadow_stage = std::array {vk::PipelineShaderStageCreateInfo {
         .stage = vk::ShaderStageFlagBits::eVertex,
         .module = *shadows,
         .pName = "vertex",
     }};
+
+    auto alpha_clip_shadow_stages = std::array {
+        vk::PipelineShaderStageCreateInfo {
+            .stage = vk::ShaderStageFlagBits::eVertex,
+            .module = *shadows,
+            .pName = "vertex_alpha_clip",
+        },
+        vk::PipelineShaderStageCreateInfo {
+            .stage = vk::ShaderStageFlagBits::eFragment,
+            .module = *shadows,
+            .pName = "pixel_alpha_clip",
+        },
+    };
 
     auto u32 = vk::Format::eR32Uint;
 
@@ -377,53 +396,67 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
     auto depth_only_rendering_info = vk::PipelineRenderingCreateInfoKHR {
         .depthAttachmentFormat = vk::Format::eD32Sfloat};
 
-    auto graphics_pipeline_infos = std::array {
-        // Shadow pass
-        vk::GraphicsPipelineCreateInfo {
-            .pNext = &depth_only_rendering_info,
-            .stageCount = shadow_pass_stage.size(),
-            .pStages = shadow_pass_stage.data(),
-            .pVertexInputState = &EMPTY_VERTEX_INPUT,
-            .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
-            .pViewportState = &DEFAULT_VIEWPORT_STATE,
-            .pRasterizationState = &FILL_RASTERIZATION,
-            .pMultisampleState = &NO_MULTISAMPLING,
-            .pDepthStencilState = &DEPTH_WRITE_LESS,
-            .pColorBlendState = &EMPTY_BLEND_STATE,
-            .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
-            .layout = *pipeline_layout,
-        },
-        // visibility buffer pass
-        vk::GraphicsPipelineCreateInfo {
-            .pNext = &u32_format_rendering_info,
-            .stageCount = visbuffer_stages.size(),
-            .pStages = visbuffer_stages.data(),
-            .pVertexInputState = &EMPTY_VERTEX_INPUT,
-            .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
-            .pViewportState = &DEFAULT_VIEWPORT_STATE,
-            .pRasterizationState = &FILL_RASTERIZATION,
-            .pMultisampleState = &NO_MULTISAMPLING,
-            .pDepthStencilState = &DEPTH_WRITE_GREATER,
-            .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
-            .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
-            .layout = *pipeline_layout,
-        },
-        // visibility alpha clip buffer pass
-        vk::GraphicsPipelineCreateInfo {
-            .pNext = &u32_format_rendering_info,
-            .stageCount = visbuffer_alpha_clip_stages.size(),
-            .pStages = visbuffer_alpha_clip_stages.data(),
-            .pVertexInputState = &EMPTY_VERTEX_INPUT,
-            .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
-            .pViewportState = &DEFAULT_VIEWPORT_STATE,
-            .pRasterizationState = &FILL_RASTERIZATION,
-            .pMultisampleState = &NO_MULTISAMPLING,
-            .pDepthStencilState = &DEPTH_WRITE_GREATER,
-            .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
-            .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
-            .layout = *pipeline_layout,
-        },
-    };
+    auto graphics_pipeline_infos =
+        std::array {// opaque shadowmaps
+                    vk::GraphicsPipelineCreateInfo {
+                        .pNext = &depth_only_rendering_info,
+                        .stageCount = opaque_shadow_stage.size(),
+                        .pStages = opaque_shadow_stage.data(),
+                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
+                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
+                        .pRasterizationState = &FILL_RASTERIZATION,
+                        .pMultisampleState = &NO_MULTISAMPLING,
+                        .pDepthStencilState = &DEPTH_WRITE_LESS,
+                        .pColorBlendState = &EMPTY_BLEND_STATE,
+                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+                        .layout = *pipeline_layout,
+                    },
+                    // alpha clip shadow maps
+                    vk::GraphicsPipelineCreateInfo {
+                        .pNext = &depth_only_rendering_info,
+                        .stageCount = alpha_clip_shadow_stages.size(),
+                        .pStages = alpha_clip_shadow_stages.data(),
+                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
+                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
+                        .pRasterizationState = &FILL_RASTERIZATION_DOUBLE_SIDED,
+                        .pMultisampleState = &NO_MULTISAMPLING,
+                        .pDepthStencilState = &DEPTH_WRITE_LESS,
+                        .pColorBlendState = &EMPTY_BLEND_STATE,
+                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+                        .layout = *pipeline_layout,
+                    },
+                    // opaque visibility buffer
+                    vk::GraphicsPipelineCreateInfo {
+                        .pNext = &u32_format_rendering_info,
+                        .stageCount = visbuffer_stages.size(),
+                        .pStages = visbuffer_stages.data(),
+                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
+                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
+                        .pRasterizationState = &FILL_RASTERIZATION,
+                        .pMultisampleState = &NO_MULTISAMPLING,
+                        .pDepthStencilState = &DEPTH_WRITE_GREATER,
+                        .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
+                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+                        .layout = *pipeline_layout,
+                    },
+                    // alpha clip visibility buffer
+                    vk::GraphicsPipelineCreateInfo {
+                        .pNext = &u32_format_rendering_info,
+                        .stageCount = visbuffer_alpha_clip_stages.size(),
+                        .pStages = visbuffer_alpha_clip_stages.data(),
+                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
+                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
+                        .pRasterizationState = &FILL_RASTERIZATION_DOUBLE_SIDED,
+                        .pMultisampleState = &NO_MULTISAMPLING,
+                        .pDepthStencilState = &DEPTH_WRITE_GREATER,
+                        .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
+                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+                        .layout = *pipeline_layout,
+                    }};
 
     auto compute_pipeline_infos = std::array {
         vk::ComputePipelineCreateInfo {
@@ -490,11 +523,28 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
         device.createComputePipelines(nullptr, compute_pipeline_infos);
 
     return Pipelines {
-        .shadow_pass = name_pipeline(
-            std::move(graphics_pipelines[0]),
-            device,
-            "shadow_pass"
-        ),
+        .render_shadowmap =
+            {.opaque = name_pipeline(
+                 std::move(graphics_pipelines[0]),
+                 device,
+                 "render_shadowmap::opaque"
+             ),
+             .alpha_clip = name_pipeline(
+                 std::move(graphics_pipelines[1]),
+                 device,
+                 "render_shadowmap::alpha_clip"
+             )},
+        .render_visbuffer =
+            {.opaque = name_pipeline(
+                 std::move(graphics_pipelines[2]),
+                 device,
+                 "render_visbuffer::opaque"
+             ),
+             .alpha_clip = name_pipeline(
+                 std::move(graphics_pipelines[3]),
+                 device,
+                 "render_visbuffer::alpha_clip"
+             )},
         .read_depth = name_pipeline(
             std::move(compute_pipelines[0]),
             device,
@@ -515,9 +565,7 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
             device,
             "display_transform_compute"
         ),
-        .write_visbuffer = std::move(graphics_pipelines[1]),
         .render_geometry = std::move(compute_pipelines[4]),
-        .write_visbuffer_alphaclip = std::move(graphics_pipelines[2]),
         .pipeline_layout = std::move(pipeline_layout),
         .calc_bounding_sphere =
             {.pipeline = name_pipeline(

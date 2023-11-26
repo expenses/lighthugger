@@ -45,3 +45,12 @@ VaryingsAlphaClip vertex_alpha_clip(
     varyings.uv = float2(load_value<uint16_t2>(mesh_info.uvs, index)) * mesh_info.texture_scale + mesh_info.texture_offset;
     return varyings;
 }
+
+[shader("pixel")]
+void pixel_alpha_clip(
+    VaryingsAlphaClip input
+) {
+    if (textures[input.albedo_texture_index].Sample(repeat_sampler, input.uv).a < 0.5) {
+        discard;
+    }
+}

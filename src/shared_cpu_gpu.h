@@ -16,7 +16,6 @@
 
 const static uint32_t MESH_INFO_FLAGS_32_BIT_INDICES = 1 << 0;
 const static uint32_t MESH_INFO_FLAGS_ALPHA_CLIP = 1 << 1;
-const static uint32_t MESH_INFO_FLAGS_DOUBLE_SIDED = 1 << 2;
 
 struct MeshInfo {
     uint64_t positions;
@@ -112,3 +111,8 @@ struct CopyQuantizedPositionsConstant {
     uint64_t src;
     uint32_t count;
 };
+
+const static uint32_t MAX_OPAQUE_DRAWS = 512;
+const static uint32_t MAX_ALPHA_CLIP_DRAWS = 512;
+
+const static uint32_t ALPHA_CLIP_DRAWS_OFFSET = MAX_ALPHA_CLIP_DRAWS;
