@@ -110,7 +110,12 @@ int main() {
         .queueCount = 1,
         .pQueuePriorities = &queue_prio};
 
+    auto shader_clock_features = vk::PhysicalDeviceShaderClockFeaturesKHR {
+        .shaderSubgroupClock = true
+    };
+
     auto vulkan_1_2_features = vk::PhysicalDeviceVulkan12Features {
+        .pNext = &shader_clock_features,
         .drawIndirectCount = true,
         .shaderInt8 = true,
         .shaderSampledImageArrayNonUniformIndexing = true,
@@ -130,7 +135,7 @@ int main() {
         .shaderInt16 = true,
     };
 
-    auto device_extensions = std::array {"VK_KHR_swapchain"};
+    auto device_extensions = std::array {"VK_KHR_swapchain", "VK_KHR_shader_clock"};
 
     vk::raii::Device device = phys_device.createDevice(
         {
@@ -677,6 +682,11 @@ int main() {
                 &uniforms->debug,
                 UNIFORMS_DEBUG_INSTANCE_INDEX
             );
+            ImGui::RadioButton(
+                "Debug: Shader Clock",
+                &uniforms->debug,
+                UNIFORMS_DEBUG_SHADER_CLOCK
+            );
         }
         ImGui::Render();
 
@@ -701,6 +711,7 @@ int main() {
                 0.01f
             );
 
+            uniforms->camera_pos = camera_params.position;
             uniforms->window_size = glm::uvec2(extent.width, extent.height);
             uniforms->sun_dir = camera_params.sun_dir();
             uniforms->view = view;

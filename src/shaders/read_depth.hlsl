@@ -154,5 +154,5 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
     float4x4 shadowView = lookAt(shadow_cam_distance * uniforms.sun_dir + frustumCenter, frustumCenter, float3(0,1,0));
 	float4x4 shadowProj = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, shadow_cam_distance * 2.0);
 
-    misc_storage[0].shadow_rendering_matrices[cascade_index] = mul(shadowProj, shadowView);
+    misc_storage[0].shadow_matrices[cascade_index] = mul(shadowProj, shadowView);
 }

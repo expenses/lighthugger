@@ -22,6 +22,12 @@ struct Material {
 void render_geometry(
     uint3 global_id: SV_DispatchThreadID
 ) {
+    uint64_t start_time = 0;
+
+    if (uniforms.debug == UNIFORMS_DEBUG_SHADER_CLOCK) {
+        start_time = vk::ReadClock(vk::SubgroupScope);
+    }
+
     if (global_id.x >= uniforms.window_size.x || global_id.y >= uniforms.window_size.y) {
         return;
     }
@@ -41,10 +47,14 @@ void render_geometry(
 
     float2 ndc = float2(global_id.xy) / float2(uniforms.window_size) * 2.0 - 1.0;
 
+    float3 pos_a = calculate_world_pos(instance, mesh_info, indices.x);
+    float3 pos_b = calculate_world_pos(instance, mesh_info, indices.y);
+    float3 pos_c = calculate_world_pos(instance, mesh_info, indices.z);
+
     BarycentricDeriv bary = CalcFullBary(
-        calculate_view_pos_position(instance, mesh_info, indices.x),
-        calculate_view_pos_position(instance, mesh_info, indices.y),
-        calculate_view_pos_position(instance, mesh_info, indices.z),
+        mul(uniforms.combined_perspective_view, float4(pos_a, 1.0)),
+        mul(uniforms.combined_perspective_view, float4(pos_b, 1.0)),
+        mul(uniforms.combined_perspective_view, float4(pos_c, 1.0)),
         ndc,
         uniforms.window_size
     );
@@ -63,6 +73,8 @@ void render_geometry(
         float2(load_value<uint16_t2>(mesh_info.uvs, indices.z)) * mesh_info.texture_scale + mesh_info.texture_offset
     );
 
+    float3 view_vector = world_pos - uniforms.camera_pos;
+
     // Load 3 x i8 with a padding byte.
     float3 normal = interpolate(
         bary,
@@ -72,11 +84,27 @@ void render_geometry(
     ).value;
     normal = normalize(mul(instance.normal_transform, normal));
 
+    if (mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP) {
+        // Calculate whether the triangle is back facing using the (unnormalized) geometric normal.
+        // I tried getting this with the code from
+        // https://registry.khronos.org/vulkan/specs/1.3-khr-extensions/html/chap22.html#tessellation-vertex-winding-order
+        // but I had problems with large triangles that go over the edges of the screen.
+        float3 geometric_normal = cross(pos_b - pos_a, pos_c - pos_a);
+        bool is_back_facing = dot(geometric_normal, view_vector) > 0;
+
+        // For leaves etc, we shouldn't treat them as totally opaque by just flipping
+        // the normals like this. But it's fine for now.
+
+        if (is_back_facing) {
+            normal = -normal;
+        }
+    }
+
     uint32_t cascade_index;
     float4 shadow_coord = float4(0,0,0,0);
     for (cascade_index = 0; cascade_index < 4; cascade_index++) {
         // Get the coordinate in shadow view space.
-        shadow_coord = mul(misc_storage[0].shadow_rendering_matrices[cascade_index], float4(world_pos, 1.0));
+        shadow_coord = mul(misc_storage[0].shadow_matrices[cascade_index], float4(world_pos, 1.0));
         // If it's inside the cascade view space (which is NDC so -1 to 1) then stop as
         // this is the highest quality cascade for the fragment.
         if (abs(shadow_coord.x) < 1.0 && abs(shadow_coord.y) < 1.0) {
@@ -129,5 +157,12 @@ void render_geometry(
         rw_scene_referred_framebuffer[global_id.xy] = float4(DEBUG_COLOURS[triangle_index % 10], 1.0);
     } else if (uniforms.debug == UNIFORMS_DEBUG_INSTANCE_INDEX) {
         rw_scene_referred_framebuffer[global_id.xy] = float4(DEBUG_COLOURS[instance_index % 10], 1.0);
+    } else if (uniforms.debug == UNIFORMS_DEBUG_SHADER_CLOCK) {
+        uint64_t end_time = vk::ReadClock(vk::SubgroupScope);
+
+        float heatmapScale = 65000.0f;
+        float deltaTimeScaled =  clamp(float(timediff(start_time, end_time)) / heatmapScale, 0.0f, 1.0f );
+
+        rw_scene_referred_framebuffer[global_id.xy] = float4(temperature(deltaTimeScaled), 1.0);
     }
 }

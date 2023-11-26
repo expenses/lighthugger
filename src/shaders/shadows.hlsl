@@ -15,7 +15,7 @@ float4 vertex(
         instance,
         mesh_info,
         load_index(mesh_info, vertex_id),
-        misc_storage[0].shadow_rendering_matrices[shadow_constant.cascade_index]
+        misc_storage[0].shadow_matrices[shadow_constant.cascade_index]
     );
 }
 
@@ -39,7 +39,7 @@ VaryingsAlphaClip vertex_alpha_clip(
         instance,
         mesh_info,
         index,
-        misc_storage[0].shadow_rendering_matrices[shadow_constant.cascade_index]
+        misc_storage[0].shadow_matrices[shadow_constant.cascade_index]
     );
     varyings.albedo_texture_index = mesh_info.albedo_texture_index;
     varyings.uv = float2(load_value<uint16_t2>(mesh_info.uvs, index)) * mesh_info.texture_scale + mesh_info.texture_offset;

@@ -24,14 +24,22 @@ uint32_t load_index(MeshInfo mesh_info, uint32_t vertex_id) {
     }
 }
 
+float3 calculate_world_pos(
+    Instance instance,
+    MeshInfo mesh_info,
+    uint32_t index
+) {
+    float3 position = float3(load_uint16_t3(mesh_info.positions, index));
+    return mul(instance.transform, float4(position, 1.0)).xyz;
+}
+
 float4 calculate_view_pos_position(
     Instance instance,
     MeshInfo mesh_info,
     uint32_t index,
     float4x4 perspective_view_matrix
 ) {
-    float3 position = float3(load_uint16_t3(mesh_info.positions, index));
-    float3 world_pos = mul(instance.transform, float4(position, 1.0)).xyz;
+    float3 world_pos = calculate_world_pos(instance, mesh_info, index);
     return mul(perspective_view_matrix, float4(world_pos, 1.0));
 }
 

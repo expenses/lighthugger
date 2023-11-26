@@ -49,29 +49,33 @@ struct MeshInfoWithUintBoundingSphereRadius {
 
 // Stores depth info and draw call counts.
 struct MiscStorageBuffer {
-    MATRIX4_TYPE shadow_rendering_matrices[4];
+    MATRIX4_TYPE shadow_matrices[4];
     uint32_t min_depth;
     uint32_t max_depth;
     uint32_t num_opaque_draws;
     uint32_t num_alpha_clip_draws;
 };
 
+// This is only an int32_t because of imgui.
 const static int32_t UNIFORMS_DEBUG_OFF = 0;
 const static int32_t UNIFORMS_DEBUG_CASCADES = 1;
 const static int32_t UNIFORMS_DEBUG_TRIANGLE_INDEX = 2;
 const static int32_t UNIFORMS_DEBUG_INSTANCE_INDEX = 3;
+const static int32_t UNIFORMS_DEBUG_SHADER_CLOCK = 4;
 
 struct Uniforms {
     MATRIX4_TYPE combined_perspective_view;
     MATRIX4_TYPE inv_perspective_view;
     MATRIX4_TYPE view;
-    VEC3_TYPE sun_dir;
+    VEC3_TYPE camera_pos;
     uint32_t _padding0;
+    VEC3_TYPE sun_dir;
+    uint32_t _padding1;
     VEC3_TYPE sun_intensity;
     uint32_t num_instances;
     UVEC2_TYPE window_size;
     int32_t debug;
-    uint32_t _padding;
+    uint32_t _padding2;
     bool debug_shadowmaps;
 };
 

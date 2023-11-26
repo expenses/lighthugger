@@ -427,6 +427,11 @@ GltfMesh load_gltf(
                     flags |= MESH_INFO_FLAGS_ALPHA_CLIP;
                 }
 
+                if (material.alphaCutoff != 0.5) {
+                    dbg(material.alphaCutoff);
+                    abort();
+                }
+
                 // Assume that all alpha clipped geometry is double-sided
                 // and that all opaque geometry is single sided.
                 if ((material.alphaMode == fastgltf::AlphaMode::Mask)

@@ -530,27 +530,27 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
         device.createComputePipelines(nullptr, compute_pipeline_infos);
 
     return Pipelines {
-        .render_shadowmap =
+        .rasterize_shadowmap
             {.opaque = name_pipeline(
                  std::move(graphics_pipelines[0]),
                  device,
-                 "render_shadowmap::opaque"
+                 "rasterize_shadowmap::opaque"
              ),
              .alpha_clip = name_pipeline(
                  std::move(graphics_pipelines[1]),
                  device,
-                 "render_shadowmap::alpha_clip"
+                 "rasterize_shadowmap::alpha_clip"
              )},
-        .render_visbuffer =
+        .rasterize_visbuffer =
             {.opaque = name_pipeline(
                  std::move(graphics_pipelines[2]),
                  device,
-                 "render_visbuffer::opaque"
+                 "rasterize_visbuffer::opaque"
              ),
              .alpha_clip = name_pipeline(
                  std::move(graphics_pipelines[3]),
                  device,
-                 "render_visbuffer::alpha_clip"
+                 "rasterize_visbuffer::alpha_clip"
              )},
         .read_depth = name_pipeline(
             std::move(compute_pipelines[0]),

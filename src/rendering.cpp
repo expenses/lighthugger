@@ -173,7 +173,7 @@ void render(
 
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eGraphics,
-            *pipelines.render_visbuffer.opaque
+            *pipelines.rasterize_visbuffer.opaque
         );
         {
             TracyVkZone(
@@ -193,7 +193,7 @@ void render(
         }
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eGraphics,
-            *pipelines.render_visbuffer.alpha_clip
+            *pipelines.rasterize_visbuffer.alpha_clip
         );
         {
             TracyVkZone(
@@ -257,7 +257,7 @@ void render(
     }
 
     {
-        TracyVkZone(tracy_ctx, *command_buffer, "shadowmap rendering");
+        TracyVkZone(tracy_ctx, *command_buffer, "shadowmap rasterization");
 
         set_scissor_and_viewport(command_buffer, 1024, 1024);
 
@@ -288,7 +288,7 @@ void render(
             );
             command_buffer.bindPipeline(
                 vk::PipelineBindPoint::eGraphics,
-                *pipelines.render_shadowmap.opaque
+                *pipelines.rasterize_shadowmap.opaque
             );
             {
                 TracyVkZone(
@@ -308,7 +308,7 @@ void render(
             }
             command_buffer.bindPipeline(
                 vk::PipelineBindPoint::eGraphics,
-                *pipelines.render_shadowmap.alpha_clip
+                *pipelines.rasterize_shadowmap.alpha_clip
             );
             {
                 TracyVkZone(

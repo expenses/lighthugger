@@ -11,14 +11,14 @@ struct PipelineAndLayout {
     vk::raii::PipelineLayout layout;
 };
 
-struct RenderPipeline {
+struct RasterizationPipeline {
     vk::raii::Pipeline opaque;
     vk::raii::Pipeline alpha_clip;
 };
 
 struct Pipelines {
-    RenderPipeline render_shadowmap;
-    RenderPipeline render_visbuffer;
+    RasterizationPipeline rasterize_shadowmap;
+    RasterizationPipeline rasterize_visbuffer;
 
     vk::raii::Pipeline read_depth;
     vk::raii::Pipeline generate_matrices;
