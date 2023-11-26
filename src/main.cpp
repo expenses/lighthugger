@@ -380,8 +380,8 @@ int main() {
     }
 
     instances.push_back(Instance(
-        glm::translate(glm::mat4(1), glm::vec3(0, 30, 0))
-            * glm::scale(glm::mat4(1), glm::vec3(5))
+        glm::translate(glm::mat4(1), glm::vec3(75.0, 20.0, 45.0))
+            * glm::scale(glm::mat4(1), glm::vec3(1))
             * helmet.primitives[0].transform,
         device.getBufferAddress(
             {.buffer = helmet.primitives[0].mesh_info.buffer}
@@ -495,12 +495,12 @@ int main() {
     descriptor_set.write_descriptors(resources, device, swapchain_image_views);
 
     auto camera_params = CameraParams {
-        .position = glm::vec3(-207.7, 121.7, -94.8),
+        .position = glm::vec3(56.918, 29.851, 38.586),
         .fov = 45.0f,
-        .yaw = 0.74,
-        .pitch = -0.35,
-        .sun_latitude = -2.555f,
-        .sun_longitude = 0.3f,
+        .yaw = 0.312,
+        .pitch = -0.224,
+        .sun_latitude = -2.930f,
+        .sun_longitude = 0.775f,
     };
 
     auto tracy_ctx =

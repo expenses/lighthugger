@@ -35,7 +35,7 @@ struct CameraParams {
             return;
         }
 
-        auto movement = glm::normalize(glm::vec3(movement_vector)) * 2.0f;
+        auto movement = glm::normalize(glm::vec3(movement_vector)) * 0.25f;
 
         position += movement.x * right();
         position += movement.z * facing();
