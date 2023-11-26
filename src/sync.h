@@ -44,3 +44,9 @@ void insert_color_image_barriers(
         thsvs_barriers.data()
     );
 }
+
+void insert_global_barrier(
+    const vk::raii::CommandBuffer& command_buffer,
+    ThsvsAccessType prev_access,
+    ThsvsAccessType next_access
+);
