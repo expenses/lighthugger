@@ -185,14 +185,15 @@ GltfMesh load_gltf(
     auto error = fastgltf::validate(asset);
     assert(error == fastgltf::Error::None);
 
+    std::vector<std::vector<uint8_t>> source_buffers;
     std::vector<PersistentlyMappedBuffer> staging_buffers;
     staging_buffers.reserve(asset.buffers.size());
+    source_buffers.reserve(asset.buffers.size());
     for (auto& buffer : asset.buffers) {
         if (auto* uri = std::get_if<fastgltf::sources::URI>(&buffer.data)) {
-            std::ifstream stream(
-                parent_path / uri->uri.fspath(),
-                std::ios::binary
-            );
+            auto source_buffer =
+                read_file_to_bytes(parent_path / uri->uri.fspath());
+
             auto staging_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
                 vk::BufferCreateInfo {
                     .size = buffer.byteLength,
@@ -207,11 +208,14 @@ GltfMesh load_gltf(
                 allocator,
                 uri->uri.fspath()
             ));
-            stream.read(
-                reinterpret_cast<char*>(staging_buffer.mapped_ptr),
-                static_cast<std::streamsize>(buffer.byteLength)
+
+            memcpy(
+                staging_buffer.mapped_ptr,
+                source_buffer.data(),
+                buffer.byteLength
             );
             staging_buffers.push_back(std::move(staging_buffer));
+            source_buffers.push_back(std::move(source_buffer));
         } else {
             dbg("here");
             abort();
@@ -292,18 +296,20 @@ GltfMesh load_gltf(
                     positions.count * sizeof(uint16_t) * 3,
                     "positions"
                 );
-                {
-                    auto& buffer_view =
-                        asset.bufferViews[positions.bufferViewIndex.value()];
 
+                auto& positions_buffer_view =
+                    asset.bufferViews[positions.bufferViewIndex.value()];
+
+                {
                     copy_uint16_t4_to_uint16_3(
                         device,
                         command_buffer,
                         position_buffer,
-                        staging_buffers[buffer_view.bufferIndex].buffer,
+                        staging_buffers[positions_buffer_view.bufferIndex]
+                            .buffer,
                         pipelines,
                         positions.count,
-                        buffer_view.byteOffset + positions.byteOffset
+                        positions_buffer_view.byteOffset + positions.byteOffset
                     );
                 }
 
@@ -418,8 +424,7 @@ GltfMesh load_gltf(
                 }
 
                 if (material.normalTexture) {
-                    auto& tex =
-                        material.normalTexture.value();
+                    auto& tex = material.normalTexture.value();
                     normal_texture_index =
                         image_indices[asset.textures[tex.textureIndex]
                                           .imageIndex.value()];
@@ -488,7 +493,11 @@ GltfMesh load_gltf(
                     .metallic_roughness_texture_index =
                         metallic_roughness_texture_index,
                     .normal_texture_index = normal_texture_index,
-                    .albedo_factor = glm::vec3(material.pbrData.baseColorFactor[0], material.pbrData.baseColorFactor[1], material.pbrData.baseColorFactor[2])};
+                    .albedo_factor = glm::vec3(
+                        material.pbrData.baseColorFactor[0],
+                        material.pbrData.baseColorFactor[1],
+                        material.pbrData.baseColorFactor[2]
+                    )};
 
                 auto mesh_info_buffer = upload_via_staging_buffer(
                     &mesh_info,
@@ -516,13 +525,43 @@ GltfMesh load_gltf(
                     positions.count
                 );
 
+                std::vector<float> float_positions(positions.count * 3);
+
+                uint16_t* uint_positions = reinterpret_cast<uint16_t*>(
+                    source_buffers[positions_buffer_view.bufferIndex].data()
+                    + positions_buffer_view.byteOffset + positions.byteOffset
+                );
+                for (size_t i = 0; i < positions.count; i++) {
+                    assert(uint_positions[i * 4 + 3] == 0);
+                    float_positions[i * 3] = float(uint_positions[i * 4]);
+                    float_positions[i * 3 + 1] =
+                        float(uint_positions[i * 4 + 1]);
+                    float_positions[i * 3 + 2] =
+                        float(uint_positions[i * 4 + 2]);
+                }
+
+                auto& indices_buffer_view =
+                    asset.bufferViews[indices.bufferViewIndex.value()];
+
+                auto meshlets = build_meshlets(
+                    source_buffers[indices_buffer_view.bufferIndex].data()
+                        + indices_buffer_view.byteOffset + indices.byteOffset,
+                    indices.count,
+                    float_positions.data(),
+                    positions.count,
+                    uses_32_bit_indices
+                );
+
+                dbg(meshlets.meshlets.size());
+
                 primitives.push_back(GltfPrimitive {
                     .position = std::move(position_buffer),
                     .indices = std::move(indices_buffer),
                     .uvs = std::move(uvs_buffer),
                     .normals = std::move(normals_buffer),
                     .mesh_info = std::move(mesh_info_buffer),
-                    .transform = transform});
+                    .transform = transform,
+                    .meshlets = meshlets});
             }
         }
     }

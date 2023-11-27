@@ -19,3 +19,6 @@
 [submodule "external/fastgltf"]
 	path = external/fastgltf
 	url = https://github.com/spnda/fastgltf
+[submodule "external/meshoptimizer"]
+	path = external/meshoptimizer
+	url = https://github.com/zeux/meshoptimizer

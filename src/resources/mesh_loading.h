@@ -3,6 +3,7 @@
 #include "../descriptor_set.h"
 #include "../pipelines.h"
 #include "../shared_cpu_gpu.h"
+#include "meshlets.h"
 
 struct BoundingBox {
     glm::vec3 min = glm::vec3(std::numeric_limits<float>::max());
@@ -25,6 +26,7 @@ struct GltfPrimitive {
     AllocatedBuffer normals;
     AllocatedBuffer mesh_info;
     glm::mat4 transform;
+    Meshlets meshlets;
 };
 
 struct GltfMesh {

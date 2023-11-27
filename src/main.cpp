@@ -110,9 +110,8 @@ int main() {
         .queueCount = 1,
         .pQueuePriorities = &queue_prio};
 
-    auto shader_clock_features = vk::PhysicalDeviceShaderClockFeaturesKHR {
-        .shaderSubgroupClock = true
-    };
+    auto shader_clock_features =
+        vk::PhysicalDeviceShaderClockFeaturesKHR {.shaderSubgroupClock = true};
 
     auto vulkan_1_2_features = vk::PhysicalDeviceVulkan12Features {
         .pNext = &shader_clock_features,
@@ -135,7 +134,8 @@ int main() {
         .shaderInt16 = true,
     };
 
-    auto device_extensions = std::array {"VK_KHR_swapchain", "VK_KHR_shader_clock"};
+    auto device_extensions =
+        std::array {"VK_KHR_swapchain", "VK_KHR_shader_clock"};
 
     vk::raii::Device device = phys_device.createDevice(
         {
@@ -649,8 +649,18 @@ int main() {
         ImGui::NewFrame();
         {
             ImGui::Checkbox("debug shadowmaps", &uniforms->debug_shadowmaps);
-            ImGui::SliderFloat("shadow_cam_distance", &uniforms->shadow_cam_distance, 0.0f, 10000.0f);
-            ImGui::SliderFloat("cascade_split_pow", &uniforms->cascade_split_pow, 0.0f, 10.0f);
+            ImGui::SliderFloat(
+                "shadow_cam_distance",
+                &uniforms->shadow_cam_distance,
+                0.0f,
+                10000.0f
+            );
+            ImGui::SliderFloat(
+                "cascade_split_pow",
+                &uniforms->cascade_split_pow,
+                0.0f,
+                10.0f
+            );
             ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
             ImGui::SliderFloat(
                 "sun_intensity",

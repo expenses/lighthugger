@@ -34,3 +34,5 @@ struct DescriptorPoolAndSet {
     vk::raii::DescriptorPool pool;
     vk::raii::DescriptorSet set;
 };
+
+std::vector<uint8_t> read_file_to_bytes(const std::filesystem::path& filepath);

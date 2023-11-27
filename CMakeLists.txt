@@ -7,6 +7,7 @@ find_package(Vulkan REQUIRED)
 find_package(VulkanMemoryAllocator REQUIRED)
 add_subdirectory(external/VulkanMemoryAllocator-Hpp)
 add_subdirectory(external/fastgltf)
+add_subdirectory(external/meshoptimizer)
 
 add_compile_definitions(vkcpptest TRACY_ENABLE IMGUI_DEFINE_MATH_OPERATORS)
 file(GLOB_RECURSE SRC_FILES src/**.cpp)
@@ -26,8 +27,8 @@ target_sources(vkcpptest PRIVATE
     "external/imgui/backends/imgui_impl_vulkan.cpp"
 )
 
-target_include_directories(vkcpptest PRIVATE src external/simple_vulkan_synchronization external/VulkanMemoryAllocator-Hpp/include external/dbg-macro external/tracy/public external/imgui)
-target_link_libraries(vkcpptest glfw Vulkan::Vulkan fastgltf)
+target_include_directories(vkcpptest PRIVATE src external/simple_vulkan_synchronization external/VulkanMemoryAllocator-Hpp/include external/dbg-macro external/tracy/public external/imgui external/meshoptimizer/src)
+target_link_libraries(vkcpptest glfw Vulkan::Vulkan fastgltf meshoptimizer)
 target_precompile_headers(vkcpptest PRIVATE src/pch.h)
 target_compile_features(vkcpptest PUBLIC cxx_std_20)
 target_compile_options(vkcpptest PUBLIC -Wall -Wextra -Wpedantic -Wfatal-errors -fdiagnostics-color=always)

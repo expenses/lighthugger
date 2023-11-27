@@ -39,3 +39,19 @@ vk::DescriptorBufferInfo buffer_info(const AllocatedBuffer& buffer) {
 uint32_t dispatch_size(uint32_t width, uint32_t workgroup_size) {
     return ((width - 1) / workgroup_size) + 1;
 }
+
+std::vector<uint8_t> read_file_to_bytes(const std::filesystem::path& filepath) {
+    std::ifstream file_stream(filepath, std::ios::binary);
+
+    if (!file_stream) {
+        dbg(filepath);
+        abort();
+    }
+
+    std::vector<uint8_t> contents(
+        (std::istreambuf_iterator<char>(file_stream)),
+        {}
+    );
+
+    return contents;
+}

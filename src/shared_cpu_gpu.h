@@ -128,3 +128,15 @@ const static uint32_t MAX_ALPHA_CLIP_DRAWS = 512;
 const static uint32_t ALPHA_CLIP_DRAWS_OFFSET = MAX_ALPHA_CLIP_DRAWS;
 
 const static float NEAR_PLANE = 0.01f;
+
+struct Meshlet {
+    VEC3_TYPE cone_apex;
+    VEC3_TYPE cone_axis;
+    float cone_cutoff;
+    // The buffers these index into are often large enough to require 32-bit offsets.
+    uint32_t triangle_offset;
+    uint32_t index_offset;
+    // hlsl doesn't support 8-bit types so we just pack these two
+    // together.
+    uint16_t packed_index_and_triangle_count;
+};

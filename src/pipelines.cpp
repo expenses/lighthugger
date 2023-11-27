@@ -1,6 +1,7 @@
 #include "pipelines.h"
 
 #include "shared_cpu_gpu.h"
+#include "util.h"
 
 const auto RGBA_MASK = vk::ColorComponentFlagBits::eR
     | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB
@@ -68,24 +69,6 @@ const auto DEPTH_WRITE_LESS = vk::PipelineDepthStencilStateCreateInfo {
     .depthWriteEnable = true,
     .depthCompareOp = vk::CompareOp::eLess,
 };
-
-std::vector<uint8_t> read_file_to_bytes(const char* filepath) {
-    std::ifstream file_stream(filepath, std::ios::binary);
-
-    if (!file_stream) {
-        dbg(filepath);
-        abort();
-    }
-
-    std::vector<uint8_t> contents(
-        (std::istreambuf_iterator<char>(file_stream)),
-        {}
-    );
-
-    assert(!contents.empty());
-
-    return contents;
-}
 
 vk::raii::ShaderModule
 create_shader_from_file(const vk::raii::Device& device, const char* filepath) {
@@ -530,17 +513,17 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
         device.createComputePipelines(nullptr, compute_pipeline_infos);
 
     return Pipelines {
-        .rasterize_shadowmap
-            {.opaque = name_pipeline(
-                 std::move(graphics_pipelines[0]),
-                 device,
-                 "rasterize_shadowmap::opaque"
-             ),
-             .alpha_clip = name_pipeline(
-                 std::move(graphics_pipelines[1]),
-                 device,
-                 "rasterize_shadowmap::alpha_clip"
-             )},
+        .rasterize_shadowmap {
+            .opaque = name_pipeline(
+                std::move(graphics_pipelines[0]),
+                device,
+                "rasterize_shadowmap::opaque"
+            ),
+            .alpha_clip = name_pipeline(
+                std::move(graphics_pipelines[1]),
+                device,
+                "rasterize_shadowmap::alpha_clip"
+            )},
         .rasterize_visbuffer =
             {.opaque = name_pipeline(
                  std::move(graphics_pipelines[2]),
