@@ -376,6 +376,8 @@ GltfMesh load_gltf(
                     std::numeric_limits<uint32_t>::max();
                 auto metallic_roughness_texture_index =
                     std::numeric_limits<uint32_t>::max();
+                auto normal_texture_index =
+                    std::numeric_limits<uint32_t>::max();
 
                 if (material.pbrData.baseColorTexture) {
                     auto& tex = material.pbrData.baseColorTexture.value();
@@ -400,6 +402,25 @@ GltfMesh load_gltf(
                     auto& tex =
                         material.pbrData.metallicRoughnessTexture.value();
                     metallic_roughness_texture_index =
+                        image_indices[asset.textures[tex.textureIndex]
+                                          .imageIndex.value()];
+
+                    if (tex.transform != nullptr) {
+                        texture_scale = glm::vec2(
+                            (*tex.transform).uvScale[0],
+                            (*tex.transform).uvScale[1]
+                        );
+                        texture_offset = glm::vec2(
+                            (*tex.transform).uvOffset[0],
+                            (*tex.transform).uvOffset[1]
+                        );
+                    }
+                }
+
+                if (material.normalTexture) {
+                    auto& tex =
+                        material.normalTexture.value();
+                    normal_texture_index =
                         image_indices[asset.textures[tex.textureIndex]
                                           .imageIndex.value()];
 
@@ -441,6 +462,8 @@ GltfMesh load_gltf(
                     abort();
                 }
 
+                assert(material.pbrData.baseColorFactor[3] == 1.0);
+
                 // todo: albedo factor, proper pbr.
 
                 auto mesh_info = MeshInfo {
@@ -463,7 +486,9 @@ GltfMesh load_gltf(
                     .texture_offset = texture_offset,
                     .albedo_texture_index = albedo_texture_index,
                     .metallic_roughness_texture_index =
-                        metallic_roughness_texture_index};
+                        metallic_roughness_texture_index,
+                    .normal_texture_index = normal_texture_index,
+                    .albedo_factor = glm::vec3(material.pbrData.baseColorFactor[0], material.pbrData.baseColorFactor[1], material.pbrData.baseColorFactor[2])};
 
                 auto mesh_info_buffer = upload_via_staging_buffer(
                     &mesh_info,

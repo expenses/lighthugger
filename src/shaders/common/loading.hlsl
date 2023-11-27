@@ -28,6 +28,8 @@ MeshInfo load_mesh_info(uint64_t address) {
     info.texture_offset = load_value_and_increment_address<float2>(address);
     info.albedo_texture_index = load_value_and_increment_address<uint32_t>(address);
     info.metallic_roughness_texture_index = load_value_and_increment_address<uint32_t>(address);
+    info.normal_texture_index = load_value_and_increment_address<uint32_t>(address);
+    info.albedo_factor = load_value_and_increment_address<float3>(address);
     return info;
 }
 

@@ -30,6 +30,8 @@ struct MeshInfo {
     VEC2_TYPE texture_offset;
     uint32_t albedo_texture_index;
     uint32_t metallic_roughness_texture_index;
+    uint32_t normal_texture_index;
+    VEC3_TYPE albedo_factor;
 };
 
 struct MeshInfoWithUintBoundingSphereRadius {
@@ -45,6 +47,8 @@ struct MeshInfoWithUintBoundingSphereRadius {
     VEC2_TYPE texture_offset;
     uint32_t albedo_texture_index;
     uint32_t metallic_roughness_texture_index;
+    uint32_t normal_texture_index;
+    VEC3_TYPE albedo_factor;
 };
 
 // Stores depth info and draw call counts.

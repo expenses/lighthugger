@@ -150,7 +150,7 @@ void render(
         vk::RenderingAttachmentInfoKHR visbuffer_attachment_info = {
             .imageView = *resources.resizing.visbuffer.view,
             .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-            .loadOp = vk::AttachmentLoadOp::eClear,
+            .loadOp = vk::AttachmentLoadOp::eDontCare,
             .storeOp = vk::AttachmentStoreOp::eStore,
         };
         vk::RenderingAttachmentInfoKHR depth_attachment_info = {
