@@ -398,6 +398,19 @@ int main() {
         )
     ));
 
+    auto instance_meshlets_buf = AllocatedBuffer(
+        vk::BufferCreateInfo {
+            .size = sizeof(MeshletIndex) * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
+            .usage = vk::BufferUsageFlagBits::eStorageBuffer
+                | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        },
+        {
+            .usage = vma::MemoryUsage::eAuto,
+        },
+        allocator,
+        "instance_meshlets_buf"
+    );
+
     auto resources = Resources {
         .resizing = ResizingResources(device, allocator, extent),
         .uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
@@ -481,7 +494,8 @@ int main() {
                 .compareEnable = true,
                 .compareOp = vk::CompareOp::eLess,
                 .minLod = 0.0f,
-                .maxLod = VK_LOD_CLAMP_NONE})};
+                .maxLod = VK_LOD_CLAMP_NONE}),
+        .num_instances = instances.size()};
 
     command_buffer.end();
 
@@ -508,12 +522,12 @@ int main() {
     descriptor_set.write_descriptors(resources, device, swapchain_image_views);
 
     auto camera_params = CameraParams {
-        .position = glm::vec3(112.492310, 29.228727, 33.554398),
+        .position = glm::vec3(76.03, 21.91, 50.30),
         .fov = 45.0f,
-        .yaw = 09.166492,
-        .pitch = -0.300172,
-        .sun_latitude = -4.730007,
-        .sun_longitude = 1.295797,
+        .yaw = 10.986,
+        .pitch = -0.11,
+        .sun_latitude = -5.6,
+        .sun_longitude = 1.37,
     };
 
     auto tracy_ctx =
@@ -559,6 +573,8 @@ int main() {
     // quality loss when setting this value to be absurdly high.
     uniforms->shadow_cam_distance = 1024.0;
     uniforms->cascade_split_pow = 3.0;
+    uniforms->instance_meshlets =
+        device.getBufferAddress({.buffer = instance_meshlets_buf.buffer});
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();

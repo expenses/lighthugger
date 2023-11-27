@@ -57,13 +57,19 @@ void render_geometry(
     uint32_t instance_index = packed & ((1 << 16) - 1);
     uint32_t triangle_index = packed >> 16;
 
-    Instance instance = load_instance(instance_index);
+    MeshletIndex meshlet_index = load_instance_meshlet(uniforms.instance_meshlets, instance_index);
+
+    Instance instance = load_instance(meshlet_index.instance_index);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
+    Meshlet meshlet = load_meshlet(mesh_info.meshlets, meshlet_index.meshlet_index);
+    uint16_t micro_index_a = load_uint8_t(mesh_info.micro_indices + meshlet.triangle_offset + triangle_index * 3);
+    uint16_t micro_index_b = load_uint8_t(mesh_info.micro_indices + meshlet.triangle_offset + triangle_index * 3 + 1);
+    uint16_t micro_index_c = load_uint8_t(mesh_info.micro_indices + meshlet.triangle_offset + triangle_index * 3 + 2);
 
     uint3 indices = uint3(
-        load_index(mesh_info, triangle_index * 3),
-        load_index(mesh_info, triangle_index * 3 + 1),
-        load_index(mesh_info, triangle_index * 3 + 2)
+        load_index(mesh_info, meshlet.index_offset + micro_index_a),
+        load_index(mesh_info, meshlet.index_offset + micro_index_b),
+        load_index(mesh_info, meshlet.index_offset + micro_index_c)
     );
 
     float2 ndc = float2(global_id.xy) / float2(uniforms.window_size) * 2.0 - 1.0;
@@ -86,10 +92,12 @@ void render_geometry(
 
     InterpolatedVector<float2> uv = interpolate(
         bary,
-        float2(load_value<uint16_t2>(mesh_info.uvs, indices.x)) * mesh_info.texture_scale + mesh_info.texture_offset,
-        float2(load_value<uint16_t2>(mesh_info.uvs, indices.y)) * mesh_info.texture_scale + mesh_info.texture_offset,
-        float2(load_value<uint16_t2>(mesh_info.uvs, indices.z)) * mesh_info.texture_scale + mesh_info.texture_offset
+        float2(load_value<uint16_t2>(mesh_info.uvs, indices.x)) * mesh_info.texture_scale,
+        float2(load_value<uint16_t2>(mesh_info.uvs, indices.y)) * mesh_info.texture_scale,
+        float2(load_value<uint16_t2>(mesh_info.uvs, indices.z)) * mesh_info.texture_scale
     );
+    // Don't need to do this per triangle uv as it doesn't affect the derivs.
+    uv.value += mesh_info.texture_offset;
 
     float3 view_vector = world_pos.value - uniforms.camera_pos;
 

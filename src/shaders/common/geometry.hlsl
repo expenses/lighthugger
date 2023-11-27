@@ -3,17 +3,7 @@
 #include "bindings.hlsl"
 
 Instance load_instance(uint32_t offset) {
-    uint32_t packed_instance_size = 112;
-    offset = offset * packed_instance_size;
-    Instance instance;
-    instance.transform = load_value_and_increment_offset<float4x4>(instances, offset);
-    instance.mesh_info_address = load_value_and_increment_offset<uint64_t>(instances, offset);
-    instance.normal_transform = float3x3(
-        load_value_and_increment_offset<float3>(instances, offset),
-        load_value_and_increment_offset<float3>(instances, offset),
-        load_value_and_increment_offset<float3>(instances, offset)
-    );
-    return instance;
+    return instances.Load<Instance>(offset * sizeof(Instance));
 }
 
 uint32_t load_index(MeshInfo mesh_info, uint32_t vertex_id) {

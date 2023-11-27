@@ -124,6 +124,13 @@ void render(
          *descriptor_set.swapchain_image_sets[swapchain_image_index]},
         {}
     );
+    command_buffer.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics,
+        *pipelines.pipeline_layout,
+        0,
+        {*descriptor_set.set},
+        {}
+    );
 
     {
         TracyVkZone(tracy_ctx, *command_buffer, "write draw calls");
@@ -132,17 +139,12 @@ void render(
             vk::PipelineBindPoint::eCompute,
             *pipelines.write_draw_calls
         );
-        command_buffer.dispatch(1, 1, 1);
+        command_buffer
+            .dispatch(dispatch_size(resources.num_instances, 64), 1, 1);
     }
 
     set_scissor_and_viewport(command_buffer, extent.width, extent.height);
-    command_buffer.bindDescriptorSets(
-        vk::PipelineBindPoint::eGraphics,
-        *pipelines.pipeline_layout,
-        0,
-        {*descriptor_set.set},
-        {}
-    );
+
 
     {
         TracyVkZone(tracy_ctx, *command_buffer, "visbuffer rendering");

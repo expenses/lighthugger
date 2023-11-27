@@ -42,17 +42,25 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
     uint32_t current_draw;
 
     if (mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP) {
-        InterlockedAdd(misc_storage[0].num_alpha_clip_draws, 1, current_draw);
+        InterlockedAdd(misc_storage[0].num_alpha_clip_draws, mesh_info.num_meshlets, current_draw);
         current_draw += ALPHA_CLIP_DRAWS_OFFSET;
     } else {
-        InterlockedAdd(misc_storage[0].num_opaque_draws, 1, current_draw);
+        InterlockedAdd(misc_storage[0].num_opaque_draws, mesh_info.num_meshlets, current_draw);
     }
 
+    for (uint32_t i = 0; i < mesh_info.num_meshlets; i++) {
+        Meshlet meshlet = load_meshlet(mesh_info.meshlets, i);
 
-    // Todo: merge draw calls that use the same mesh.
+        uint32_t num_triangles = meshlet.triangle_count;
 
-    draw_calls[current_draw].vertexCount = mesh_info.num_indices;
-    draw_calls[current_draw].instanceCount = 1;
-    draw_calls[current_draw].firstVertex = 0;
-    draw_calls[current_draw].firstInstance = id;
+        uint64_t write_address = uniforms.instance_meshlets + (current_draw + i) * sizeof(MeshletIndex);
+        vk::RawBufferStore<uint32_t>(write_address, id);
+        write_address += sizeof(uint32_t);
+        vk::RawBufferStore<uint32_t>(write_address, i);
+
+        draw_calls[current_draw + i].vertexCount = num_triangles * 3;
+        draw_calls[current_draw + i].instanceCount = 1;
+        draw_calls[current_draw + i].firstVertex = 0;
+        draw_calls[current_draw + i].firstInstance = current_draw + i;
+    }
 }

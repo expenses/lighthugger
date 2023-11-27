@@ -1,5 +1,8 @@
 #include "common/loading.hlsl"
 
+[[vk::push_constant]]
+CalcBoundingSphereConstant constant;
+
 // Todo: can we use atomic max with buffer device address
 // and get rid of this binding?
 [[vk::binding(0)]] RWStructuredBuffer<MeshInfoWithUintBoundingSphereRadius> mesh_info_buffer;
@@ -11,7 +14,7 @@ void calc_bounding_sphere(uint3 global_id: SV_DispatchThreadID) {
 
     MeshInfoWithUintBoundingSphereRadius mesh_info = mesh_info_buffer[0];
 
-    if (index >= mesh_info.num_vertices) {
+    if (index >= constant.num_vertices) {
         return;
     }
 

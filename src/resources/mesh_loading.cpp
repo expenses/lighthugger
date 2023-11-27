@@ -119,6 +119,12 @@ void calc_bounding_sphere(
         {*descriptor_set},
         {}
     );
+    command_buffer.pushConstants<CalcBoundingSphereConstant>(
+        *pipelines.calc_bounding_sphere.layout,
+        vk::ShaderStageFlagBits::eCompute,
+        0,
+        {{.num_vertices = num_vertices}}
+    );
     command_buffer.dispatch(dispatch_size(num_vertices, 64), 1, 1);
 
     temp_descriptor_sets.push_back(DescriptorPoolAndSet {
@@ -325,19 +331,6 @@ GltfMesh load_gltf(
                     );
                 }
                 assert(indices.type == fastgltf::AccessorType::Scalar);
-                auto indices_buffer_size = indices.count
-                    * (uses_32_bit_indices ? sizeof(uint32_t) : sizeof(uint16_t)
-                    );
-                auto indices_buffer =
-                    create_buffer(indices_buffer_size, "indices");
-                copy_buffer_to_final(
-                    indices,
-                    asset,
-                    staging_buffers,
-                    indices_buffer,
-                    command_buffer,
-                    indices_buffer_size
-                );
 
                 auto& uvs = get_accessor("TEXCOORD_0");
                 assert(
@@ -471,20 +464,104 @@ GltfMesh load_gltf(
 
                 // todo: albedo factor, proper pbr.
 
+                std::vector<float> float_positions(positions.count * 3);
+
+                uint16_t* uint_positions = reinterpret_cast<uint16_t*>(
+                    source_buffers[positions_buffer_view.bufferIndex].data()
+                    + positions_buffer_view.byteOffset + positions.byteOffset
+                );
+                for (size_t i = 0; i < positions.count; i++) {
+                    assert(uint_positions[i * 4 + 3] == 0);
+                    float_positions[i * 3] = float(uint_positions[i * 4]);
+                    float_positions[i * 3 + 1] =
+                        float(uint_positions[i * 4 + 1]);
+                    float_positions[i * 3 + 2] =
+                        float(uint_positions[i * 4 + 2]);
+                }
+
+                auto& indices_buffer_view =
+                    asset.bufferViews[indices.bufferViewIndex.value()];
+
+                auto meshlets = build_meshlets(
+                    source_buffers[indices_buffer_view.bufferIndex].data()
+                        + indices_buffer_view.byteOffset + indices.byteOffset,
+                    indices.count,
+                    float_positions.data(),
+                    positions.count,
+                    uses_32_bit_indices
+                );
+
+                total_meshlets += meshlets.meshlets.size();
+
+                std::optional<AllocatedBuffer> indices_buffer = std::nullopt;
+
+                if (uses_32_bit_indices) {
+                    indices_buffer = upload_via_staging_buffer(
+                        meshlets.indices_32bit.data(),
+                        meshlets.indices_32bit.size() * sizeof(uint32_t),
+                        allocator,
+                        vk::BufferUsageFlagBits::eStorageBuffer
+                            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                        primitive_name + " indices buffer",
+                        command_buffer,
+                        temp_buffers
+                    );
+                } else {
+                    indices_buffer = upload_via_staging_buffer(
+                        meshlets.indices_16bit.data(),
+                        meshlets.indices_16bit.size() * sizeof(uint16_t),
+                        allocator,
+                        vk::BufferUsageFlagBits::eStorageBuffer
+                            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                        primitive_name + " indices buffer",
+                        command_buffer,
+                        temp_buffers
+                    );
+                }
+
+                auto micro_indices = upload_via_staging_buffer(
+                    meshlets.micro_indices.data(),
+                    meshlets.micro_indices.size(),
+                    allocator,
+                    vk::BufferUsageFlagBits::eStorageBuffer
+                        | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                    primitive_name + " micro indices buffer",
+                    command_buffer,
+                    temp_buffers
+                );
+
+                auto meshlets_buffer = upload_via_staging_buffer(
+                    meshlets.meshlets.data(),
+                    meshlets.meshlets.size() * sizeof(Meshlet),
+                    allocator,
+                    vk::BufferUsageFlagBits::eStorageBuffer
+                        | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                    primitive_name + " meshlets buffer",
+                    command_buffer,
+                    temp_buffers
+                );
+
                 auto mesh_info = MeshInfo {
                     .positions = device.getBufferAddress(
                         {.buffer = position_buffer.buffer}
                     ),
                     .indices = device.getBufferAddress(
-                        {.buffer = indices_buffer.buffer}
+                        {.buffer = indices_buffer.value().buffer}
                     ),
                     .normals = device.getBufferAddress(
                         {.buffer = normals_buffer.buffer}
                     ),
                     .uvs =
                         device.getBufferAddress({.buffer = uvs_buffer.buffer}),
+                    .micro_indices =
+                        device.getBufferAddress({.buffer = micro_indices.buffer}
+                        ),
+                    .meshlets = device.getBufferAddress(
+                        {.buffer = meshlets_buffer.buffer}
+                    ),
+                    .num_meshlets = meshlets.meshlets.size(),
+
                     .num_indices = static_cast<uint32_t>(indices.count),
-                    .num_vertices = static_cast<uint32_t>(positions.count),
                     .flags = flags,
                     .bounding_sphere_radius = 0.0f,
                     .texture_scale = texture_scale,
@@ -525,43 +602,15 @@ GltfMesh load_gltf(
                     positions.count
                 );
 
-                std::vector<float> float_positions(positions.count * 3);
-
-                uint16_t* uint_positions = reinterpret_cast<uint16_t*>(
-                    source_buffers[positions_buffer_view.bufferIndex].data()
-                    + positions_buffer_view.byteOffset + positions.byteOffset
-                );
-                for (size_t i = 0; i < positions.count; i++) {
-                    assert(uint_positions[i * 4 + 3] == 0);
-                    float_positions[i * 3] = float(uint_positions[i * 4]);
-                    float_positions[i * 3 + 1] =
-                        float(uint_positions[i * 4 + 1]);
-                    float_positions[i * 3 + 2] =
-                        float(uint_positions[i * 4 + 2]);
-                }
-
-                auto& indices_buffer_view =
-                    asset.bufferViews[indices.bufferViewIndex.value()];
-
-                auto meshlets = build_meshlets(
-                    source_buffers[indices_buffer_view.bufferIndex].data()
-                        + indices_buffer_view.byteOffset + indices.byteOffset,
-                    indices.count,
-                    float_positions.data(),
-                    positions.count,
-                    uses_32_bit_indices
-                );
-
-                dbg(meshlets.meshlets.size());
-
                 primitives.push_back(GltfPrimitive {
                     .position = std::move(position_buffer),
-                    .indices = std::move(indices_buffer),
+                    .indices = std::move(indices_buffer.value()),
                     .uvs = std::move(uvs_buffer),
                     .normals = std::move(normals_buffer),
                     .mesh_info = std::move(mesh_info_buffer),
-                    .transform = transform,
-                    .meshlets = meshlets});
+                    .micro_indices = std::move(micro_indices),
+                    .meshlets = std::move(meshlets_buffer),
+                    .transform = transform});
             }
         }
     }

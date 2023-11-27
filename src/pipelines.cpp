@@ -274,11 +274,19 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
     auto calc_bounding_sphere_layout_array =
         std::array {*descriptor_set_layouts.calc_bounding_sphere};
 
+    auto calc_bounding_sphere_push_constants =
+        std::array {vk::PushConstantRange {
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+            .offset = 0,
+            .size = sizeof(CalcBoundingSphereConstant)}};
+
     auto calc_bounding_sphere_pipeline_layout =
         device.createPipelineLayout(vk::PipelineLayoutCreateInfo {
             .setLayoutCount = calc_bounding_sphere_layout_array.size(),
             .pSetLayouts = calc_bounding_sphere_layout_array.data(),
-
+            .pushConstantRangeCount =
+                calc_bounding_sphere_push_constants.size(),
+            .pPushConstantRanges = calc_bounding_sphere_push_constants.data(),
         });
 
     auto copy_quantized_positions_push_constants =

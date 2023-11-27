@@ -22,8 +22,10 @@ struct MeshInfo {
     uint64_t indices;
     uint64_t normals;
     uint64_t uvs;
+    uint64_t micro_indices;
+    uint64_t meshlets;
+    uint32_t num_meshlets;
     uint32_t num_indices;
-    uint32_t num_vertices;
     uint32_t flags;
     float bounding_sphere_radius;
     VEC2_TYPE texture_scale;
@@ -39,8 +41,10 @@ struct MeshInfoWithUintBoundingSphereRadius {
     uint64_t indices;
     uint64_t normals;
     uint64_t uvs;
+    uint64_t micro_indices;
+    uint64_t meshlets;
+    uint32_t num_meshlets;
     uint32_t num_indices;
-    uint32_t num_vertices;
     uint32_t flags;
     uint32_t bounding_sphere_radius;
     VEC2_TYPE texture_scale;
@@ -71,6 +75,7 @@ struct Uniforms {
     MATRIX4_TYPE combined_perspective_view;
     MATRIX4_TYPE inv_perspective_view;
     MATRIX4_TYPE view;
+    uint64_t instance_meshlets;
     VEC3_TYPE camera_pos;
     uint32_t _padding0;
     VEC3_TYPE sun_dir;
@@ -116,16 +121,20 @@ struct DisplayTransformConstant {
     uint32_t swapchain_image_index;
 };
 
+struct CalcBoundingSphereConstant {
+    uint32_t num_vertices;
+};
+
 struct CopyQuantizedPositionsConstant {
     uint64_t dst;
     uint64_t src;
     uint32_t count;
 };
 
-const static uint32_t MAX_OPAQUE_DRAWS = 512;
-const static uint32_t MAX_ALPHA_CLIP_DRAWS = 512;
+const static uint32_t MAX_OPAQUE_DRAWS = 10000;
+const static uint32_t MAX_ALPHA_CLIP_DRAWS = 2048;
 
-const static uint32_t ALPHA_CLIP_DRAWS_OFFSET = MAX_ALPHA_CLIP_DRAWS;
+const static uint32_t ALPHA_CLIP_DRAWS_OFFSET = MAX_OPAQUE_DRAWS;
 
 const static float NEAR_PLANE = 0.01f;
 
@@ -138,5 +147,11 @@ struct Meshlet {
     uint32_t index_offset;
     // hlsl doesn't support 8-bit types so we just pack these two
     // together.
-    uint16_t packed_index_and_triangle_count;
+    uint16_t triangle_count;
+    uint16_t index_count;
+};
+
+struct MeshletIndex {
+    uint32_t instance_index;
+    uint32_t meshlet_index;
 };

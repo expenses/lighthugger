@@ -81,4 +81,5 @@ struct Resources {
     vk::raii::Sampler repeat_sampler;
     vk::raii::Sampler clamp_sampler;
     vk::raii::Sampler shadowmap_comparison_sampler;
+    uint32_t num_instances;
 };

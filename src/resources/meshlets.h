@@ -4,11 +4,11 @@ struct Meshlets {
     std::vector<Meshlet> meshlets;
     // Contains a micro index buffer that indexes into the main index buffer.
     // Yeah it's confusing.
-    std::vector<uint8_t> meshlet_triangles;
+    std::vector<uint8_t> micro_indices;
 
     // This is the new index buffer.
-    std::vector<uint32_t> meshlet_indices_32bit;
-    std::vector<uint16_t> meshlet_indices_16bit;
+    std::vector<uint32_t> indices_32bit;
+    std::vector<uint16_t> indices_16bit;
 };
 
 Meshlets build_meshlets(

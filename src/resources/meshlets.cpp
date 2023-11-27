@@ -7,9 +7,9 @@ Meshlets build_meshlets(
     size_t vertices_count,
     bool uses_32_bit_indices
 ) {
-    auto max_vertices = 64;
-    auto max_triangles = 124;
-    auto cone_weight = 0.5f;
+    auto max_vertices = 255;
+    auto max_triangles = 512;
+    auto cone_weight = 1.0f;
 
     size_t max_meshlets =
         meshopt_buildMeshletsBound(indices_count, max_vertices, max_triangles);
@@ -17,9 +17,7 @@ Meshlets build_meshlets(
     std::vector<unsigned int> meshlet_indices_32bit(
         max_meshlets * max_vertices
     );
-    std::vector<unsigned char> meshlet_triangles(
-        max_meshlets * max_triangles * 3
-    );
+    std::vector<unsigned char> micro_indices(max_meshlets * max_triangles * 3);
 
     size_t meshlet_count = 0;
 
@@ -29,7 +27,7 @@ Meshlets build_meshlets(
         meshlet_count = meshopt_buildMeshlets(
             meshlets.data(),
             meshlet_indices_32bit.data(),
-            meshlet_triangles.data(),
+            micro_indices.data(),
             reinterpret_cast<uint32_t*>(indices),
             indices_count,
             positions,
@@ -43,7 +41,7 @@ Meshlets build_meshlets(
         meshlet_count = meshopt_buildMeshlets(
             meshlets.data(),
             meshlet_indices_32bit.data(),
-            meshlet_triangles.data(),
+            micro_indices.data(),
             reinterpret_cast<uint16_t*>(indices),
             indices_count,
             positions,
@@ -58,7 +56,7 @@ Meshlets build_meshlets(
     const meshopt_Meshlet& last = meshlets[meshlet_count - 1];
 
     meshlet_indices_32bit.resize(last.vertex_offset + last.vertex_count);
-    meshlet_triangles.resize(
+    micro_indices.resize(
         last.triangle_offset + ((last.triangle_count * 3 + 3) & ~3)
     );
     meshlets.resize(meshlet_count);
@@ -69,7 +67,7 @@ Meshlets build_meshlets(
         auto meshlet = meshlets[i];
         meshlet_bounds[i] = meshopt_computeMeshletBounds(
             &meshlet_indices_32bit[meshlet.vertex_offset],
-            &meshlet_triangles[meshlet.triangle_offset],
+            &micro_indices[meshlet.triangle_offset],
             meshlet.triangle_count,
             positions,
             vertices_count,
@@ -104,17 +102,16 @@ Meshlets build_meshlets(
             .cone_cutoff = bounds.cone_cutoff,
             .triangle_offset = meshlet.triangle_offset,
             .index_offset = meshlet.vertex_offset,
-            .packed_index_and_triangle_count = static_cast<uint16_t>(
-                meshlet.vertex_count << 8 | meshlet.triangle_count
-            )};
+            .triangle_count = meshlet.triangle_count,
+            .index_count = meshlet.vertex_count};
     }
 
     if (uses_32_bit_indices) {
         return {
             .meshlets = final_meshlets,
-            .meshlet_triangles = meshlet_triangles,
-            .meshlet_indices_32bit = meshlet_indices_32bit,
-            .meshlet_indices_16bit = {}};
+            .micro_indices = micro_indices,
+            .indices_32bit = meshlet_indices_32bit,
+            .indices_16bit = {}};
     } else {
         // No need to use 32-bit indices.
         std::vector<uint16_t> meshlet_indices_16bit(meshlet_indices_32bit.size()
@@ -128,8 +125,8 @@ Meshlets build_meshlets(
 
         return {
             .meshlets = final_meshlets,
-            .meshlet_triangles = meshlet_triangles,
-            .meshlet_indices_32bit = {},
-            .meshlet_indices_16bit = meshlet_indices_16bit};
+            .micro_indices = micro_indices,
+            .indices_32bit = {},
+            .indices_16bit = meshlet_indices_16bit};
     }
 }
