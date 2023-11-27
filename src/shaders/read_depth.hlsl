@@ -61,6 +61,11 @@ void read_depth(uint3 global_id: SV_DispatchThreadID){
     }
 }
 
+// Super easy.
+float convert_infinite_reverze_z_depth(float depth) {
+    return NEAR_PLANE / depth;
+}
+
 [shader("compute")]
 [numthreads(4, 1, 1)]
 void generate_matrices(uint3 global_id: SV_DispatchThreadID)
@@ -76,37 +81,19 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
 
     uint32_t cascade_index = global_id.x;
 
-    //float cascadeSplits[4];
-    /*
-    float nearClip = 0.01;
-    float farClip = 100000.0;
-    float clipRange = farClip - nearClip;
-
-    float minZ = nearClip + min_depth * clipRange;
-    float maxZ = nearClip + max_depth * clipRange;
-
-    float range = maxZ - minZ;
-    float ratio = maxZ / minZ;
-
-
-    float cascadeSplitLambda = 0.95;
-
-    // Calculate split depths based on view camera frustum
-    // Based on method presented in https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch10.html
-    for (uint32_t i = 0; i < 4; i++) {
-            float p = (i + 1) / float(4);
-            float log = minZ * pow(ratio, p);
-            float uniform_value = minZ + range * p;
-            float d = cascadeSplitLambda * (log - uniform_value) + uniform_value;
-            cascadeSplits[i] = (d - nearClip) / clipRange;
-    }
-    */
+    float min_distance = convert_infinite_reverze_z_depth(max_depth);
+    float max_distance = convert_infinite_reverze_z_depth(min_depth);
 
     float cascadeSplits[4] = {
-        lerp(max_depth, min_depth, 0.25), lerp(max_depth, min_depth, 0.5), lerp(max_depth, min_depth, 0.75), min_depth
+        // The first shadow frustum just tightly fits the aabb of the plane of the nearest stuff.
+        // This is generally reasonably large.
+        max_depth,
+        convert_infinite_reverze_z_depth(lerp(min_distance, max_distance, pow(0.5, uniforms.cascade_split_pow))),
+        convert_infinite_reverze_z_depth(lerp(min_distance, max_distance, pow(0.75, uniforms.cascade_split_pow))),
+        min_depth
     };
 
-    float lastSplitDist = (cascade_index > 0 ? cascadeSplits[cascade_index - 1] : max_depth);
+    float lastSplitDist = select(cascade_index > 0, cascadeSplits[cascade_index - 1], max_depth);
     float splitDist = cascadeSplits[cascade_index];
 
     // Get the corners of the visible depth slice in view space
@@ -144,15 +131,8 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
     float3 maxExtents = sphere_radius;
     float3 minExtents = -maxExtents;
 
-    // Set the camera to be a fixed distance away from the frustum center, so that
-    // we don't get clipping on the near plane. We use the longest distance of the
-    // (currently only) mesh in the scene for this.
-    // Ideally you want to have the near and far plane be the distance of the closest
-    // point on a mesh and the furthest point on a mesh respectively.
-    float shadow_cam_distance = load_mesh_info(load_instance(0).mesh_info_address).bounding_sphere_radius * 2.0f;
-
-    float4x4 shadowView = lookAt(shadow_cam_distance * uniforms.sun_dir + frustumCenter, frustumCenter, float3(0,1,0));
-	float4x4 shadowProj = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, shadow_cam_distance * 2.0);
+    float4x4 shadowView = lookAt(uniforms.shadow_cam_distance * uniforms.sun_dir + frustumCenter, frustumCenter, float3(0,1,0));
+	float4x4 shadowProj = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, uniforms.shadow_cam_distance * 2.0);
 
     misc_storage[0].shadow_matrices[cascade_index] = mul(shadowProj, shadowView);
 }

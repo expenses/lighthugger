@@ -74,6 +74,8 @@ struct Uniforms {
     VEC3_TYPE sun_intensity;
     uint32_t num_instances;
     UVEC2_TYPE window_size;
+    float shadow_cam_distance;
+    float cascade_split_pow;
     int32_t debug;
     uint32_t _padding2;
     bool debug_shadowmaps;
@@ -120,3 +122,5 @@ const static uint32_t MAX_OPAQUE_DRAWS = 512;
 const static uint32_t MAX_ALPHA_CLIP_DRAWS = 512;
 
 const static uint32_t ALPHA_CLIP_DRAWS_OFFSET = MAX_ALPHA_CLIP_DRAWS;
+
+const static float NEAR_PLANE = 0.01f;

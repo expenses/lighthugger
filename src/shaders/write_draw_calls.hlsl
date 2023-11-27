@@ -32,10 +32,8 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
     // Flip z, not 100% sure why, copied this from older code.
     sphere_center.z = -sphere_center.z;
 
-    float z_near = 0.01;
-
     // Cull any objects completely behind the camera.
-    if (sphere_center.z + bounding_sphere_radius <= z_near) {
+    if (sphere_center.z + bounding_sphere_radius <= NEAR_PLANE) {
         return;
     }
 

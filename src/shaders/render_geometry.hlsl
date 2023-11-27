@@ -101,7 +101,8 @@ void render_geometry(
     }
 
     // Use the tiniest shadow bias for alpha clipped meshes as they're double sided..
-    float shadow_bias = (mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP) ? 0.000001 : 0.0;
+    // Hand-chosen for a shadow_cam_distance of 1024 with the sponza flowers in the nearest shadow frustum.
+    float shadow_bias = select(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP, 0.000002, 0.0);
 
     float4 shadow_view_coord = mul(bias_matrix, shadow_coord);
     shadow_view_coord /= shadow_view_coord.w;
@@ -119,7 +120,8 @@ void render_geometry(
     shadow_sum /= 9.0;
 
     // If the shadow coord clips the far plane of the shadow frustum
-    // then just ignore any shadow values.
+    // then just ignore any shadow values. If `uniforms.shadow_cam_distance`
+    // is high enough then this shouldn't be needed.
     shadow_sum = select(shadow_view_coord.z > 1, 1.0, shadow_sum);
 
     Material material;

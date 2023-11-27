@@ -508,12 +508,12 @@ int main() {
     descriptor_set.write_descriptors(resources, device, swapchain_image_views);
 
     auto camera_params = CameraParams {
-        .position = glm::vec3(56.918, 29.851, 38.586),
+        .position = glm::vec3(112.492310, 29.228727, 33.554398),
         .fov = 45.0f,
-        .yaw = 0.312,
-        .pitch = -0.224,
-        .sun_latitude = -2.930f,
-        .sun_longitude = 0.775f,
+        .yaw = 09.166492,
+        .pitch = -0.300172,
+        .sun_latitude = -4.730007,
+        .sun_longitude = 1.295797,
     };
 
     auto tracy_ctx =
@@ -554,6 +554,11 @@ int main() {
         reinterpret_cast<Uniforms*>(resources.uniform_buffer.mapped_ptr);
     uniforms->num_instances = instances.size();
     uniforms->sun_intensity = glm::vec3(1.0);
+    // Set the camera to be a fixed distance away from the frustum center, so that
+    // we don't get clipping on the near plane or far planes. I haven't observed any
+    // quality loss when setting this value to be absurdly high.
+    uniforms->shadow_cam_distance = 1024.0;
+    uniforms->cascade_split_pow = 3.0;
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -644,6 +649,8 @@ int main() {
         ImGui::NewFrame();
         {
             ImGui::Checkbox("debug shadowmaps", &uniforms->debug_shadowmaps);
+            ImGui::SliderFloat("shadow_cam_distance", &uniforms->shadow_cam_distance, 0.0f, 10000.0f);
+            ImGui::SliderFloat("cascade_split_pow", &uniforms->cascade_split_pow, 0.0f, 10.0f);
             ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
             ImGui::SliderFloat(
                 "sun_intensity",
@@ -708,7 +715,7 @@ int main() {
                 glm::radians(camera_params.fov),
                 float(extent.width),
                 float(extent.height),
-                0.01f
+                NEAR_PLANE
             );
 
             uniforms->camera_pos = camera_params.position;

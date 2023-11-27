@@ -441,6 +441,8 @@ GltfMesh load_gltf(
                     abort();
                 }
 
+                // todo: albedo factor, proper pbr.
+
                 auto mesh_info = MeshInfo {
                     .positions = device.getBufferAddress(
                         {.buffer = position_buffer.buffer}
