@@ -100,7 +100,8 @@ Meshlets build_meshlets(
                 bounds.cone_axis[2]
             ),
             .cone_cutoff = bounds.cone_cutoff,
-            .center = glm::vec3(bounds.center[0], bounds.center[1], bounds.center[2]),
+            .center =
+                glm::vec3(bounds.center[0], bounds.center[1], bounds.center[2]),
             .radius = bounds.radius,
             .triangle_offset = meshlet.triangle_offset,
             .index_offset = meshlet.vertex_offset,

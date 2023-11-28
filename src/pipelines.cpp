@@ -513,7 +513,7 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
                     .pName = "copy_quantized_positions",
                 },
             .layout = *copy_quantized_positions_pipeline_layout},
-            vk::ComputePipelineCreateInfo {
+        vk::ComputePipelineCreateInfo {
             .stage =
                 vk::PipelineShaderStageCreateInfo {
                     .stage = vk::ShaderStageFlagBits::eCompute,
@@ -573,10 +573,10 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
         ),
         .render_geometry = std::move(compute_pipelines[4]),
         .expand_meshlets = name_pipeline(
-                 std::move(compute_pipelines[7]),
-                 device,
-                 "expand_meshlets"
-             ),
+            std::move(compute_pipelines[7]),
+            device,
+            "expand_meshlets"
+        ),
         .pipeline_layout = std::move(pipeline_layout),
         .calc_bounding_sphere =
             {.pipeline = name_pipeline(

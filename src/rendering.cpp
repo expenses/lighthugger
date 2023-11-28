@@ -4,8 +4,6 @@
 
 const auto u32_max = std::numeric_limits<uint32_t>::max();
 
-
-
 void insert_global_barrier(
     const vk::raii::CommandBuffer& command_buffer,
     ThsvsAccessType prev_access,
@@ -180,16 +178,22 @@ void render(
     }
 
     {
-        TracyVkZone(tracy_ctx, *command_buffer, "cull meshlets and write draw calls");
+        TracyVkZone(
+            tracy_ctx,
+            *command_buffer,
+            "cull meshlets and write draw calls"
+        );
 
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eCompute,
             *pipelines.write_draw_calls
         );
-        command_buffer
-            .dispatch(dispatch_size(MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS, 64), 1, 1);
+        command_buffer.dispatch(
+            dispatch_size(MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS, 64),
+            1,
+            1
+        );
     }
-
 
     insert_global_barrier(
         command_buffer,

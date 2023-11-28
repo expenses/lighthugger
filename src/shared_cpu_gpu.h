@@ -77,6 +77,7 @@ struct Uniforms {
     MATRIX4_TYPE inv_perspective_view;
     MATRIX4_TYPE view;
     MATRIX4_TYPE initial_view;
+    MATRIX4_TYPE perspective;
     uint64_t instance_meshlets;
     uint64_t expanded_meshlets;
     VEC3_TYPE camera_pos;

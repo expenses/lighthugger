@@ -588,18 +588,12 @@ int main() {
     // quality loss when setting this value to be absurdly high.
     uniforms->shadow_cam_distance = 1024.0;
     uniforms->cascade_split_pow = 3.0;
-    uniforms->expanded_meshlets = device.getBufferAddress({.buffer = instance_meshlets_buf2.buffer});
+    uniforms->expanded_meshlets =
+        device.getBufferAddress({.buffer = instance_meshlets_buf2.buffer});
     uniforms->instance_meshlets =
         device.getBufferAddress({.buffer = instance_meshlets_buf.buffer});
 
-    {
-        auto view = glm::lookAt(
-                camera_params.position,
-                camera_params.position + camera_params.facing(),
-                glm::vec3(0, 1, 0)
-            );
-        uniforms->initial_view = view;
-    }
+    auto copy_view = true;
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -690,6 +684,7 @@ int main() {
         ImGui::NewFrame();
         {
             ImGui::Checkbox("debug shadowmaps", &uniforms->debug_shadowmaps);
+            ImGui::Checkbox("copy view", &copy_view);
             ImGui::SliderFloat(
                 "shadow_cam_distance",
                 &uniforms->shadow_cam_distance,
@@ -769,12 +764,16 @@ int main() {
                 NEAR_PLANE
             );
 
-            uniforms->camera_pos = camera_params.position;
             uniforms->window_size = glm::uvec2(extent.width, extent.height);
             uniforms->sun_dir = camera_params.sun_dir();
             uniforms->view = view;
             uniforms->combined_perspective_view = perspective * view;
             uniforms->inv_perspective_view = glm::inverse(perspective * view);
+            uniforms->perspective = perspective;
+            if (copy_view) {
+                uniforms->initial_view = view;
+                uniforms->camera_pos = camera_params.position;
+            }
         }
 
         // Reset the command pool instead of resetting the single command buffer as
