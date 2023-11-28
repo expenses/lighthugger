@@ -54,8 +54,8 @@ void render_geometry(
     }
 
     uint32_t packed = visibility_buffer[global_id.xy];
-    uint32_t instance_index = packed & ((1 << 16) - 1);
-    uint32_t triangle_index = packed >> 16;
+    uint32_t instance_index = packed & ((1 << 24) - 1);
+    uint32_t triangle_index = packed >> 24;
 
     MeshletIndex meshlet_index = load_instance_meshlet(uniforms.instance_meshlets, instance_index);
 

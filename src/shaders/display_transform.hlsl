@@ -1,5 +1,7 @@
 #include "common/bindings.hlsl"
 
+[[vk::binding(0, 1)]] RWTexture2D<float4> swapchain_image;
+
 float3 tony_mc_mapface(float3 stimulus) {
     // Apply a non-linear transform that the LUT is encoded with.
     const float3 encoded = stimulus / (stimulus + 1.0);

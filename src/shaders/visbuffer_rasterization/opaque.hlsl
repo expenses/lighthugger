@@ -20,7 +20,7 @@ Varyings vertex(
     uint32_t index = load_index(mesh_info, meshlet.index_offset + micro_index);
 
     varyings.clip_pos =  calculate_view_pos_position(instance, mesh_info, index);
-    varyings.packed = (vertex_index / 3) << 16 | instance_index;
+    varyings.packed = pack(instance_index, vertex_index);
     return varyings;
 }
 

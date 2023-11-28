@@ -21,5 +21,3 @@
 [[vk::binding(11)]] RWStructuredBuffer<DrawIndirectCommand> draw_calls;
 [[vk::binding(12)]] RWTexture2D<float4> rw_scene_referred_framebuffer;
 [[vk::binding(13)]] Texture2D<uint32_t> visibility_buffer;
-
-[[vk::binding(0, 1)]] RWTexture2D<float4> swapchain_image;

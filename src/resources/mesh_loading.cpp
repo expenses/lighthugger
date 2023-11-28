@@ -491,8 +491,6 @@ GltfMesh load_gltf(
                     uses_32_bit_indices
                 );
 
-                total_meshlets += meshlets.meshlets.size();
-
                 std::optional<AllocatedBuffer> indices_buffer = std::nullopt;
 
                 if (uses_32_bit_indices) {
