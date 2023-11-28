@@ -4,6 +4,29 @@
 
 const auto u32_max = std::numeric_limits<uint32_t>::max();
 
+
+
+void insert_global_barrier(
+    const vk::raii::CommandBuffer& command_buffer,
+    ThsvsAccessType prev_access,
+    ThsvsAccessType next_access
+) {
+    ThsvsGlobalBarrier global_barrier = {
+        .prevAccessCount = 1,
+        .pPrevAccesses = &prev_access,
+        .nextAccessCount = 1,
+        .pNextAccesses = &next_access};
+
+    thsvsCmdPipelineBarrier(
+        *command_buffer,
+        &global_barrier,
+        0,
+        nullptr,
+        0,
+        nullptr
+    );
+}
+
 void set_scissor_and_viewport(
     const vk::raii::CommandBuffer& command_buffer,
     uint32_t width,
@@ -111,7 +134,7 @@ void render(
         command_buffer.fillBuffer(
             resources.misc_storage_buffer.buffer,
             offset + 4,
-            12,
+            16,
             0
         );
 
@@ -122,6 +145,12 @@ void render(
             0
         );
     }
+
+    insert_global_barrier(
+        command_buffer,
+        THSVS_ACCESS_GENERAL,
+        THSVS_ACCESS_GENERAL
+    );
 
     command_buffer.bindDescriptorSets(
         vk::PipelineBindPoint::eCompute,
@@ -140,15 +169,33 @@ void render(
     );
 
     {
-        TracyVkZone(tracy_ctx, *command_buffer, "write draw calls");
+        TracyVkZone(tracy_ctx, *command_buffer, "expand instances to meshlets");
+
+        command_buffer.bindPipeline(
+            vk::PipelineBindPoint::eCompute,
+            *pipelines.expand_meshlets
+        );
+        command_buffer
+            .dispatch(dispatch_size(resources.num_instances, 64), 1, 1);
+    }
+
+    {
+        TracyVkZone(tracy_ctx, *command_buffer, "cull meshlets and write draw calls");
 
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eCompute,
             *pipelines.write_draw_calls
         );
         command_buffer
-            .dispatch(dispatch_size(resources.num_instances, 64), 1, 1);
+            .dispatch(dispatch_size(MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS, 64), 1, 1);
     }
+
+
+    insert_global_barrier(
+        command_buffer,
+        THSVS_ACCESS_GENERAL,
+        THSVS_ACCESS_GENERAL
+    );
 
     set_scissor_and_viewport(command_buffer, extent.width, extent.height);
 

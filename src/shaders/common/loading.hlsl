@@ -50,6 +50,8 @@ Meshlet load_meshlet(uint64_t address, uint32_t offset) {
     meshlet.cone_apex = load_value_and_increment_address<float3>(address);
     meshlet.cone_axis = load_value_and_increment_address<float3>(address);
     meshlet.cone_cutoff = load_value_and_increment_address<float>(address);
+    meshlet.center = load_value_and_increment_address<float3>(address);
+    meshlet.radius = load_value_and_increment_address<float>(address);
     meshlet.triangle_offset = load_value_and_increment_address<uint32_t>(address);
     meshlet.index_offset = load_value_and_increment_address<uint32_t>(address);
     meshlet.triangle_count = load_value_and_increment_address<uint16_t>(address);
