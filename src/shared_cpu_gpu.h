@@ -60,8 +60,8 @@ struct MiscStorageBuffer {
     MATRIX4_TYPE shadow_matrices[4];
     uint32_t min_depth;
     uint32_t max_depth;
-    uint32_t num_opaque_draws;
-    uint32_t num_alpha_clip_draws;
+    uint32_t num_opaque_meshlets;
+    uint32_t num_alpha_clip_meshlets;
 };
 
 // This is only an int32_t because of imgui.
@@ -155,3 +155,6 @@ struct MeshletIndex {
     uint32_t instance_index;
     uint32_t meshlet_index;
 };
+
+const static uint32_t MAX_MESHLET_TRIANGLES = 124;
+const static uint32_t MAX_MESHLET_VERTICES = MAX_MESHLET_TRIANGLES * 3;

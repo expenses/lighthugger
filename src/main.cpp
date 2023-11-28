@@ -400,7 +400,8 @@ int main() {
 
     auto instance_meshlets_buf = AllocatedBuffer(
         vk::BufferCreateInfo {
-            .size = sizeof(MeshletIndex) * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
+            .size = sizeof(MeshletIndex)
+                * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
             .usage = vk::BufferUsageFlagBits::eStorageBuffer
                 | vk::BufferUsageFlagBits::eShaderDeviceAddress,
         },
@@ -449,10 +450,10 @@ int main() {
         ),
         .draw_calls_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
-                .size = sizeof(vk::DrawIndirectCommand)
-                    * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
+                .size = sizeof(vk::DrawIndirectCommand) * 2,
                 .usage = vk::BufferUsageFlagBits::eIndirectBuffer
-                    | vk::BufferUsageFlagBits::eStorageBuffer},
+                    | vk::BufferUsageFlagBits::eStorageBuffer
+                    | vk::BufferUsageFlagBits::eTransferDst},
             {
                 .usage = vma::MemoryUsage::eAuto,
             },

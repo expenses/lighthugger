@@ -8,7 +8,7 @@ Meshlets build_meshlets(
     bool uses_32_bit_indices
 ) {
     auto max_vertices = 64;
-    auto max_triangles = 124;
+    auto max_triangles = MAX_MESHLET_TRIANGLES;
     auto cone_weight = 1.0f;
 
     size_t max_meshlets =

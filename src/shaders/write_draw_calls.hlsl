@@ -39,28 +39,30 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
 
     // todo: cull on vertical and horizontal planes.
 
-    uint32_t current_draw;
+    uint32_t meshlets_offset;
+    uint32_t draw_call = 0;
 
-    //if (mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP) {
-    //    InterlockedAdd(misc_storage[0].num_alpha_clip_draws, mesh_info.num_meshlets, current_draw);
-    //    current_draw += ALPHA_CLIP_DRAWS_OFFSET;
-    //} else {
-        InterlockedAdd(misc_storage[0].num_opaque_draws, mesh_info.num_meshlets, current_draw);
-    //}
+    if (mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP) {
+        InterlockedAdd(misc_storage[0].num_opaque_meshlets, mesh_info.num_meshlets, meshlets_offset);
+        meshlets_offset += ALPHA_CLIP_DRAWS_OFFSET;
+        draw_call = 1;
+    } else {
+        InterlockedAdd(misc_storage[0].num_alpha_clip_meshlets, mesh_info.num_meshlets, meshlets_offset);
+    }
+
+    InterlockedAdd(draw_calls[draw_call].vertexCount, MAX_MESHLET_VERTICES * mesh_info.num_meshlets);
+    draw_calls[0].instanceCount = 1;
+    draw_calls[0].firstVertex = 0;
+    draw_calls[0].firstInstance = 0;
+
+    draw_calls[1].instanceCount = 1;
+    draw_calls[1].firstVertex = 0;
+    draw_calls[1].firstInstance = 0;
 
     for (uint32_t i = 0; i < mesh_info.num_meshlets; i++) {
-        Meshlet meshlet = load_meshlet(mesh_info.meshlets, i);
-
-        uint32_t num_triangles = meshlet.triangle_count;
-
-        uint64_t write_address = uniforms.instance_meshlets + (current_draw + i) * sizeof(MeshletIndex);
+        uint64_t write_address = uniforms.instance_meshlets + (meshlets_offset + i) * sizeof(MeshletIndex);
         vk::RawBufferStore<uint32_t>(write_address, id);
         write_address += sizeof(uint32_t);
         vk::RawBufferStore<uint32_t>(write_address, i);
-
-        draw_calls[current_draw + i].vertexCount = num_triangles * 3;
-        draw_calls[current_draw + i].instanceCount = 1;
-        draw_calls[current_draw + i].firstVertex = 0;
-        draw_calls[current_draw + i].firstInstance = current_draw + i;
     }
 }
