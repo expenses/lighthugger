@@ -132,7 +132,7 @@ void render(
         command_buffer.fillBuffer(
             resources.misc_storage_buffer.buffer,
             offset + 4,
-            12,
+            16,
             0
         );
     }
@@ -160,18 +160,41 @@ void render(
     );
 
     {
-        TracyVkZone(tracy_ctx, *command_buffer, "write draw calls");
+        TracyVkZone(tracy_ctx, *command_buffer, "expand instances to meshlets");
 
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eCompute,
-            *pipelines.write_draw_calls
+            *pipelines.expand_meshlets
         );
         command_buffer
             .dispatch(dispatch_size(resources.num_instances, 64), 1, 1);
     }
 
-    set_scissor_and_viewport(command_buffer, extent.width, extent.height);
+    {
+        TracyVkZone(
+            tracy_ctx,
+            *command_buffer,
+            "cull meshlets and write draw calls"
+        );
 
+        command_buffer.bindPipeline(
+            vk::PipelineBindPoint::eCompute,
+            *pipelines.write_draw_calls
+        );
+        command_buffer.dispatch(
+            dispatch_size(MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS, 64),
+            1,
+            1
+        );
+    }
+
+    insert_global_barrier(
+        command_buffer,
+        THSVS_ACCESS_GENERAL,
+        THSVS_ACCESS_GENERAL
+    );
+
+    set_scissor_and_viewport(command_buffer, extent.width, extent.height);
 
     {
         TracyVkZone(tracy_ctx, *command_buffer, "visbuffer rendering");

@@ -412,6 +412,20 @@ int main() {
         "instance_meshlets_buf"
     );
 
+    auto instance_meshlets_buf2 = AllocatedBuffer(
+        vk::BufferCreateInfo {
+            .size = sizeof(MeshletIndex)
+                * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
+            .usage = vk::BufferUsageFlagBits::eStorageBuffer
+                | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        },
+        {
+            .usage = vma::MemoryUsage::eAuto,
+        },
+        allocator,
+        "wowwo"
+    );
+
     auto resources = Resources {
         .resizing = ResizingResources(device, allocator, extent),
         .uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
@@ -574,6 +588,8 @@ int main() {
     // quality loss when setting this value to be absurdly high.
     uniforms->shadow_cam_distance = 1024.0;
     uniforms->cascade_split_pow = 3.0;
+    uniforms->expanded_meshlets =
+        device.getBufferAddress({.buffer = instance_meshlets_buf2.buffer});
     uniforms->instance_meshlets =
         device.getBufferAddress({.buffer = instance_meshlets_buf.buffer});
 

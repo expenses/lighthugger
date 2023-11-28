@@ -512,7 +512,15 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
                     .module = *copy_quantized_positions,
                     .pName = "copy_quantized_positions",
                 },
-            .layout = *copy_quantized_positions_pipeline_layout}};
+            .layout = *copy_quantized_positions_pipeline_layout},
+        vk::ComputePipelineCreateInfo {
+            .stage =
+                vk::PipelineShaderStageCreateInfo {
+                    .stage = vk::ShaderStageFlagBits::eCompute,
+                    .module = *write_draw_calls,
+                    .pName = "expand_meshlets",
+                },
+            .layout = *pipeline_layout}};
 
     auto graphics_pipelines =
         device.createGraphicsPipelines(nullptr, graphics_pipeline_infos);
@@ -564,6 +572,11 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
             "display_transform_compute"
         ),
         .render_geometry = std::move(compute_pipelines[4]),
+        .expand_meshlets = name_pipeline(
+            std::move(compute_pipelines[7]),
+            device,
+            "expand_meshlets"
+        ),
         .pipeline_layout = std::move(pipeline_layout),
         .calc_bounding_sphere =
             {.pipeline = name_pipeline(
