@@ -8,8 +8,8 @@ float4 vertex(
     uint32_t vertex_index : SV_VertexID, uint32_t instance_index: SV_InstanceID
 ): SV_Position
 {
-    MeshletIndex meshlet_index = load_instance_meshlet(uniforms.instance_meshlets, instance_index);
 
+    MeshletIndex meshlet_index = load_instance_meshlet(uniforms.instance_meshlets, instance_index);
     Instance instance = load_instance(meshlet_index.instance_index);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
     Meshlet meshlet = load_meshlet(mesh_info.meshlets, meshlet_index.meshlet_index);
@@ -36,8 +36,8 @@ VaryingsAlphaClip vertex_alpha_clip(
     uint32_t vertex_index : SV_VertexID, uint32_t instance_index: SV_InstanceID
 )
 {
-    MeshletIndex meshlet_index = load_instance_meshlet(uniforms.instance_meshlets, instance_index);
 
+    MeshletIndex meshlet_index = load_instance_meshlet(uniforms.instance_meshlets, instance_index);
     Instance instance = load_instance(meshlet_index.instance_index);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
     Meshlet meshlet = load_meshlet(mesh_info.meshlets, meshlet_index.meshlet_index);

@@ -75,7 +75,10 @@ struct Uniforms {
     MATRIX4_TYPE combined_perspective_view;
     MATRIX4_TYPE inv_perspective_view;
     MATRIX4_TYPE view;
+    MATRIX4_TYPE initial_view;
+    MATRIX4_TYPE perspective;
     uint64_t instance_meshlets;
+    uint64_t expanded_meshlets;
     VEC3_TYPE camera_pos;
     uint32_t _padding0;
     VEC3_TYPE sun_dir;
@@ -142,6 +145,8 @@ struct Meshlet {
     VEC3_TYPE cone_apex;
     VEC3_TYPE cone_axis;
     float cone_cutoff;
+    VEC3_TYPE center;
+    float radius;
     // The buffers these index into are often large enough to require 32-bit offsets.
     uint32_t triangle_offset;
     uint32_t index_offset;
@@ -155,3 +160,6 @@ struct MeshletIndex {
     uint32_t instance_index;
     uint32_t meshlet_index;
 };
+
+const static uint32_t MAX_MESHLET_TRIANGLES = 124;
+const static uint32_t MAX_MESHLET_VERTICES = MAX_MESHLET_TRIANGLES * 3;

@@ -50,6 +50,8 @@ Meshlet load_meshlet(uint64_t address, uint32_t offset) {
     meshlet.cone_apex = load_value_and_increment_address<float3>(address);
     meshlet.cone_axis = load_value_and_increment_address<float3>(address);
     meshlet.cone_cutoff = load_value_and_increment_address<float>(address);
+    meshlet.center = load_value_and_increment_address<float3>(address);
+    meshlet.radius = load_value_and_increment_address<float>(address);
     meshlet.triangle_offset = load_value_and_increment_address<uint32_t>(address);
     meshlet.index_offset = load_value_and_increment_address<uint32_t>(address);
     meshlet.triangle_count = load_value_and_increment_address<uint16_t>(address);
@@ -84,6 +86,6 @@ uint16_t load_uint8_t(uint64_t address) {
     return vk::RawBufferLoad<uint16_t>(address, 1) & ((1 << 8) - 1);
 }
 
-uint32_t pack(uint32_t instance_index, uint32_t vertex_index) {
-    return (vertex_index / 3) << 24 | instance_index;
+uint32_t pack(uint32_t triangle_index, uint32_t instance_index) {
+    return triangle_index << 24 | instance_index;
 }

@@ -4,6 +4,27 @@
 
 const auto u32_max = std::numeric_limits<uint32_t>::max();
 
+void insert_global_barrier(
+    const vk::raii::CommandBuffer& command_buffer,
+    ThsvsAccessType prev_access,
+    ThsvsAccessType next_access
+) {
+    ThsvsGlobalBarrier global_barrier = {
+        .prevAccessCount = 1,
+        .pPrevAccesses = &prev_access,
+        .nextAccessCount = 1,
+        .pNextAccesses = &next_access};
+
+    thsvsCmdPipelineBarrier(
+        *command_buffer,
+        &global_barrier,
+        0,
+        nullptr,
+        0,
+        nullptr
+    );
+}
+
 void set_scissor_and_viewport(
     const vk::raii::CommandBuffer& command_buffer,
     uint32_t width,
@@ -115,6 +136,12 @@ void render(
             0
         );
     }
+
+    insert_global_barrier(
+        command_buffer,
+        THSVS_ACCESS_GENERAL,
+        THSVS_ACCESS_GENERAL
+    );
 
     command_buffer.bindDescriptorSets(
         vk::PipelineBindPoint::eCompute,

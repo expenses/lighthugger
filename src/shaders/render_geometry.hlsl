@@ -185,7 +185,7 @@ void render_geometry(
     } else if (uniforms.debug == UNIFORMS_DEBUG_TRIANGLE_INDEX) {
         rw_scene_referred_framebuffer[global_id.xy] = float4(DEBUG_COLOURS[triangle_index % 10], 1.0);
     } else if (uniforms.debug == UNIFORMS_DEBUG_INSTANCE_INDEX) {
-        rw_scene_referred_framebuffer[global_id.xy] = float4(DEBUG_COLOURS[instance_index % 10], 1.0);
+        rw_scene_referred_framebuffer[global_id.xy] = float4(DEBUG_COLOURS[meshlet_index.meshlet_index % 10], 1.0);
     } else if (uniforms.debug == UNIFORMS_DEBUG_SHADER_CLOCK) {
         uint64_t end_time = vk::ReadClock(vk::SubgroupScope);
 

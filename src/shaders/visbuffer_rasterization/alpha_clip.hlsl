@@ -11,8 +11,9 @@ struct Varyings {
 Varyings vertex(
     uint32_t vertex_index : SV_VertexID, uint32_t instance_index: SV_InstanceID
 ) {
-    MeshletIndex meshlet_index = load_instance_meshlet(uniforms.instance_meshlets, instance_index);
+    uint32_t triangle_index = vertex_index / 3;
 
+    MeshletIndex meshlet_index = load_instance_meshlet(uniforms.instance_meshlets, instance_index);
     Instance instance = load_instance(meshlet_index.instance_index);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
     Meshlet meshlet = load_meshlet(mesh_info.meshlets, meshlet_index.meshlet_index);
@@ -22,7 +23,7 @@ Varyings vertex(
 
     Varyings varyings;
     varyings.clip_pos =  calculate_view_pos_position(instance, mesh_info, index);
-    varyings.packed = (vertex_index / 3) << 16 | instance_index;
+    varyings.packed = pack(triangle_index, instance_index);
     varyings.albedo_texture_index = mesh_info.albedo_texture_index;
     varyings.uv = float2(load_value<uint16_t2>(mesh_info.uvs, index)) * mesh_info.texture_scale + mesh_info.texture_offset;
     return varyings;

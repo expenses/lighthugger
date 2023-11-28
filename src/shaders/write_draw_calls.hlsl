@@ -2,6 +2,49 @@
 #include "common/loading.hlsl"
 #include "common/geometry.hlsl"
 
+// todo: cull on vertical and horizontal planes.
+bool cull_bounding_sphere(Instance instance, float3 position, float radius) {
+    float3 scale = float3(
+        length(instance.transform[0].xyz),
+        length(instance.transform[1].xyz),
+        length(instance.transform[2].xyz)
+    );
+    // 99% of the time scales will be uniform. But in the chance they're not,
+    // use the longest dimension.
+    float scale_scalar = max(max(scale.x, scale.y), scale.z);
+
+    radius *= scale_scalar;
+
+    float3 view_space_pos = mul(uniforms.initial_view, float4(position, 1.0)).xyz;
+    // The view space goes from negatives in the front to positives in the back.
+    // This is confusing so flipping it here makes sense I think.
+    view_space_pos.z = -view_space_pos.z;
+
+    // Is the most positive/forwards point of the object in front of the near plane?
+    bool visible = view_space_pos.z + radius > NEAR_PLANE;
+
+    // Do some fancy stuff by getting the frustum planes and comparing the position against them.
+    float3 frustum_x = normalize(uniforms.perspective[3].xyz + uniforms.perspective[0].xyz);
+    float3 frustum_y = normalize(uniforms.perspective[3].xyz + uniforms.perspective[1].xyz);
+
+    visible &= view_space_pos.z * frustum_x.z + abs(view_space_pos.x) * frustum_x.x < radius;
+    visible &= view_space_pos.z * frustum_y.z - abs(view_space_pos.y) * frustum_y.y < radius;
+
+    return !visible;
+}
+
+bool cull_cone_perspective(Instance instance, Meshlet meshlet) {
+    float3 apex = mul(instance.transform, float4(meshlet.cone_apex, 1.0)).xyz;
+    float3 axis = normalize(mul(instance.normal_transform, meshlet.cone_axis));
+
+    return dot(normalize(apex - uniforms.camera_pos), normalize(axis)) >= meshlet.cone_cutoff;
+}
+
+bool cull_cone_orthographic(Instance instance, Meshlet meshlet) {
+    float3 axis = normalize(mul(instance.normal_transform, meshlet.cone_axis));
+    return dot(uniforms.sun_dir, axis) >= meshlet.cone_cutoff;
+}
+
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
