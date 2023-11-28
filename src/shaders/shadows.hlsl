@@ -17,8 +17,11 @@ float4 vertex(
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
     Meshlet meshlet = load_meshlet(mesh_info.meshlets, meshlet_index.meshlet_index);
 
-    // Cull extra triangles bu setting all indices to 0.
-    vertex_index = select(triangle_index < meshlet.triangle_count, vertex_index, 0);
+
+    if (triangle_index >= meshlet.triangle_count) {
+        return 0;
+    }
+
 
     uint16_t micro_index = load_uint8_t(mesh_info.micro_indices + meshlet.triangle_offset + vertex_index);
 
@@ -53,8 +56,14 @@ VaryingsAlphaClip vertex_alpha_clip(
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
     Meshlet meshlet = load_meshlet(mesh_info.meshlets, meshlet_index.meshlet_index);
 
-    // Cull extra triangles bu setting all indices to 0.
-    vertex_index = select(triangle_index < meshlet.triangle_count, vertex_index, 0);
+
+
+    if (triangle_index >= meshlet.triangle_count) {
+        VaryingsAlphaClip varyings;
+        varyings.clip_pos = 0;
+        return varyings;
+    }
+
 
     uint16_t micro_index = load_uint8_t(mesh_info.micro_indices + meshlet.triangle_offset + vertex_index);
 
