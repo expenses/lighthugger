@@ -169,6 +169,11 @@ GltfMesh load_gltf(
     const Pipelines& pipelines,
     std::vector<DescriptorPoolAndSet>& temp_descriptor_sets
 ) {
+    if (!std::filesystem::exists(filepath)) {
+        dbg(filepath, "does not exist");
+        abort();
+    }
+
     fastgltf::Parser parser(
         fastgltf::Extensions::KHR_mesh_quantization
         | fastgltf::Extensions::KHR_texture_transform
@@ -182,7 +187,10 @@ GltfMesh load_gltf(
         parser.loadGLTF(&data, parent_path, fastgltf::Options::None);
     if (auto error = asset_result.error(); error != fastgltf::Error::None) {
         // Some error occurred while reading the buffer, parsing the JSON, or validating the data.
-        dbg(fastgltf::getErrorMessage(error));
+        // 'std::string_view's don't print super well.
+        std::string error_message =
+            std::string(fastgltf::getErrorMessage(error));
+        dbg(error_message);
         abort();
     }
 
@@ -212,7 +220,7 @@ GltfMesh load_gltf(
                     .usage = vma::MemoryUsage::eAuto,
                 },
                 allocator,
-                uri->uri.fspath()
+                uri->uri.fspath().string()
             ));
 
             memcpy(
@@ -267,7 +275,7 @@ GltfMesh load_gltf(
                 auto& primitive = mesh.primitives[i];
 
                 auto primitive_name =
-                    std::string(filepath) + " primitive " + std::to_string(i);
+                    filepath.string() + " primitive " + std::to_string(i);
 
                 auto create_buffer = [&](uint64_t size, const char* name) {
                     return AllocatedBuffer(

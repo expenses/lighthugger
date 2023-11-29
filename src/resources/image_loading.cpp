@@ -55,13 +55,18 @@ uint32_t round_up(uint32_t value, uint32_t round_to) {
 }
 
 ImageWithView load_dds(
-    const char* filepath,
+    const std::filesystem::path& filepath,
     vma::Allocator allocator,
     const vk::raii::Device& device,
     const vk::raii::CommandBuffer& command_buffer,
     uint32_t graphics_queue_family,
     std::vector<AllocatedBuffer>& temp_buffers
 ) {
+    if (!std::filesystem::exists(filepath)) {
+        dbg(filepath, "does not exist");
+        abort();
+    }
+
     std::ifstream stream(filepath, std::ios::binary);
 
     assert(stream);
@@ -103,7 +108,7 @@ ImageWithView load_dds(
         .layerCount = 1,
     };
 
-    auto image_name = std::string("'") + filepath + "'";
+    auto image_name = std::string("'") + filepath.string() + "'";
 
     auto image = ImageWithView(
         vk::ImageCreateInfo {
@@ -126,7 +131,7 @@ ImageWithView load_dds(
         dimension.view_type
     );
 
-    auto staging_buffer_name = std::string(filepath) + " staging buffer";
+    auto staging_buffer_name = filepath.string() + " staging buffer";
 
     auto staging_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
         vk::BufferCreateInfo {
@@ -279,7 +284,7 @@ ImageWithView load_ktx2_image(
                 | vk::ImageUsageFlagBits::eTransferDst},
         allocator,
         device,
-        std::string(filepath),
+        filepath.string(),
         subresource_range,
         vk::ImageViewType::e2D
     );
@@ -294,7 +299,7 @@ ImageWithView load_ktx2_image(
             .usage = vma::MemoryUsage::eAuto,
         },
         allocator,
-        std::string(filepath) + " staging buffer"
+        filepath.string() + " staging buffer"
     ));
 
     vk::DeviceSize offset = 0;

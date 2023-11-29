@@ -9,6 +9,7 @@
 #include <thsvs_simpler_vulkan_synchronization.h>
 
 #include <fstream>
+#include <numbers>
 #include <tracy/Tracy.hpp>
 #include <tracy/TracyVulkan.hpp>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE

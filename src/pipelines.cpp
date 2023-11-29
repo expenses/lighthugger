@@ -70,8 +70,10 @@ const auto DEPTH_WRITE_LESS = vk::PipelineDepthStencilStateCreateInfo {
     .depthCompareOp = vk::CompareOp::eLess,
 };
 
-vk::raii::ShaderModule
-create_shader_from_file(const vk::raii::Device& device, const char* filepath) {
+vk::raii::ShaderModule create_shader_from_file(
+    const vk::raii::Device& device,
+    const std::filesystem::path& filepath
+) {
     auto bytes = read_file_to_bytes(filepath);
 
     auto shader = device.createShaderModule(vk::ShaderModuleCreateInfo {
