@@ -2,7 +2,7 @@
 #include "../allocations/image_with_view.h"
 
 ImageWithView load_dds(
-    const char* filepath,
+    const std::filesystem::path& filepath,
     vma::Allocator allocator,
     const vk::raii::Device& device,
     const vk::raii::CommandBuffer& command_buffer,

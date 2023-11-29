@@ -7,7 +7,7 @@
 #define DBG_MACRO_NO_WARNING
 #include <dbg.h>
 #include <thsvs_simpler_vulkan_synchronization.h>
-
+#include <numbers>
 #include <fstream>
 #include <tracy/Tracy.hpp>
 #include <tracy/TracyVulkan.hpp>
