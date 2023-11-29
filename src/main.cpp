@@ -245,6 +245,11 @@ int main() {
     auto render_fence =
         device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
 
+       
+    auto base_dir =
+        std::filesystem::path("C:/Users/Ashley/source/repos/vulkancppstarter2");
+    std::filesystem::current_path(base_dir);
+
     auto pipelines = Pipelines::compile_pipelines(device);
 
     auto pool_sizes = std::array {
