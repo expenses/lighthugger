@@ -29,7 +29,6 @@ struct Pipelines {
 
     vk::raii::PipelineLayout pipeline_layout;
 
-    PipelineAndLayout calc_bounding_sphere;
     PipelineAndLayout copy_quantized_positions;
 
     DescriptorSetLayouts dsl;

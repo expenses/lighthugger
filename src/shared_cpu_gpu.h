@@ -3,12 +3,14 @@
 #ifdef __HLSL_VERSION
     #define MATRIX4_TYPE float4x4
     #define MATRIX3_TYPE float3x3
+    #define VEC4_TYPE float4
     #define VEC3_TYPE float3
     #define VEC2_TYPE float2
     #define UVEC2_TYPE uint32_t2
 #else
     #define MATRIX4_TYPE glm::mat4
     #define MATRIX3_TYPE glm::mat3
+    #define VEC4_TYPE glm::vec4
     #define VEC3_TYPE glm::vec3
     #define VEC2_TYPE glm::vec2
     #define UVEC2_TYPE glm::uvec2
@@ -27,26 +29,7 @@ struct MeshInfo {
     uint32_t num_meshlets;
     uint32_t num_indices;
     uint32_t flags;
-    float bounding_sphere_radius;
-    VEC2_TYPE texture_scale;
-    VEC2_TYPE texture_offset;
-    uint32_t albedo_texture_index;
-    uint32_t metallic_roughness_texture_index;
-    uint32_t normal_texture_index;
-    VEC3_TYPE albedo_factor;
-};
-
-struct MeshInfoWithUintBoundingSphereRadius {
-    uint64_t positions;
-    uint64_t indices;
-    uint64_t normals;
-    uint64_t uvs;
-    uint64_t micro_indices;
-    uint64_t meshlets;
-    uint32_t num_meshlets;
-    uint32_t num_indices;
-    uint32_t flags;
-    uint32_t bounding_sphere_radius;
+    VEC4_TYPE bounding_sphere;
     VEC2_TYPE texture_scale;
     VEC2_TYPE texture_offset;
     uint32_t albedo_texture_index;
@@ -63,6 +46,9 @@ struct MiscStorageBuffer {
     uint32_t num_opaque_meshlets;
     uint32_t num_alpha_clip_meshlets;
     uint32_t num_expanded_meshlets;
+    uint32_t _padding0;
+    uint32_t _padding1;
+    uint32_t _padding2;
 };
 
 // This is only an int32_t because of imgui.
@@ -146,8 +132,7 @@ struct Meshlet {
     VEC3_TYPE cone_apex;
     VEC3_TYPE cone_axis;
     float cone_cutoff;
-    VEC3_TYPE center;
-    float radius;
+    VEC4_TYPE bounding_sphere;
     // The buffers these index into are often large enough to require 32-bit offsets.
     uint32_t triangle_offset;
     uint32_t index_offset;

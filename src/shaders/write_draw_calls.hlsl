@@ -3,7 +3,10 @@
 #include "common/geometry.hlsl"
 
 // todo: cull on vertical and horizontal planes.
-bool cull_bounding_sphere(Instance instance, float3 position, float radius) {
+bool cull_bounding_sphere(Instance instance, float4 bounding_sphere) {
+    float3 world_space_pos = mul(instance.transform, float4(bounding_sphere.xyz, 1.0)).xyz;
+    float radius = bounding_sphere.w;
+
     float3 scale = float3(
         length(instance.transform[0].xyz),
         length(instance.transform[1].xyz),
@@ -15,7 +18,7 @@ bool cull_bounding_sphere(Instance instance, float3 position, float radius) {
 
     radius *= scale_scalar;
 
-    float3 view_space_pos = mul(uniforms.initial_view, float4(position, 1.0)).xyz;
+    float3 view_space_pos = mul(uniforms.initial_view, float4(world_space_pos, 1.0)).xyz;
     // The view space goes from negatives in the front to positives in the back.
     // This is confusing so flipping it here makes sense I think.
     view_space_pos.z = -view_space_pos.z;
@@ -61,7 +64,7 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
 
     Meshlet meshlet = load_meshlet(mesh_info.meshlets, meshlet_index.meshlet_index);
 
-    if (cull_bounding_sphere(instance, mul(instance.transform, float4(meshlet.center, 1.0)).xyz, meshlet.radius)) {
+    if (cull_bounding_sphere(instance, meshlet.bounding_sphere)) {
         return;
     }
 
@@ -102,10 +105,7 @@ void expand_meshlets(uint3 global_id: SV_DispatchThreadID) {
     Instance instance = load_instance(id);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
 
-    // Extract position and scale from transform matrix
-    float3 position = float3(instance.transform[0][3], instance.transform[1][3], instance.transform[2][3]);
-
-    if (cull_bounding_sphere(instance, position, mesh_info.bounding_sphere_radius)) {
+    if (cull_bounding_sphere(instance, mesh_info.bounding_sphere)) {
         return;
     }
 

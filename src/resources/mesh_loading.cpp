@@ -3,6 +3,8 @@
 #include "../allocations/staging.h"
 #include "image_loading.h"
 
+#include "bounding_sphere.h"
+
 struct NodeTreeNode {
     glm::mat4 transform = glm::mat4(1);
     size_t parent = std::numeric_limits<size_t>::max();
@@ -63,73 +65,6 @@ void copy_buffer_to_final(
             .dstOffset = 0,
             .size = buffer_size}}
     );
-}
-
-void calc_bounding_sphere(
-    const vk::raii::Device& device,
-    const vk::raii::CommandBuffer& command_buffer,
-    const AllocatedBuffer& mesh_info_buffer,
-    const Pipelines& pipelines,
-    std::vector<DescriptorPoolAndSet>& temp_descriptor_sets,
-    uint32_t num_vertices
-) {
-    auto pool_sizes = std::array {vk::DescriptorPoolSize {
-        .type = vk::DescriptorType::eStorageBuffer,
-        .descriptorCount = 1}};
-
-    auto descriptor_pool = device.createDescriptorPool(
-        {.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-
-         .maxSets = 1,
-         .poolSizeCount = pool_sizes.size(),
-         .pPoolSizes = pool_sizes.data()}
-    );
-
-    auto descriptor_sets_to_create =
-        std::array {*pipelines.dsl.calc_bounding_sphere};
-
-    std::vector<vk::raii::DescriptorSet> descriptor_sets =
-        device.allocateDescriptorSets(vk::DescriptorSetAllocateInfo {
-            .descriptorPool = *descriptor_pool,
-            .descriptorSetCount =
-                static_cast<uint32_t>(descriptor_sets_to_create.size()),
-            .pSetLayouts = descriptor_sets_to_create.data()});
-
-    auto descriptor_set = std::move(descriptor_sets[0]);
-
-    auto info = buffer_info(mesh_info_buffer);
-
-    device.updateDescriptorSets(
-        {vk::WriteDescriptorSet {
-            .dstSet = *descriptor_set,
-            .descriptorCount = 1,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .pBufferInfo = &info}},
-        {}
-    );
-
-    command_buffer.bindPipeline(
-        vk::PipelineBindPoint::eCompute,
-        *pipelines.calc_bounding_sphere.pipeline
-    );
-    command_buffer.bindDescriptorSets(
-        vk::PipelineBindPoint::eCompute,
-        *pipelines.calc_bounding_sphere.layout,
-        0,
-        {*descriptor_set},
-        {}
-    );
-    command_buffer.pushConstants<CalcBoundingSphereConstant>(
-        *pipelines.calc_bounding_sphere.layout,
-        vk::ShaderStageFlagBits::eCompute,
-        0,
-        {{.num_vertices = num_vertices}}
-    );
-    command_buffer.dispatch(dispatch_size(num_vertices, 64), 1, 1);
-
-    temp_descriptor_sets.push_back(DescriptorPoolAndSet {
-        .pool = std::move(descriptor_pool),
-        .set = std::move(descriptor_set)});
 }
 
 void copy_uint16_t4_to_uint16_3(
@@ -547,6 +482,9 @@ GltfMesh load_gltf(
                     temp_buffers
                 );
 
+                float bounding_sphere[4];
+                computeBoundingSphere(bounding_sphere, float_positions.data(), positions.count);
+
                 auto mesh_info = MeshInfo {
                     .positions = device.getBufferAddress(
                         {.buffer = position_buffer.buffer}
@@ -569,7 +507,7 @@ GltfMesh load_gltf(
 
                     .num_indices = static_cast<uint32_t>(indices.count),
                     .flags = flags,
-                    .bounding_sphere_radius = 0.0f,
+                    .bounding_sphere = glm::vec4(bounding_sphere[0], bounding_sphere[1], bounding_sphere[2], bounding_sphere[3]),
                     .texture_scale = texture_scale,
                     .texture_offset = texture_offset,
                     .albedo_texture_index = albedo_texture_index,
@@ -598,15 +536,6 @@ GltfMesh load_gltf(
                     dbg(triangle_count);
                     abort();
                 }
-
-                calc_bounding_sphere(
-                    device,
-                    command_buffer,
-                    mesh_info_buffer,
-                    pipelines,
-                    temp_descriptor_sets,
-                    positions.count
-                );
 
                 primitives.push_back(GltfPrimitive {
                     .position = std::move(position_buffer),

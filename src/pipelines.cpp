@@ -98,6 +98,28 @@ vk::raii::Pipeline name_pipeline(
     return pipeline;
 }
 
+vk::raii::Pipeline create_pipeline_from_shader(
+    const vk::raii::Device& device,
+    const vk::raii::PipelineLayout& layout,
+    const vk::raii::ShaderModule& shader,
+    const char* entry_point
+) {
+    auto create_info = std::array {vk::ComputePipelineCreateInfo {
+        .stage =
+            vk::PipelineShaderStageCreateInfo {
+                .stage = vk::ShaderStageFlagBits::eCompute,
+                .module = *shader,
+                .pName = entry_point,
+            },
+        .layout = *layout}};
+
+    return name_pipeline(
+        std::move(device.createComputePipelines(nullptr, create_info)[0]),
+        device,
+        entry_point
+    );
+}
+
 DescriptorSetLayouts
 create_descriptor_set_layouts(const vk::raii::Device& device) {
     auto everything_bindings = std::array {
@@ -273,24 +295,6 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
             .pPushConstantRanges = push_constants.data(),
         });
 
-    auto calc_bounding_sphere_layout_array =
-        std::array {*descriptor_set_layouts.calc_bounding_sphere};
-
-    auto calc_bounding_sphere_push_constants =
-        std::array {vk::PushConstantRange {
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-            .offset = 0,
-            .size = sizeof(CalcBoundingSphereConstant)}};
-
-    auto calc_bounding_sphere_pipeline_layout =
-        device.createPipelineLayout(vk::PipelineLayoutCreateInfo {
-            .setLayoutCount = calc_bounding_sphere_layout_array.size(),
-            .pSetLayouts = calc_bounding_sphere_layout_array.data(),
-            .pushConstantRangeCount =
-                calc_bounding_sphere_push_constants.size(),
-            .pPushConstantRanges = calc_bounding_sphere_push_constants.data(),
-        });
-
     auto copy_quantized_positions_push_constants =
         std::array {vk::PushConstantRange {
             .stageFlags = vk::ShaderStageFlagBits::eCompute,
@@ -333,11 +337,6 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
     auto visbuffer_alpha_clip = create_shader_from_file(
         device,
         "compiled_shaders/visbuffer_rasterization/alpha_clip.spv"
-    );
-
-    auto calc_bounding_sphere = create_shader_from_file(
-        device,
-        "compiled_shaders/calc_bounding_sphere.spv"
     );
 
     auto copy_quantized_positions = create_shader_from_file(
@@ -503,26 +502,11 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
             .stage =
                 vk::PipelineShaderStageCreateInfo {
                     .stage = vk::ShaderStageFlagBits::eCompute,
-                    .module = *calc_bounding_sphere,
-                    .pName = "calc_bounding_sphere",
-                },
-            .layout = *calc_bounding_sphere_pipeline_layout},
-        vk::ComputePipelineCreateInfo {
-            .stage =
-                vk::PipelineShaderStageCreateInfo {
-                    .stage = vk::ShaderStageFlagBits::eCompute,
                     .module = *copy_quantized_positions,
                     .pName = "copy_quantized_positions",
                 },
             .layout = *copy_quantized_positions_pipeline_layout},
-        vk::ComputePipelineCreateInfo {
-            .stage =
-                vk::PipelineShaderStageCreateInfo {
-                    .stage = vk::ShaderStageFlagBits::eCompute,
-                    .module = *write_draw_calls,
-                    .pName = "expand_meshlets",
-                },
-            .layout = *pipeline_layout}};
+       };
 
     auto graphics_pipelines =
         device.createGraphicsPipelines(nullptr, graphics_pipeline_infos);
@@ -574,22 +558,16 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
             "display_transform_compute"
         ),
         .render_geometry = std::move(compute_pipelines[4]),
-        .expand_meshlets = name_pipeline(
-            std::move(compute_pipelines[7]),
+        .expand_meshlets = create_pipeline_from_shader(
             device,
+            pipeline_layout,
+            write_draw_calls,
             "expand_meshlets"
         ),
         .pipeline_layout = std::move(pipeline_layout),
-        .calc_bounding_sphere =
-            {.pipeline = name_pipeline(
-                 std::move(compute_pipelines[5]),
-                 device,
-                 "calc_bounding_sphere"
-             ),
-             .layout = std::move(calc_bounding_sphere_pipeline_layout)},
         .copy_quantized_positions =
             {.pipeline = name_pipeline(
-                 std::move(compute_pipelines[6]),
+                 std::move(compute_pipelines[5]),
                  device,
                  "copy_quantized_positions"
              ),
