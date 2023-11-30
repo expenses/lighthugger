@@ -489,6 +489,7 @@ int main() {
         .repeat_sampler = device.createSampler(vk::SamplerCreateInfo {
             .magFilter = vk::Filter::eLinear,
             .minFilter = vk::Filter::eLinear,
+            .mipmapMode = vk::SamplerMipmapMode::eLinear,
             .addressModeU = vk::SamplerAddressMode::eRepeat,
             .addressModeV = vk::SamplerAddressMode::eRepeat,
             .addressModeW = vk::SamplerAddressMode::eRepeat,
@@ -499,6 +500,7 @@ int main() {
         .clamp_sampler = device.createSampler(vk::SamplerCreateInfo {
             .magFilter = vk::Filter::eLinear,
             .minFilter = vk::Filter::eLinear,
+            .mipmapMode = vk::SamplerMipmapMode::eLinear,
             .addressModeU = vk::SamplerAddressMode::eClampToEdge,
             .addressModeV = vk::SamplerAddressMode::eClampToEdge,
             .addressModeW = vk::SamplerAddressMode::eClampToEdge,
@@ -508,6 +510,7 @@ int main() {
             device.createSampler(vk::SamplerCreateInfo {
                 .magFilter = vk::Filter::eLinear,
                 .minFilter = vk::Filter::eLinear,
+                .mipmapMode = vk::SamplerMipmapMode::eLinear,
                 .addressModeU = vk::SamplerAddressMode::eClampToEdge,
                 .addressModeV = vk::SamplerAddressMode::eClampToEdge,
                 .addressModeW = vk::SamplerAddressMode::eClampToEdge,
