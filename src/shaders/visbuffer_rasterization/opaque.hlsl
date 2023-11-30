@@ -7,14 +7,20 @@ struct Varyings {
 
 [shader("vertex")]
 Varyings vertex(
-    uint32_t vertex_index : SV_VertexID, uint32_t instance_index: SV_InstanceID
+    uint32_t global_vertex_index : SV_VertexID
 ) {
+    uint32_t instance_index = global_vertex_index / MAX_MESHLET_VERTICES;
+    uint32_t vertex_index = global_vertex_index % MAX_MESHLET_VERTICES;
     uint32_t triangle_index = vertex_index / 3;
 
     MeshletIndex meshlet_index = load_instance_meshlet(uniforms.instance_meshlets, instance_index);
     Instance instance = load_instance(meshlet_index.instance_index);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
     Meshlet meshlet = load_meshlet(mesh_info.meshlets, meshlet_index.meshlet_index);
+
+    // Cull extra triangles bu setting all indices to 0.
+    vertex_index = select(triangle_index < meshlet.triangle_count, vertex_index, 0);
+
     Varyings varyings;
 
     uint16_t micro_index = load_uint8_t(mesh_info.micro_indices + meshlet.triangle_offset + vertex_index);

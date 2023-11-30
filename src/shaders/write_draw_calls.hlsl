@@ -72,20 +72,25 @@ void write_draw_calls(uint3 global_id: SV_DispatchThreadID) {
         return;
     }
 
+    uint32_t draw_call = 0;
     uint meshlet_offset;
 
     if (mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP) {
         InterlockedAdd(misc_storage[0].num_alpha_clip_meshlets, 1, meshlet_offset);
         meshlet_offset += ALPHA_CLIP_DRAWS_OFFSET;
+        draw_call = 1;
     } else {
         InterlockedAdd(misc_storage[0].num_opaque_meshlets, 1, meshlet_offset);
     }
 
+    InterlockedAdd(draw_calls[draw_call].vertexCount, MAX_MESHLET_VERTICES);
+    draw_calls[0].instanceCount = 1;
+    draw_calls[0].firstVertex = 0;
+    draw_calls[0].firstInstance = 0;
 
-    draw_calls[meshlet_offset].vertexCount = meshlet.triangle_count * 3;
-    draw_calls[meshlet_offset].instanceCount = 1;
-    draw_calls[meshlet_offset].firstVertex = 0;
-    draw_calls[meshlet_offset].firstInstance = meshlet_offset;
+    draw_calls[1].instanceCount = 1;
+    draw_calls[1].firstVertex = 0;
+    draw_calls[1].firstInstance = 0;
 
     uint64_t write_address = uniforms.instance_meshlets + (meshlet_offset) * sizeof(MeshletIndex);
     vk::RawBufferStore<uint32_t>(write_address, meshlet_index.instance_index);
