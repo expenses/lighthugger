@@ -90,14 +90,12 @@ void render_geometry(
     Instance instance = load_instance(meshlet_index.instance_index);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
     Meshlet meshlet = load_meshlet(mesh_info.meshlets, meshlet_index.meshlet_index);
-    uint16_t micro_index_a = load_uint8_t(mesh_info.micro_indices + meshlet.triangle_offset + triangle_index * 3);
-    uint16_t micro_index_b = load_uint8_t(mesh_info.micro_indices + meshlet.triangle_offset + triangle_index * 3 + 1);
-    uint16_t micro_index_c = load_uint8_t(mesh_info.micro_indices + meshlet.triangle_offset + triangle_index * 3 + 2);
+    uint32_t4 micro_indices = meshlet.index_offset + load_uint8_t3(mesh_info.micro_indices + meshlet.triangle_offset + triangle_index * 3);
 
     uint3 indices = uint3(
-        load_index(mesh_info, meshlet.index_offset + micro_index_a),
-        load_index(mesh_info, meshlet.index_offset + micro_index_b),
-        load_index(mesh_info, meshlet.index_offset + micro_index_c)
+        load_index(mesh_info, micro_indices.x),
+        load_index(mesh_info, micro_indices.y),
+        load_index(mesh_info, micro_indices.z)
     );
 
     float2 ndc = float2(global_id.xy) / float2(uniforms.window_size) * 2.0 - 1.0;

@@ -11,3 +11,9 @@ mkdir -p compiled_shaders/visbuffer_rasterization
 for file in src/shaders/visbuffer_rasterization/*.hlsl; do
     $compiler $file -Fo compiled_shaders/visbuffer_rasterization/$(basename $file .hlsl).spv || exit 1
 done
+
+mkdir -p compiled_shaders/compute
+
+for file in src/shaders/compute/*.hlsl; do
+    $compiler $file -Fo compiled_shaders/compute/$(basename $file .hlsl).spv || exit 1
+done

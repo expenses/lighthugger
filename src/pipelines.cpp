@@ -310,22 +310,6 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
 
         });
 
-    auto render_geometry =
-        create_shader_from_file(device, "compiled_shaders/render_geometry.spv");
-
-    auto display_transform = create_shader_from_file(
-        device,
-        "compiled_shaders/display_transform.spv"
-    );
-
-    auto read_depth =
-        create_shader_from_file(device, "compiled_shaders/read_depth.spv");
-
-    auto write_draw_calls = create_shader_from_file(
-        device,
-        "compiled_shaders/write_draw_calls.spv"
-    );
-
     auto shadows =
         create_shader_from_file(device, "compiled_shaders/shadows.spv");
 
@@ -337,11 +321,6 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
     auto visbuffer_alpha_clip = create_shader_from_file(
         device,
         "compiled_shaders/visbuffer_rasterization/alpha_clip.spv"
-    );
-
-    auto copy_quantized_positions = create_shader_from_file(
-        device,
-        "compiled_shaders/copy_quantized_positions.spv"
     );
 
     auto visbuffer_stages = std::array {
@@ -457,62 +436,16 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
                         .layout = *pipeline_layout,
                     }};
 
-    auto compute_pipeline_infos = std::array {
-        vk::ComputePipelineCreateInfo {
-            .stage =
-                vk::PipelineShaderStageCreateInfo {
-                    .stage = vk::ShaderStageFlagBits::eCompute,
-                    .module = *read_depth,
-                    .pName = "read_depth",
-                },
-            .layout = *pipeline_layout},
-        vk::ComputePipelineCreateInfo {
-            .stage =
-                vk::PipelineShaderStageCreateInfo {
-                    .stage = vk::ShaderStageFlagBits::eCompute,
-                    .module = *read_depth,
-                    .pName = "generate_matrices",
-                },
-            .layout = *pipeline_layout},
-        vk::ComputePipelineCreateInfo {
-            .stage =
-                vk::PipelineShaderStageCreateInfo {
-                    .stage = vk::ShaderStageFlagBits::eCompute,
-                    .module = *write_draw_calls,
-                    .pName = "write_draw_calls",
-                },
-            .layout = *pipeline_layout},
-        vk::ComputePipelineCreateInfo {
-            .stage =
-                vk::PipelineShaderStageCreateInfo {
-                    .stage = vk::ShaderStageFlagBits::eCompute,
-                    .module = *display_transform,
-                    .pName = "display_transform",
-                },
-            .layout = *pipeline_layout},
-        vk::ComputePipelineCreateInfo {
-            .stage =
-                vk::PipelineShaderStageCreateInfo {
-                    .stage = vk::ShaderStageFlagBits::eCompute,
-                    .module = *render_geometry,
-                    .pName = "render_geometry",
-                },
-            .layout = *pipeline_layout},
-        vk::ComputePipelineCreateInfo {
-            .stage =
-                vk::PipelineShaderStageCreateInfo {
-                    .stage = vk::ShaderStageFlagBits::eCompute,
-                    .module = *copy_quantized_positions,
-                    .pName = "copy_quantized_positions",
-                },
-            .layout = *copy_quantized_positions_pipeline_layout},
-    };
-
     auto graphics_pipelines =
         device.createGraphicsPipelines(nullptr, graphics_pipeline_infos);
 
-    auto compute_pipelines =
-        device.createComputePipelines(nullptr, compute_pipeline_infos);
+    auto render_geometry =
+        create_shader_from_file(device, "compiled_shaders/render_geometry.spv");
+
+    auto write_draw_calls = create_shader_from_file(
+        device,
+        "compiled_shaders/write_draw_calls.spv"
+    );
 
     return Pipelines {
         .rasterize_shadowmap {
@@ -537,27 +470,45 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
                  device,
                  "rasterize_visbuffer::alpha_clip"
              )},
-        .read_depth = name_pipeline(
-            std::move(compute_pipelines[0]),
+        .read_depth = create_pipeline_from_shader(
             device,
+            pipeline_layout,
+            create_shader_from_file(
+                device,
+                "compiled_shaders/compute/read_depth.spv"
+            ),
             "read_depth"
         ),
-        .generate_matrices = name_pipeline(
-            std::move(compute_pipelines[1]),
+        .generate_matrices = create_pipeline_from_shader(
             device,
+            pipeline_layout,
+            create_shader_from_file(
+                device,
+                "compiled_shaders/compute/generate_shadow_matrices.spv"
+            ),
             "generate_matrices"
         ),
-        .write_draw_calls = name_pipeline(
-            std::move(compute_pipelines[2]),
+        .write_draw_calls = create_pipeline_from_shader(
             device,
+            pipeline_layout,
+            write_draw_calls,
             "write_draw_calls"
         ),
-        .display_transform = name_pipeline(
-            std::move(compute_pipelines[3]),
+        .display_transform = create_pipeline_from_shader(
             device,
-            "display_transform_compute"
+            pipeline_layout,
+            create_shader_from_file(
+                device,
+                "compiled_shaders/display_transform.spv"
+            ),
+            "display_transform"
         ),
-        .render_geometry = std::move(compute_pipelines[4]),
+        .render_geometry = create_pipeline_from_shader(
+            device,
+            pipeline_layout,
+            render_geometry,
+            "render_geometry"
+        ),
         .expand_meshlets = create_pipeline_from_shader(
             device,
             pipeline_layout,
@@ -566,9 +517,13 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
         ),
         .pipeline_layout = std::move(pipeline_layout),
         .copy_quantized_positions =
-            {.pipeline = name_pipeline(
-                 std::move(compute_pipelines[5]),
+            {.pipeline = create_pipeline_from_shader(
                  device,
+                 copy_quantized_positions_pipeline_layout,
+                 create_shader_from_file(
+                     device,
+                     "compiled_shaders/compute/copy_quantized_positions.spv"
+                 ),
                  "copy_quantized_positions"
              ),
              .layout = std::move(copy_quantized_positions_pipeline_layout)},
