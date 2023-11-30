@@ -1,10 +1,5 @@
 #pragma once
-
-struct DescriptorSetLayouts {
-    vk::raii::DescriptorSetLayout everything;
-    vk::raii::DescriptorSetLayout swapchain_storage_image;
-    vk::raii::DescriptorSetLayout calc_bounding_sphere;
-};
+#include "descriptor_set.h"
 
 struct PipelineAndLayout {
     vk::raii::Pipeline pipeline;
@@ -31,7 +26,8 @@ struct Pipelines {
 
     PipelineAndLayout copy_quantized_positions;
 
-    DescriptorSetLayouts dsl;
-
-    static Pipelines compile_pipelines(const vk::raii::Device& device);
+    static Pipelines compile_pipelines(
+        const vk::raii::Device& device,
+        const DescriptorSetLayouts& descriptor_set_layouts
+    );
 };

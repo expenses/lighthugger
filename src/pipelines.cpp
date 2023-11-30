@@ -120,158 +120,10 @@ vk::raii::Pipeline create_pipeline_from_shader(
     );
 }
 
-DescriptorSetLayouts
-create_descriptor_set_layouts(const vk::raii::Device& device) {
-    auto everything_bindings = std::array {
-        // Bindless images
-        vk::DescriptorSetLayoutBinding {
-            .binding = 0,
-            .descriptorType = vk::DescriptorType::eSampledImage,
-            .descriptorCount = 512,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute
-                | vk::ShaderStageFlagBits::eFragment,
-        },
-        // instance buffer
-        vk::DescriptorSetLayoutBinding {
-            .binding = 1,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute
-                | vk::ShaderStageFlagBits::eVertex
-                | vk::ShaderStageFlagBits::eFragment,
-        },
-        // Uniforms
-        vk::DescriptorSetLayoutBinding {
-            .binding = 2,
-            .descriptorType = vk::DescriptorType::eUniformBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eVertex
-                | vk::ShaderStageFlagBits::eCompute,
-        },
-        // hdr framebuffer
-        vk::DescriptorSetLayoutBinding {
-            .binding = 3,
-            .descriptorType = vk::DescriptorType::eSampledImage,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-        },
-        // clamp sampler
-        vk::DescriptorSetLayoutBinding {
-            .binding = 4,
-            .descriptorType = vk::DescriptorType::eSampler,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-        },
-        // display transform LUT
-        vk::DescriptorSetLayoutBinding {
-            .binding = 5,
-            .descriptorType = vk::DescriptorType::eSampledImage,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-        },
-        // repeat sampler
-        vk::DescriptorSetLayoutBinding {
-            .binding = 6,
-            .descriptorType = vk::DescriptorType::eSampler,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute
-                | vk::ShaderStageFlagBits::eFragment,
-        },
-        // depthbuffer
-        vk::DescriptorSetLayoutBinding {
-            .binding = 7,
-            .descriptorType = vk::DescriptorType::eSampledImage,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-        },
-        // misc storage (depth info etc.) buffer
-        vk::DescriptorSetLayoutBinding {
-            .binding = 8,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute
-                | vk::ShaderStageFlagBits::eVertex,
-        },
-        // shadow map
-        vk::DescriptorSetLayoutBinding {
-            .binding = 9,
-            .descriptorType = vk::DescriptorType::eSampledImage,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-        },
-        // Shadowmap comparison sampler
-        vk::DescriptorSetLayoutBinding {
-            .binding = 10,
-            .descriptorType = vk::DescriptorType::eSampler,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-        },
-        // draw calls buffer
-        vk::DescriptorSetLayoutBinding {
-            .binding = 11,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-        },
-        // rw scene referred framebuffer
-        vk::DescriptorSetLayoutBinding {
-            .binding = 12,
-            .descriptorType = vk::DescriptorType::eStorageImage,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-        },
-        vk::DescriptorSetLayoutBinding {
-            .binding = 13,
-            .descriptorType = vk::DescriptorType::eSampledImage,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-        },
-    };
-
-    std::vector<vk::DescriptorBindingFlags> flags(everything_bindings.size());
-    // Set the images as being partially bound, so not all slots have to be used.
-    flags[0] = vk::DescriptorBindingFlagBits::ePartiallyBound;
-
-    auto flags_create_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo {
-        .bindingCount = static_cast<uint32_t>(flags.size()),
-        .pBindingFlags = flags.data()};
-
-    auto swapchain_storage_image_bindings = std::array {
-        vk::DescriptorSetLayoutBinding {
-            .binding = 0,
-            .descriptorType = vk::DescriptorType::eStorageImage,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute},
-    };
-
-    auto calc_bounding_sphere_bindings = std::array {
-        vk::DescriptorSetLayoutBinding {
-            .binding = 0,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute},
-    };
-
-    return DescriptorSetLayouts {
-        .everything = device.createDescriptorSetLayout({
-            .pNext = &flags_create_info,
-            .bindingCount = everything_bindings.size(),
-            .pBindings = everything_bindings.data(),
-        }),
-        .swapchain_storage_image = device.createDescriptorSetLayout({
-            .bindingCount = swapchain_storage_image_bindings.size(),
-            .pBindings = swapchain_storage_image_bindings.data(),
-        }),
-        .calc_bounding_sphere = device.createDescriptorSetLayout({
-            .bindingCount = calc_bounding_sphere_bindings.size(),
-            .pBindings = calc_bounding_sphere_bindings.data(),
-        }),
-    };
-}
-
-Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
-    auto descriptor_set_layouts = create_descriptor_set_layouts(device);
-
+Pipelines Pipelines::compile_pipelines(
+    const vk::raii::Device& device,
+    const DescriptorSetLayouts& descriptor_set_layouts
+) {
     auto descriptor_set_layout_array = std::array {
         *descriptor_set_layouts.everything,
         *descriptor_set_layouts.swapchain_storage_image};
@@ -527,6 +379,5 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
                  "copy_quantized_positions"
              ),
              .layout = std::move(copy_quantized_positions_pipeline_layout)},
-        .dsl = std::move(descriptor_set_layouts),
     };
 }

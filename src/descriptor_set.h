@@ -4,6 +4,14 @@
 #include "frame_resources.h"
 #include "shared_cpu_gpu.h"
 
+struct DescriptorSetLayouts {
+    vk::raii::DescriptorSetLayout everything;
+    vk::raii::DescriptorSetLayout swapchain_storage_image;
+};
+
+DescriptorSetLayouts
+create_descriptor_set_layouts(const vk::raii::Device& device);
+
 struct IndexTracker {
     uint32_t next_index = 0;
     std::vector<uint32_t> free_indices;
