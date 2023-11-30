@@ -130,6 +130,7 @@ int main() {
 
     auto vulkan_1_0_features = vk::PhysicalDeviceFeatures {
         .multiDrawIndirect = true,
+        .samplerAnisotropy = true,
         .shaderInt64 = true,
         .shaderInt16 = true,
     };
@@ -489,6 +490,8 @@ int main() {
             .addressModeU = vk::SamplerAddressMode::eRepeat,
             .addressModeV = vk::SamplerAddressMode::eRepeat,
             .addressModeW = vk::SamplerAddressMode::eRepeat,
+            .anisotropyEnable = true,
+            .maxAnisotropy = 16.0f,
             .minLod = 0.0f,
             .maxLod = VK_LOD_CLAMP_NONE}),
         .clamp_sampler = device.createSampler(vk::SamplerCreateInfo {

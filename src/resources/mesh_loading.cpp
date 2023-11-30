@@ -1,9 +1,8 @@
 #include "mesh_loading.h"
 
 #include "../allocations/staging.h"
-#include "image_loading.h"
-
 #include "bounding_sphere.h"
+#include "image_loading.h"
 
 struct NodeTreeNode {
     glm::mat4 transform = glm::mat4(1);
@@ -483,7 +482,11 @@ GltfMesh load_gltf(
                 );
 
                 float bounding_sphere[4];
-                computeBoundingSphere(bounding_sphere, float_positions.data(), positions.count);
+                computeBoundingSphere(
+                    bounding_sphere,
+                    float_positions.data(),
+                    positions.count
+                );
 
                 auto mesh_info = MeshInfo {
                     .positions = device.getBufferAddress(
@@ -507,7 +510,12 @@ GltfMesh load_gltf(
 
                     .num_indices = static_cast<uint32_t>(indices.count),
                     .flags = flags,
-                    .bounding_sphere = glm::vec4(bounding_sphere[0], bounding_sphere[1], bounding_sphere[2], bounding_sphere[3]),
+                    .bounding_sphere = glm::vec4(
+                        bounding_sphere[0],
+                        bounding_sphere[1],
+                        bounding_sphere[2],
+                        bounding_sphere[3]
+                    ),
                     .texture_scale = texture_scale,
                     .texture_offset = texture_offset,
                     .albedo_texture_index = albedo_texture_index,

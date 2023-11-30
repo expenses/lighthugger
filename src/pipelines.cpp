@@ -506,7 +506,7 @@ Pipelines Pipelines::compile_pipelines(const vk::raii::Device& device) {
                     .pName = "copy_quantized_positions",
                 },
             .layout = *copy_quantized_positions_pipeline_layout},
-       };
+    };
 
     auto graphics_pipelines =
         device.createGraphicsPipelines(nullptr, graphics_pipeline_infos);
