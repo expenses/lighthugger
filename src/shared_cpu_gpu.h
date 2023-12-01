@@ -77,6 +77,7 @@ struct Uniforms {
     float cascade_split_pow;
     int32_t debug;
     uint32_t _padding2;
+    float vsm_bias;
     bool debug_shadowmaps;
 };
 

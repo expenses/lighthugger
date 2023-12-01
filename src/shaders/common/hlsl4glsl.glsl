@@ -46,3 +46,11 @@ float select(bool boolean, float true_value, float false_value) {
 float3 select(bool boolean, float3 true_value, float3 false_value) {
     return mix(false_value, true_value, bvec3(boolean));
 }
+
+float3 saturate(float3 value) {
+    return clamp(value, 0.0, 1.0);
+}
+
+float saturate(float value) {
+    return clamp(value, 0.0, 1.0);
+}

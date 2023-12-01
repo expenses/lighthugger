@@ -2,6 +2,7 @@
 #include "common/debug.hlsl"
 #include "common/vbuffer.hlsl"
 #include "common/pbr.hlsl"
+#include "common/vsm.glsl"
 
 static const float4x4 bias_matrix = float4x4(
     0.5, 0.0, 0.0, 0.0,
@@ -169,32 +170,15 @@ void main(
         }
     }
 
-    // Use the tiniest shadow bias for alpha clipped meshes as they're double sided..
-    // Hand-chosen for a shadow_cam_distance of 1024 with the sponza flowers in the nearest shadow frustum.
-    float shadow_bias = select(bool(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP), 0.000002, 0.0);
-
     float4 shadow_view_coord = bias_matrix * shadow_coord;
     shadow_view_coord /= shadow_view_coord.w;
-    float shadow_sum = 0.0;
-    for (int x = -1; x <= 1; x++) {
-        for (int y = -1; y <= 1; y++) {
-            float2 offset = float2(x, y) / 1024.0;
-            shadow_sum += texture(
-                sampler2DArrayShadow(
-                    shadowmap,
-                    shadowmap_comparison_sampler
-                ),
-                float4(shadow_view_coord.xy + offset, cascade_index,
-                shadow_view_coord.z - shadow_bias)
-            );
-        }
-    }
-    shadow_sum /= 9.0;
-
     // If the shadow coord clips the far plane of the shadow frustum
     // then just ignore any shadow values. If `uniforms.shadow_cam_distance`
     // is high enough then this shouldn't be needed.
-    shadow_sum = select(shadow_view_coord.z > 1, 1.0, shadow_sum);
+    //shadow_sum = select(shadow_view_coord.z > 1, 1.0, shadow_sum);
+
+    float shadow_sum = SampleShadowMapVSM(shadow_view_coord.xyz, cascade_index);
+
 
     Material material;
 

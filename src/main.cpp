@@ -712,6 +712,7 @@ int main() {
                 10.0f
             );
             ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
+            ImGui::SliderFloat("vsm_bias", &uniforms->vsm_bias, 0.0f, 1.0f);
             ImGui::SliderFloat(
                 "sun_intensity",
                 &uniforms->sun_intensity.x,

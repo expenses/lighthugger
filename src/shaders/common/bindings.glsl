@@ -13,6 +13,8 @@ layout(binding = 2, scalar) uniform UniformsBinding {
     Uniforms uniforms;
 };
 
+layout(binding = 4) uniform sampler clamp_sampler;
+
 layout(binding = 6) uniform sampler repeat_sampler;
 
 layout(binding = 7) uniform texture2D depth_buffer;
