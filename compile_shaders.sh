@@ -1,5 +1,5 @@
 for file in src/shaders/*.comp; do
-    glslc -std=450 --target-env=vulkan1.3 --target-spv=spv1.6 $file -o compiled_shaders/$(basename $file .comp).spv -I src || exit 1
+    glslc -g -O -DGLSL=1 -std=450 --target-env=vulkan1.3 --target-spv=spv1.6 -I src $file -o compiled_shaders/$(basename $file .comp).spv || exit 1
 done
 
 error_flags="-Wall -Wextra -Weverything -Wpedantic -Werror -Wno-c++98-compat -Wno-unused-macros -Wno-missing-variable-declarations -Wno-missing-prototypes -Wno-shorten-64-to-32 -Wno-float-conversion -Wno-global-constructors"

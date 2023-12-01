@@ -339,9 +339,9 @@ Pipelines Pipelines::compile_pipelines(
             device,
             pipeline_layout,
             create_shader_from_file(
-                     device,
-                     "compiled_shaders/write_draw_calls.spv"
-                 ),
+                device,
+                "compiled_shaders/write_draw_calls.spv"
+            ),
             "main"
         ),
         .display_transform = create_pipeline_from_shader(
@@ -357,15 +357,15 @@ Pipelines Pipelines::compile_pipelines(
             device,
             pipeline_layout,
             render_geometry,
-            "render_geometry"
+            "main"
         ),
         .expand_meshlets = create_pipeline_from_shader(
             device,
             pipeline_layout,
             create_shader_from_file(
-                     device,
-                     "compiled_shaders/expand_meshlets.spv"
-                 ),
+                device,
+                "compiled_shaders/expand_meshlets.spv"
+            ),
             "main"
         ),
         .pipeline_layout = std::move(pipeline_layout),

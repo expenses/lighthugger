@@ -113,8 +113,13 @@ int main() {
     auto shader_clock_features =
         vk::PhysicalDeviceShaderClockFeaturesKHR {.shaderSubgroupClock = true};
 
-    auto vulkan_1_2_features = vk::PhysicalDeviceVulkan12Features {
+    auto vulkan_1_1_features = vk::PhysicalDeviceVulkan11Features {
         .pNext = &shader_clock_features,
+        .storageBuffer16BitAccess = true,
+    };
+
+    auto vulkan_1_2_features = vk::PhysicalDeviceVulkan12Features {
+        .pNext = &vulkan_1_1_features,
         .drawIndirectCount = true,
         .shaderInt8 = true,
         .shaderSampledImageArrayNonUniformIndexing = true,

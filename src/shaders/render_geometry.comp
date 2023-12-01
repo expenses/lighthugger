@@ -1,15 +1,13 @@
-#include "common/bindings.hlsl"
+#include "common/bindings.glsl"
 #include "common/debug.hlsl"
-#include "common/loading.hlsl"
 #include "common/vbuffer.hlsl"
-#include "common/geometry.hlsl"
 #include "common/pbr.hlsl"
 
 static const float4x4 bias_matrix = float4x4(
-    0.5, 0.0, 0.0, 0.5,
-    0.0, 0.5, 0.0, 0.5,
+    0.5, 0.0, 0.0, 0.0,
+    0.0, 0.5, 0.0, 0.0,
     0.0, 0.0, 1.0, 0.0,
-    0.0, 0.0, 0.0, 1.0
+    0.5, 0.5, 0.0, 1.0
 );
 
 struct Material {
@@ -25,8 +23,8 @@ float length_squared(float3 vec) {
 // Adapted from http://www.thetenthplanet.de/archives/1180
 float3x3 compute_cotangent_frame(
     float3 normal,
-    InterpolatedVector<float3> position,
-    InterpolatedVector<float2> uv
+    InterpolatedVector_float3 position,
+    InterpolatedVector_float2 uv
 ) {
     float3 delta_pos_y_perp = cross(position.dy, normal);
     float3 delta_pos_x_perp = cross(normal, position.dx);
@@ -35,10 +33,10 @@ float3x3 compute_cotangent_frame(
     float3 b = delta_pos_y_perp * uv.dx.y + delta_pos_x_perp * uv.dy.y;
 
     float invmax = 1.0 / sqrt(max(length_squared(t), length_squared(b)));
-    return transpose(float3x3(t * invmax, b * invmax, normal));
+    return float3x3(t * invmax, b * invmax, normal);
 }
 
-const static float3 AMBIENT_LEVEL = 0.025;
+const static float3 AMBIENT_LEVEL = vec3(0.025);
 
 const static float3 AMBIENT_SH[9] = {
     AMBIENT_LEVEL,//float3(0.5,0.5,0.5),
@@ -65,32 +63,44 @@ float3 evaluate_spherical_harmonic(float3 n, float3 sh[9]) {
         + sh[8] * (n.x * n.x - n.y * n.y);
 }
 
-[shader("compute")]
-[numthreads(8, 8, 1)]
-void render_geometry(
-    uint3 global_id: SV_DispatchThreadID
+layout(local_size_x = 8, local_size_y = 8) in;
+
+vec4 sample_texture(uint32_t index, InterpolatedVector_float2 uv) {
+    return textureGrad(
+        sampler2D(
+            textures[NonUniformResourceIndex(index)],
+            repeat_sampler
+        ),
+        uv.value, uv.dx, uv.dy
+    );
+}
+
+void main(
 ) {
     if (global_id.x >= uniforms.window_size.x || global_id.y >= uniforms.window_size.y) {
         return;
     }
 
-    uint64_t start_time = vk::ReadClock(vk::SubgroupScope);
+    uint64_t start_time = clockARB();
 
-    if (depth_buffer[global_id.xy] == 0.0) {
-        rw_scene_referred_framebuffer[global_id.xy] = float4(0.0, 0.0, 0.0, 1.0);
+    ivec2 coord = ivec2(global_id.xy);
+
+    if (texelFetch(depth_buffer, coord, 0).x == 0.0) {
+        imageStore(rw_scene_referred_framebuffer, coord, float4(0.0, 0.0, 0.0, 1.0));
         return;
     }
 
-    uint32_t packed = visibility_buffer[global_id.xy];
+    uint32_t packed = texelFetch(visibility_buffer, coord, 0).x;
     uint32_t instance_index = packed & ((1 << 24) - 1);
     uint32_t triangle_index = packed >> 24;
 
-    MeshletIndex meshlet_index = load_instance_meshlet(uniforms.instance_meshlets, instance_index);
+    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.instance_meshlets).meshlet_index[instance_index];
 
-    Instance instance = load_instance(meshlet_index.instance_index);
-    MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
-    Meshlet meshlet = load_meshlet(mesh_info.meshlets, meshlet_index.meshlet_index);
-    uint32_t4 micro_indices = meshlet.index_offset + load_uint8_t3(mesh_info.micro_indices + meshlet.triangle_offset + triangle_index * 3);
+    Instance instance = instances[meshlet_index.instance_index];
+    MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
+    Meshlet meshlet = MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_index.meshlet_index];
+    uint32_t3 micro_indices = meshlet.index_offset + MicroIndexBuffer(mesh_info.micro_indices + meshlet.triangle_offset).indices[triangle_index];
+
 
     uint3 indices = uint3(
         load_index(mesh_info, micro_indices.x),
@@ -105,22 +115,22 @@ void render_geometry(
     float3 pos_c = calculate_world_pos(instance, mesh_info, indices.z);
 
     BarycentricDeriv bary = CalcFullBary(
-        mul(uniforms.combined_perspective_view, float4(pos_a, 1.0)),
-        mul(uniforms.combined_perspective_view, float4(pos_b, 1.0)),
-        mul(uniforms.combined_perspective_view, float4(pos_c, 1.0)),
+        uniforms.combined_perspective_view * float4(pos_a, 1.0),
+        uniforms.combined_perspective_view * float4(pos_b, 1.0),
+        uniforms.combined_perspective_view * float4(pos_c, 1.0),
         ndc,
         uniforms.window_size
     );
 
-    InterpolatedVector<float3> world_pos = interpolate(
+    InterpolatedVector_float3 world_pos = interpolate(
         bary, pos_a, pos_b, pos_c
     );
 
-    InterpolatedVector<float2> uv = interpolate(
+    InterpolatedVector_float2 uv = interpolate(
         bary,
-        float2(load_value<uint16_t2>(mesh_info.uvs, indices.x)) * mesh_info.texture_scale,
-        float2(load_value<uint16_t2>(mesh_info.uvs, indices.y)) * mesh_info.texture_scale,
-        float2(load_value<uint16_t2>(mesh_info.uvs, indices.z)) * mesh_info.texture_scale
+        float2(QuanitizedUvs(mesh_info.uvs).uvs[indices.x]) * mesh_info.texture_scale,
+        float2(QuanitizedUvs(mesh_info.uvs).uvs[indices.y]) * mesh_info.texture_scale,
+        float2(QuanitizedUvs(mesh_info.uvs).uvs[indices.z]) * mesh_info.texture_scale
     );
     // Don't need to do this per triangle uv as it doesn't affect the derivs.
     uv.value += mesh_info.texture_offset;
@@ -130,11 +140,11 @@ void render_geometry(
     // Load 3 x i8 with a padding byte.
     float3 normal = interpolate(
         bary,
-        normalize(float3(unpack_s8s16(load_value<int8_t4_packed>(mesh_info.normals, indices.x)).xyz)),
-        normalize(float3(unpack_s8s16(load_value<int8_t4_packed>(mesh_info.normals, indices.y)).xyz)),
-        normalize(float3(unpack_s8s16(load_value<int8_t4_packed>(mesh_info.normals, indices.z)).xyz))
+        normalize(float3(QuanitizedNormals(mesh_info.normals).normals[indices.x].xyz)),
+        normalize(float3(QuanitizedNormals(mesh_info.normals).normals[indices.y].xyz)),
+        normalize(float3(QuanitizedNormals(mesh_info.normals).normals[indices.z].xyz))
     ).value;
-    normal = normalize(mul(instance.normal_transform, normal));
+    normal = normalize(instance.normal_transform * normal);
 
     // Calculate whether the triangle is back facing using the (unnormalized) geometric normal.
     // I tried getting this with the code from
@@ -151,7 +161,7 @@ void render_geometry(
     float4 shadow_coord = float4(0,0,0,0);
     for (cascade_index = 0; cascade_index < 4; cascade_index++) {
         // Get the coordinate in shadow view space.
-        shadow_coord = mul(misc_storage[0].shadow_matrices[cascade_index], float4(world_pos.value, 1.0));
+        shadow_coord = misc_storage.shadow_matrices[cascade_index] * float4(world_pos.value, 1.0);
         // If it's inside the cascade view space (which is NDC so -1 to 1) then stop as
         // this is the highest quality cascade for the fragment.
         if (abs(shadow_coord.x) < 1.0 && abs(shadow_coord.y) < 1.0) {
@@ -161,18 +171,21 @@ void render_geometry(
 
     // Use the tiniest shadow bias for alpha clipped meshes as they're double sided..
     // Hand-chosen for a shadow_cam_distance of 1024 with the sponza flowers in the nearest shadow frustum.
-    float shadow_bias = select(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP, 0.000002, 0.0);
+    float shadow_bias = select(bool(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP), 0.000002, 0.0);
 
-    float4 shadow_view_coord = mul(bias_matrix, shadow_coord);
+    float4 shadow_view_coord = bias_matrix * shadow_coord;
     shadow_view_coord /= shadow_view_coord.w;
     float shadow_sum = 0.0;
     for (int x = -1; x <= 1; x++) {
         for (int y = -1; y <= 1; y++) {
             float2 offset = float2(x, y) / 1024.0;
-            shadow_sum += shadowmap.SampleCmpLevelZero(
-                shadowmap_comparison_sampler,
-                float3(shadow_view_coord.xy + offset, cascade_index),
-                shadow_view_coord.z - shadow_bias
+            shadow_sum += texture(
+                sampler2DArrayShadow(
+                    shadowmap,
+                    shadowmap_comparison_sampler
+                ),
+                float4(shadow_view_coord.xy + offset, cascade_index,
+                shadow_view_coord.z - shadow_bias)
             );
         }
     }
@@ -185,35 +198,35 @@ void render_geometry(
 
     Material material;
 
-    material.albedo = textures[NonUniformResourceIndex(mesh_info.albedo_texture_index)].SampleGrad(repeat_sampler, uv.value, uv.dx, uv.dy).rgb * mesh_info.albedo_factor;
-    float4 metallic_roughness_sample = textures[NonUniformResourceIndex(mesh_info.metallic_roughness_texture_index)].SampleGrad(repeat_sampler, uv.value, uv.dx, uv.dy);
+    material.albedo = sample_texture(mesh_info.albedo_texture_index, uv).rgb * mesh_info.albedo_factor;
+    float4 metallic_roughness_sample = sample_texture(mesh_info.metallic_roughness_texture_index, uv);
     material.roughness = metallic_roughness_sample.y;
     material.metallic = metallic_roughness_sample.z;
 
-    float3 map_normal = textures[NonUniformResourceIndex(mesh_info.normal_texture_index)].SampleGrad(repeat_sampler, uv.value, uv.dx, uv.dy).xyz;
+    float3 map_normal = textureGrad(sampler2D(textures[NonUniformResourceIndex(mesh_info.normal_texture_index)], repeat_sampler), uv.value, uv.dx, uv.dy).xyz;
     map_normal = map_normal * 255.0 / 127.0 - 128.0 / 127.0;
 
-    normal = normalize(mul(compute_cotangent_frame(normal, world_pos, uv), map_normal));
+    normal = normalize(compute_cotangent_frame(normal, world_pos, uv) * map_normal);
 
     float3 ambient_lighting = evaluate_spherical_harmonic(normal, AMBIENT_SH) * diffuse_color(material.albedo, material.metallic);
     float sun_intensity = PI  * shadow_sum;
     float3 sun_lighting = BRDF(view_vector, uniforms.sun_dir, normal, material.roughness, material.metallic, material.albedo) * sun_intensity;
 
-    rw_scene_referred_framebuffer[global_id.xy] = float4(sun_lighting + ambient_lighting, 1.0);
+    imageStore(rw_scene_referred_framebuffer, coord, float4(sun_lighting + ambient_lighting, 1.0));
 
     if (uniforms.debug == UNIFORMS_DEBUG_CASCADES) {
         float3 debug_col = DEBUG_COLOURS[cascade_index];
-        rw_scene_referred_framebuffer[global_id.xy] = float4(material.albedo * debug_col, 1.0);
+        imageStore(rw_scene_referred_framebuffer, coord, float4(material.albedo * debug_col, 1.0));
     } else if (uniforms.debug == UNIFORMS_DEBUG_TRIANGLE_INDEX) {
-        rw_scene_referred_framebuffer[global_id.xy] = float4(DEBUG_COLOURS[triangle_index % 10], 1.0);
+        imageStore(rw_scene_referred_framebuffer, coord, float4(DEBUG_COLOURS[triangle_index % 10], 1.0));
     } else if (uniforms.debug == UNIFORMS_DEBUG_INSTANCE_INDEX) {
-        rw_scene_referred_framebuffer[global_id.xy] = float4(DEBUG_COLOURS[meshlet_index.meshlet_index % 10], 1.0);
+        imageStore(rw_scene_referred_framebuffer, coord, float4(DEBUG_COLOURS[meshlet_index.meshlet_index % 10], 1.0));
     } else if (uniforms.debug == UNIFORMS_DEBUG_SHADER_CLOCK) {
-        uint64_t end_time = vk::ReadClock(vk::SubgroupScope);
+        uint64_t end_time = clockARB();
 
         float heatmapScale = 65000.0f;
         float deltaTimeScaled =  clamp(float(timediff(start_time, end_time)) / heatmapScale, 0.0f, 1.0f );
 
-        rw_scene_referred_framebuffer[global_id.xy] = float4(temperature(deltaTimeScaled), 1.0);
+        imageStore(rw_scene_referred_framebuffer, coord, float4(temperature(deltaTimeScaled), 1.0));
     }
 }
