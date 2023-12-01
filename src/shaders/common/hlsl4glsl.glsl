@@ -5,31 +5,25 @@
 #extension GL_EXT_nonuniform_qualifier : require
 #extension GL_ARB_shader_clock: require
 
-#define float3x3 mat3
-#define float3 vec3
 #define float2 vec2
-#define uint32_t2 uvec2
-#define float4x4 mat4
-#define float2x2 mat2
+#define float3 vec3
 #define float4 vec4
+#define float2x2 mat2
 #define float3x3 mat3
-#define uint32_t4 uvec4
-#define uint8_t3 u8vec3
-#define uint3 uvec3
+#define float4x4 mat4
+#define uint32_t2 uvec2
 #define uint32_t3 uvec3
-#define uint16_t3 u16vec3
+#define uint32_t4 uvec4
+#define uint3 uvec3
+#define uint8_t3 u8vec3
 #define uint16_t2 u16vec2
+#define uint16_t3 u16vec3
+#define uint16_t4 u16vec4
 #define int8_t4 i8vec4
 
 #define static
 
 #define __HLSL_VERSION 1
-
-#define uint16_t4 u16vec4
-
-#define global_id gl_GlobalInvocationID
-
-#define NonUniformResourceIndex nonuniformEXT
 
 float3 rcp(float3 value) {
     return 1.0 / value;

@@ -4,7 +4,7 @@
 layout(local_size_x = 64) in;
 
 void main() {
-    uint32_t id = global_id.x;
+    uint32_t id = gl_GlobalInvocationID.x;
 
     if (id >= misc_storage.num_expanded_meshlets) {
         return;
