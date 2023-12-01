@@ -85,6 +85,10 @@ uint16_t load_uint8_t(uint64_t address) {
     return vk::RawBufferLoad<uint16_t>(address, 1) & ((1 << 8) - 1);
 }
 
+uint16_t4 load_uint8_t3(uint64_t address) {
+    return unpack_u8u16(vk::RawBufferLoad<uint8_t4_packed>(address, 1));
+}
+
 uint32_t pack(uint32_t triangle_index, uint32_t instance_index) {
     return triangle_index << 24 | instance_index;
 }

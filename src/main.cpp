@@ -130,6 +130,7 @@ int main() {
 
     auto vulkan_1_0_features = vk::PhysicalDeviceFeatures {
         .multiDrawIndirect = true,
+        .samplerAnisotropy = true,
         .shaderInt64 = true,
         .shaderInt16 = true,
     };
@@ -245,7 +246,9 @@ int main() {
     auto render_fence =
         device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
 
-    auto pipelines = Pipelines::compile_pipelines(device);
+    auto descriptor_set_layouts = create_descriptor_set_layouts(device);
+    auto pipelines =
+        Pipelines::compile_pipelines(device, descriptor_set_layouts);
 
     auto pool_sizes = std::array {
         vk::DescriptorPoolSize {
@@ -277,10 +280,10 @@ int main() {
 
     for (uint32_t i = 0; i < swapchain_images.size(); i++) {
         descriptor_sets_to_create.push_back(
-            *pipelines.dsl.swapchain_storage_image
+            *descriptor_set_layouts.swapchain_storage_image
         );
     }
-    descriptor_sets_to_create.push_back(*pipelines.dsl.everything);
+    descriptor_sets_to_create.push_back(*descriptor_set_layouts.everything);
 
     std::vector<vk::raii::DescriptorSet> descriptor_sets =
         device.allocateDescriptorSets(vk::DescriptorSetAllocateInfo {
@@ -486,14 +489,18 @@ int main() {
         .repeat_sampler = device.createSampler(vk::SamplerCreateInfo {
             .magFilter = vk::Filter::eLinear,
             .minFilter = vk::Filter::eLinear,
+            .mipmapMode = vk::SamplerMipmapMode::eLinear,
             .addressModeU = vk::SamplerAddressMode::eRepeat,
             .addressModeV = vk::SamplerAddressMode::eRepeat,
             .addressModeW = vk::SamplerAddressMode::eRepeat,
+            .anisotropyEnable = true,
+            .maxAnisotropy = 16.0f,
             .minLod = 0.0f,
             .maxLod = VK_LOD_CLAMP_NONE}),
         .clamp_sampler = device.createSampler(vk::SamplerCreateInfo {
             .magFilter = vk::Filter::eLinear,
             .minFilter = vk::Filter::eLinear,
+            .mipmapMode = vk::SamplerMipmapMode::eLinear,
             .addressModeU = vk::SamplerAddressMode::eClampToEdge,
             .addressModeV = vk::SamplerAddressMode::eClampToEdge,
             .addressModeW = vk::SamplerAddressMode::eClampToEdge,
@@ -503,6 +510,7 @@ int main() {
             device.createSampler(vk::SamplerCreateInfo {
                 .magFilter = vk::Filter::eLinear,
                 .minFilter = vk::Filter::eLinear,
+                .mipmapMode = vk::SamplerMipmapMode::eLinear,
                 .addressModeU = vk::SamplerAddressMode::eClampToEdge,
                 .addressModeV = vk::SamplerAddressMode::eClampToEdge,
                 .addressModeW = vk::SamplerAddressMode::eClampToEdge,

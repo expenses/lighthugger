@@ -3,6 +3,7 @@
 #include "common/loading.hlsl"
 #include "common/vbuffer.hlsl"
 #include "common/geometry.hlsl"
+#include "common/pbr.hlsl"
 
 static const float4x4 bias_matrix = float4x4(
     0.5, 0.0, 0.0, 0.5,
@@ -37,6 +38,33 @@ float3x3 compute_cotangent_frame(
     return transpose(float3x3(t * invmax, b * invmax, normal));
 }
 
+const static float3 AMBIENT_LEVEL = 0.025;
+
+const static float3 AMBIENT_SH[9] = {
+    AMBIENT_LEVEL,//float3(0.5,0.5,0.5),
+    float3(0,0,0),
+    AMBIENT_LEVEL,//float3(0.5,0.5,0.5),
+    float3(0,0,0),
+    float3(0,0,0),
+    float3(0,0,0),
+    float3(0,0,0),
+    float3(0,0,0),
+    float3(0,0,0)
+};
+
+float3 evaluate_spherical_harmonic(float3 n, float3 sh[9]) {
+    return
+          sh[0]
+        + sh[1] * (n.x)
+        + sh[2] * (n.y)
+        + sh[3] * (n.z)
+        + sh[4] * (n.x * n.z)
+        + sh[5] * (n.z * n.y)
+        + sh[6] * (n.y * n.x)
+        + sh[7] * (3.0 * n.z * n.z - 1.0)
+        + sh[8] * (n.x * n.x - n.y * n.y);
+}
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void render_geometry(
@@ -62,14 +90,12 @@ void render_geometry(
     Instance instance = load_instance(meshlet_index.instance_index);
     MeshInfo mesh_info = load_mesh_info(instance.mesh_info_address);
     Meshlet meshlet = load_meshlet(mesh_info.meshlets, meshlet_index.meshlet_index);
-    uint16_t micro_index_a = load_uint8_t(mesh_info.micro_indices + meshlet.triangle_offset + triangle_index * 3);
-    uint16_t micro_index_b = load_uint8_t(mesh_info.micro_indices + meshlet.triangle_offset + triangle_index * 3 + 1);
-    uint16_t micro_index_c = load_uint8_t(mesh_info.micro_indices + meshlet.triangle_offset + triangle_index * 3 + 2);
+    uint32_t4 micro_indices = meshlet.index_offset + load_uint8_t3(mesh_info.micro_indices + meshlet.triangle_offset + triangle_index * 3);
 
     uint3 indices = uint3(
-        load_index(mesh_info, meshlet.index_offset + micro_index_a),
-        load_index(mesh_info, meshlet.index_offset + micro_index_b),
-        load_index(mesh_info, meshlet.index_offset + micro_index_c)
+        load_index(mesh_info, micro_indices.x),
+        load_index(mesh_info, micro_indices.y),
+        load_index(mesh_info, micro_indices.z)
     );
 
     float2 ndc = float2(global_id.xy) / float2(uniforms.window_size) * 2.0 - 1.0;
@@ -99,7 +125,7 @@ void render_geometry(
     // Don't need to do this per triangle uv as it doesn't affect the derivs.
     uv.value += mesh_info.texture_offset;
 
-    float3 view_vector = world_pos.value - uniforms.camera_pos;
+    float3 view_vector = normalize(uniforms.camera_pos - world_pos.value);
 
     // Load 3 x i8 with a padding byte.
     float3 normal = interpolate(
@@ -115,7 +141,7 @@ void render_geometry(
     // https://registry.khronos.org/vulkan/specs/1.3-khr-extensions/html/chap22.html#tessellation-vertex-winding-order
     // but I had problems with large triangles that go over the edges of the screen.
     float3 geometric_normal = cross(pos_b - pos_a, pos_c - pos_a);
-    bool is_back_facing = dot(geometric_normal, view_vector) > 0;
+    bool is_back_facing = dot(geometric_normal, view_vector) < 0;
 
     // For leaves etc, we shouldn't treat them as totally opaque by just flipping
     // the normals like this. But it's fine for now.
@@ -160,24 +186,20 @@ void render_geometry(
     Material material;
 
     material.albedo = textures[NonUniformResourceIndex(mesh_info.albedo_texture_index)].SampleGrad(repeat_sampler, uv.value, uv.dx, uv.dy).rgb * mesh_info.albedo_factor;
-    float2 metallic_roughness = textures[NonUniformResourceIndex(mesh_info.metallic_roughness_texture_index)].SampleGrad(repeat_sampler, uv.value, uv.dx, uv.dy).yx;
-    material.roughness = metallic_roughness.x;
-    material.metallic = metallic_roughness.y;
+    float4 metallic_roughness_sample = textures[NonUniformResourceIndex(mesh_info.metallic_roughness_texture_index)].SampleGrad(repeat_sampler, uv.value, uv.dx, uv.dy);
+    material.roughness = metallic_roughness_sample.y;
+    material.metallic = metallic_roughness_sample.z;
 
     float3 map_normal = textures[NonUniformResourceIndex(mesh_info.normal_texture_index)].SampleGrad(repeat_sampler, uv.value, uv.dx, uv.dy).xyz;
     map_normal = map_normal * 255.0 / 127.0 - 128.0 / 127.0;
 
     normal = normalize(mul(compute_cotangent_frame(normal, world_pos, uv), map_normal));
 
-    float n_dot_l = max(dot(uniforms.sun_dir, normal), 0.0);
+    float3 ambient_lighting = evaluate_spherical_harmonic(normal, AMBIENT_SH) * diffuse_color(material.albedo, material.metallic);
+    float sun_intensity = PI  * shadow_sum;
+    float3 sun_lighting = BRDF(view_vector, uniforms.sun_dir, normal, material.roughness, material.metallic, material.albedo) * sun_intensity;
 
-    float ambient = 0.05;
-
-    float3 lighting = max(n_dot_l * shadow_sum * uniforms.sun_intensity, ambient);
-
-    float3 diffuse = material.albedo * lighting;
-
-    rw_scene_referred_framebuffer[global_id.xy] = float4(diffuse, 1.0);
+    rw_scene_referred_framebuffer[global_id.xy] = float4(sun_lighting + ambient_lighting, 1.0);
 
     if (uniforms.debug == UNIFORMS_DEBUG_CASCADES) {
         float3 debug_col = DEBUG_COLOURS[cascade_index];
