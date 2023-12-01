@@ -120,6 +120,7 @@ int main() {
         .shaderSampledImageArrayNonUniformIndexing = true,
         .descriptorBindingPartiallyBound = true,
         .runtimeDescriptorArray = true,
+        .scalarBlockLayout = true,
         .bufferDeviceAddress = true,
     };
 
@@ -446,7 +447,7 @@ int main() {
         .shadowmap = std::move(shadowmap),
         .misc_storage_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
-                .size = sizeof(MiscStorageBuffer),
+                .size = sizeof(MiscStorage),
                 .usage = vk::BufferUsageFlagBits::eStorageBuffer
                     | vk::BufferUsageFlagBits::eTransferDst
                     | vk::BufferUsageFlagBits::eIndirectBuffer},

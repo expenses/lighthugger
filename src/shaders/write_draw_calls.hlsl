@@ -2,7 +2,6 @@
 #include "common/loading.hlsl"
 #include "common/geometry.hlsl"
 
-// todo: cull on vertical and horizontal planes.
 bool cull_bounding_sphere(Instance instance, float4 bounding_sphere) {
     float3 world_space_pos = mul(instance.transform, float4(bounding_sphere.xyz, 1.0)).xyz;
     float radius = bounding_sphere.w;

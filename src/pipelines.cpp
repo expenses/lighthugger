@@ -364,8 +364,11 @@ Pipelines Pipelines::compile_pipelines(
         .expand_meshlets = create_pipeline_from_shader(
             device,
             pipeline_layout,
-            write_draw_calls,
-            "expand_meshlets"
+            create_shader_from_file(
+                     device,
+                     "compiled_shaders/expand_meshlets.spv"
+                 ),
+            "main"
         ),
         .pipeline_layout = std::move(pipeline_layout),
         .copy_quantized_positions =

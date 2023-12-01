@@ -15,7 +15,7 @@
 [[vk::binding(5)]] Texture3D<float3> display_transform_lut;
 [[vk::binding(6)]] SamplerState repeat_sampler;
 [[vk::binding(7)]] Texture2D<float> depth_buffer;
-[[vk::binding(8)]] RWStructuredBuffer<MiscStorageBuffer> misc_storage;
+[[vk::binding(8)]] RWStructuredBuffer<MiscStorage> misc_storage;
 [[vk::binding(9)]] Texture2DArray<float> shadowmap;
 [[vk::binding(10)]] SamplerComparisonState shadowmap_comparison_sampler;
 [[vk::binding(11)]] RWStructuredBuffer<DrawIndirectCommand> draw_calls;
