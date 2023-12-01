@@ -49,7 +49,7 @@ float3 BRDF(float3 v, float3 l, float3 n, float perceptualRoughness, float metal
 
     float3 f0 = reflectance_for_ior(1.5) * (1.0 - metallic) + baseColor * metallic;
 
-    float NoV = abs(dot(n, v)) + 1e-5;
+    float NoV = clamp(dot(n, v), 1e-5, 1.0);
     float NoL = clamp(dot(n, l), 0.0, 1.0);
     float NoH = clamp(dot(n, h), 0.0, 1.0);
     float LoH = clamp(dot(l, h), 0.0, 1.0);

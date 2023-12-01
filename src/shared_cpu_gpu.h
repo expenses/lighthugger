@@ -39,7 +39,7 @@ struct MeshInfo {
 };
 
 // Stores depth info and draw call counts.
-struct MiscStorageBuffer {
+struct MiscStorage {
     MATRIX4_TYPE shadow_matrices[4];
     uint32_t min_depth;
     uint32_t max_depth;

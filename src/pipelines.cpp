@@ -294,11 +294,6 @@ Pipelines Pipelines::compile_pipelines(
     auto render_geometry =
         create_shader_from_file(device, "compiled_shaders/render_geometry.spv");
 
-    auto write_draw_calls = create_shader_from_file(
-        device,
-        "compiled_shaders/write_draw_calls.spv"
-    );
-
     return Pipelines {
         .rasterize_shadowmap {
             .opaque = name_pipeline(
@@ -343,8 +338,11 @@ Pipelines Pipelines::compile_pipelines(
         .write_draw_calls = create_pipeline_from_shader(
             device,
             pipeline_layout,
-            write_draw_calls,
-            "write_draw_calls"
+            create_shader_from_file(
+                device,
+                "compiled_shaders/write_draw_calls.spv"
+            ),
+            "main"
         ),
         .display_transform = create_pipeline_from_shader(
             device,
@@ -359,13 +357,16 @@ Pipelines Pipelines::compile_pipelines(
             device,
             pipeline_layout,
             render_geometry,
-            "render_geometry"
+            "main"
         ),
         .expand_meshlets = create_pipeline_from_shader(
             device,
             pipeline_layout,
-            write_draw_calls,
-            "expand_meshlets"
+            create_shader_from_file(
+                device,
+                "compiled_shaders/expand_meshlets.spv"
+            ),
+            "main"
         ),
         .pipeline_layout = std::move(pipeline_layout),
         .copy_quantized_positions =

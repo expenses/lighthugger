@@ -64,6 +64,7 @@ float3 InterpolateWithDeriv(BarycentricDeriv deriv, float v0, float v1, float v2
 
 // Helper structs.
 
+#ifndef GLSL
 template<class T>
 struct InterpolatedVector {
     T value;
@@ -100,3 +101,49 @@ InterpolatedVector<float3> interpolate(BarycentricDeriv deriv, float3 v0, float3
     interp.dy.z = z.z;
     return interp;
 }
+#else
+
+struct InterpolatedVector_float3 {
+  float3 value;
+  float3 dx;
+  float3 dy;
+};
+
+struct InterpolatedVector_float2 {
+  float2 value;
+  float2 dx;
+  float2 dy;
+};
+
+
+InterpolatedVector_float2 interpolate(BarycentricDeriv deriv, float2 v0, float2 v1, float2 v2) {
+    InterpolatedVector_float2 interp;
+    float3 x = InterpolateWithDeriv(deriv, v0.x, v1.x, v2.x);
+    interp.value.x = x.x;
+    interp.dx.x = x.y;
+    interp.dy.x = x.z;
+    float3 y = InterpolateWithDeriv(deriv, v0.y, v1.y, v2.y);
+    interp.value.y = y.x;
+    interp.dx.y = y.y;
+    interp.dy.y = y.z;
+    return interp;
+}
+
+InterpolatedVector_float3 interpolate(BarycentricDeriv deriv, float3 v0, float3 v1, float3 v2) {
+    InterpolatedVector_float3 interp;
+    float3 x = InterpolateWithDeriv(deriv, v0.x, v1.x, v2.x);
+    interp.value.x = x.x;
+    interp.dx.x = x.y;
+    interp.dy.x = x.z;
+    float3 y = InterpolateWithDeriv(deriv, v0.y, v1.y, v2.y);
+    interp.value.y = y.x;
+    interp.dx.y = y.y;
+    interp.dy.y = y.z;
+    float3 z = InterpolateWithDeriv(deriv, v0.z, v1.z, v2.z);
+    interp.value.z = z.x;
+    interp.dx.z = z.y;
+    interp.dy.z = z.z;
+    return interp;
+}
+
+#endif
