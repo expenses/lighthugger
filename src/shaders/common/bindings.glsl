@@ -50,6 +50,10 @@ layout(buffer_reference, scalar, buffer_reference_align = 1) buffer MicroIndexBu
     u8vec3 indices[];
 };
 
+layout(buffer_reference, scalar, buffer_reference_align = 1) buffer MicroIndexBufferSingle {
+    uint8_t indices[];
+};
+
 layout(buffer_reference, scalar) buffer Index32Buffer {
     uint32_t indices[];
 };

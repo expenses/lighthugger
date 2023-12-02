@@ -165,54 +165,79 @@ Pipelines Pipelines::compile_pipelines(
     auto shadows =
         create_shader_from_file(device, "compiled_shaders/shadows.spv");
 
-    auto visbuffer_opaque = create_shader_from_file(
+    auto visbuffer_opaque_vertex = create_shader_from_file(
         device,
-        "compiled_shaders/visbuffer_rasterization/opaque.spv"
+        "compiled_shaders/visbuffer_opaque_vertex.spv"
     );
 
-    auto visbuffer_alpha_clip = create_shader_from_file(
+    auto visbuffer_opaque_pixel = create_shader_from_file(
         device,
-        "compiled_shaders/visbuffer_rasterization/alpha_clip.spv"
+        "compiled_shaders/visbuffer_opaque_pixel.spv"
+    );
+
+    auto visbuffer_alpha_clip_pixel = create_shader_from_file(
+        device,
+        "compiled_shaders/visbuffer_alpha_clip_pixel.spv"
+    );
+
+    auto visbuffer_alpha_clip_vertex = create_shader_from_file(
+        device,
+        "compiled_shaders/visbuffer_alpha_clip_vertex.spv"
+    );
+
+    auto shadowmap_opaque_vertex = create_shader_from_file(
+        device,
+        "compiled_shaders/shadowmap_opaque_vertex.spv"
+    );
+
+    auto shadowmap_alpha_clip_vertex = create_shader_from_file(
+        device,
+        "compiled_shaders/shadowmap_alpha_clip_vertex.spv"
+    );
+
+    auto shadowmap_alpha_clipped_pixel = create_shader_from_file(
+        device,
+        "compiled_shaders/shadowmap_alpha_clipped_pixel.spv"
     );
 
     auto visbuffer_stages = std::array {
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eVertex,
-            .module = *visbuffer_opaque,
-            .pName = "vertex",
+            .module = *visbuffer_opaque_vertex,
+            .pName = "main",
         },
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eFragment,
-            .module = *visbuffer_opaque,
-            .pName = "pixel"}};
+            .module = *visbuffer_opaque_pixel,
+            .pName = "main"}};
 
     auto visbuffer_alpha_clip_stages = std::array {
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eVertex,
-            .module = *visbuffer_alpha_clip,
-            .pName = "vertex",
+            .module = *visbuffer_alpha_clip_vertex,
+            .pName = "main",
         },
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eFragment,
-            .module = *visbuffer_alpha_clip,
-            .pName = "pixel"}};
+            .module = *visbuffer_alpha_clip_pixel,
+            .pName = "main"}};
 
     auto opaque_shadow_stage = std::array {vk::PipelineShaderStageCreateInfo {
         .stage = vk::ShaderStageFlagBits::eVertex,
-        .module = *shadows,
-        .pName = "vertex",
+        .module = *shadowmap_opaque_vertex,
+        .pName = "main",
     }};
 
     auto alpha_clip_shadow_stages = std::array {
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eVertex,
-            .module = *shadows,
-            .pName = "vertex_alpha_clip",
+            .module = *shadowmap_alpha_clip_vertex,
+            .pName = "main",
         },
         vk::PipelineShaderStageCreateInfo {
             .stage = vk::ShaderStageFlagBits::eFragment,
-            .module = *shadows,
-            .pName = "pixel_alpha_clip",
+            .module = *shadowmap_alpha_clipped_pixel,
+            .pName = "main",
         },
     };
 
