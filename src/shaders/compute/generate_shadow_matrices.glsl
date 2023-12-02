@@ -1,5 +1,5 @@
 #include "../common/bindings.glsl"
-#include "../common/matrices.hlsl"
+#include "../common/matrices.glsl"
 
 // Super easy.
 float convert_infinite_reverze_z_depth(float depth) {
