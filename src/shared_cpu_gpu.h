@@ -1,19 +1,6 @@
-#pragma once
-
-#ifdef __HLSL_VERSION
-    #define MATRIX4_TYPE float4x4
-    #define MATRIX3_TYPE float3x3
-    #define VEC4_TYPE float4
-    #define VEC3_TYPE float3
-    #define VEC2_TYPE float2
-    #define UVEC2_TYPE uint32_t2
-#else
-    #define MATRIX4_TYPE glm::mat4
-    #define MATRIX3_TYPE glm::mat3
-    #define VEC4_TYPE glm::vec4
-    #define VEC3_TYPE glm::vec3
-    #define VEC2_TYPE glm::vec2
-    #define UVEC2_TYPE glm::uvec2
+#ifndef GLSL
+    #pragma once
+    using namespace glm;
 #endif
 
 const static uint32_t MESH_INFO_FLAGS_32_BIT_INDICES = 1 << 0;
@@ -29,18 +16,18 @@ struct MeshInfo {
     uint32_t num_meshlets;
     uint32_t num_indices;
     uint32_t flags;
-    VEC4_TYPE bounding_sphere;
-    VEC2_TYPE texture_scale;
-    VEC2_TYPE texture_offset;
+    vec4 bounding_sphere;
+    vec2 texture_scale;
+    vec2 texture_offset;
     uint32_t albedo_texture_index;
     uint32_t metallic_roughness_texture_index;
     uint32_t normal_texture_index;
-    VEC3_TYPE albedo_factor;
+    vec3 albedo_factor;
 };
 
 // Stores depth info and draw call counts.
 struct MiscStorage {
-    MATRIX4_TYPE shadow_matrices[4];
+    mat4 shadow_matrices[4];
     uint32_t min_depth;
     uint32_t max_depth;
     uint32_t num_opaque_meshlets;
@@ -59,20 +46,20 @@ const static int32_t UNIFORMS_DEBUG_INSTANCE_INDEX = 3;
 const static int32_t UNIFORMS_DEBUG_SHADER_CLOCK = 4;
 
 struct Uniforms {
-    MATRIX4_TYPE combined_perspective_view;
-    MATRIX4_TYPE inv_perspective_view;
-    MATRIX4_TYPE view;
-    MATRIX4_TYPE initial_view;
-    MATRIX4_TYPE perspective;
+    mat4 combined_perspective_view;
+    mat4 inv_perspective_view;
+    mat4 view;
+    mat4 initial_view;
+    mat4 perspective;
     uint64_t instance_meshlets;
     uint64_t expanded_meshlets;
-    VEC3_TYPE camera_pos;
+    vec3 camera_pos;
     uint32_t _padding0;
-    VEC3_TYPE sun_dir;
+    vec3 sun_dir;
     uint32_t _padding1;
-    VEC3_TYPE sun_intensity;
+    vec3 sun_intensity;
     uint32_t num_instances;
-    UVEC2_TYPE window_size;
+    uvec2 window_size;
     float shadow_cam_distance;
     float cascade_split_pow;
     int32_t debug;
@@ -89,11 +76,11 @@ struct DrawIndirectCommand {
 };
 
 struct Instance {
-    MATRIX4_TYPE transform;
+    mat4 transform;
     uint64_t mesh_info_address;
-    MATRIX3_TYPE normal_transform;
+    mat3 normal_transform;
 
-#ifndef __HLSL_VERSION
+#ifndef GLSL
     Instance(glm::mat4 transform_, uint64_t mesh_info_address_) :
         transform(transform_),
         mesh_info_address(mesh_info_address_) {
@@ -129,10 +116,10 @@ const static uint32_t ALPHA_CLIP_DRAWS_OFFSET = MAX_OPAQUE_DRAWS;
 const static float NEAR_PLANE = 0.01f;
 
 struct Meshlet {
-    VEC3_TYPE cone_apex;
-    VEC3_TYPE cone_axis;
+    vec3 cone_apex;
+    vec3 cone_axis;
     float cone_cutoff;
-    VEC4_TYPE bounding_sphere;
+    vec4 bounding_sphere;
     // The buffers these index into are often large enough to require 32-bit offsets.
     uint32_t triangle_offset;
     uint32_t index_offset;

@@ -63,8 +63,6 @@ float3 evaluate_spherical_harmonic(float3 n, float3 sh[9]) {
         + sh[8] * (n.x * n.x - n.y * n.y);
 }
 
-layout(local_size_x = 8, local_size_y = 8) in;
-
 vec4 sample_texture(uint32_t index, InterpolatedVector_float2 uv) {
     return textureGrad(
         sampler2D(
@@ -75,8 +73,8 @@ vec4 sample_texture(uint32_t index, InterpolatedVector_float2 uv) {
     );
 }
 
-void main(
-) {
+layout(local_size_x = 8, local_size_y = 8) in;
+void main() {
     if (gl_GlobalInvocationID.x >= uniforms.window_size.x || gl_GlobalInvocationID.y >= uniforms.window_size.y) {
         return;
     }

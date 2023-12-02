@@ -1,4 +1,3 @@
-#pragma once
 
 // Copied from http://filmicworlds.com/blog/visibility-buffer-rendering-with-material-graphs/.
 // Edits are marked.
@@ -75,7 +74,6 @@ struct InterpolatedVector_float2 {
   float2 dx;
   float2 dy;
 };
-
 
 InterpolatedVector_float2 interpolate(BarycentricDeriv deriv, float2 v0, float2 v1, float2 v2) {
     InterpolatedVector_float2 interp;

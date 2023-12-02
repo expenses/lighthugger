@@ -1,17 +1,4 @@
-glsl_flags="-g -O -DGLSL=1 -std=450 --target-env=vulkan1.3 --target-spv=spv1.6 -I src"
+glsl_flags="-DGLSL=1 -std=450 --target-env=vulkan1.3 --target-spv=spv1.6 -I src"
 
-python compile_glsl.py --flags "$glsl_flags" src/shaders/*.{glsl,comp} || exit 1
-
-error_flags="-Wall -Wextra -Weverything -Wpedantic -Werror -Wno-c++98-compat -Wno-unused-macros -Wno-missing-variable-declarations -Wno-missing-prototypes -Wno-shorten-64-to-32 -Wno-float-conversion -Wno-global-constructors"
-
-compiler="dxc -HV 2021 $error_flags -I src -spirv -fspv-target-env=vulkan1.2 -T lib_6_7 -enable-16bit-types -fvk-use-scalar-layout"
-
-for file in src/shaders/*.hlsl; do
-    $compiler $file -Fo compiled_shaders/$(basename $file .hlsl).spv || exit 1
-done
-
-mkdir -p compiled_shaders/compute
-
-for file in src/shaders/compute/*.hlsl; do
-    $compiler $file -Fo compiled_shaders/compute/$(basename $file .hlsl).spv || exit 1
-done
+python compile_glsl.py --out-dir compiled_shaders --flags "$glsl_flags" src/shaders/*.{glsl,comp} || exit 1
+python compile_glsl.py --out-dir compiled_shaders/compute --flags "$glsl_flags" --shader-stage=comp src/shaders/compute/*.* || exit 1

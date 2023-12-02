@@ -1,4 +1,4 @@
-#include "../common/bindings.hlsl"
+#include "../common/bindings.glsl"
 #include "../common/matrices.hlsl"
 
 // Super easy.
@@ -6,20 +6,18 @@ float convert_infinite_reverze_z_depth(float depth) {
     return NEAR_PLANE / depth;
 }
 
-[shader("compute")]
-[numthreads(4, 1, 1)]
-void generate_matrices(uint3 global_id: SV_DispatchThreadID)
-{
+layout(local_size_x = 4) in;
+void generate_shadow_matrices() {
     // https://github.com/SaschaWillems/Vulkan/blob/master/examples/shadowmappingcascade/shadowmappingcascade.cpp#L650-L663
 
     // Note: these values are misleading. As 0.0 is the infinite plane,
     // the max_depth is actually the closer value!
-    float min_depth = asfloat(misc_storage[0].min_depth);
-    float max_depth = asfloat(misc_storage[0].max_depth);
+    float min_depth = asfloat(misc_storage.min_depth);
+    float max_depth = asfloat(misc_storage.max_depth);
 
     float4x4 invCam = uniforms.inv_perspective_view;
 
-    uint32_t cascade_index = global_id.x;
+    uint32_t cascade_index = gl_GlobalInvocationID.x;
 
     float min_distance = convert_infinite_reverze_z_depth(max_depth);
     float max_distance = convert_infinite_reverze_z_depth(min_depth);
@@ -50,12 +48,12 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
 
     // Convert the corners to world space
     for (uint32_t i = 0; i < 8; i++) {
-        float4 invCorner = mul(invCam, float4(frustumCorners[i], 1.0f));
+        float4 invCorner = (invCam * float4(frustumCorners[i], 1.0f));
         frustumCorners[i] = (invCorner / invCorner.w).xyz;
     }
 
     // Get frustum center
-    float3 frustumCenter = 0.0f;
+    float3 frustumCenter = float3(0.0f);
     for (uint32_t i = 0; i < 8; i++) {
         frustumCenter += frustumCorners[i];
     }
@@ -68,11 +66,11 @@ void generate_matrices(uint3 global_id: SV_DispatchThreadID)
     }
     sphere_radius = ceil(sphere_radius * 16.0f) / 16.0f;
 
-    float3 maxExtents = sphere_radius;
+    float3 maxExtents = float3(sphere_radius);
     float3 minExtents = -maxExtents;
 
     float4x4 shadowView = lookAt(uniforms.shadow_cam_distance * uniforms.sun_dir + frustumCenter, frustumCenter, float3(0,1,0));
 	float4x4 shadowProj = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, uniforms.shadow_cam_distance * 2.0);
 
-    misc_storage[0].shadow_matrices[cascade_index] = mul(shadowProj, shadowView);
+    misc_storage.shadow_matrices[cascade_index] = (shadowProj * shadowView);
 }

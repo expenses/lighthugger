@@ -40,7 +40,6 @@ void visbuffer_opaque_pixel() {
 layout(location = 0) flat out uint32_t packed;
 layout(location = 1) out float2 uv;
 layout(location = 2) flat out uint32_t base_texture_index;
-layout(push_constant) uniform pc {ShadowPassConstant shadow_constant;};
 
 void visbuffer_alpha_clip_vertex() {
     uint32_t triangle_index = gl_VertexIndex / 3;
@@ -77,9 +76,11 @@ void visbuffer_alpha_clip_pixel() {
     out_packed = packed;
 }
 
-//vert
+layout(push_constant) uniform PushConstant {
+    ShadowPassConstant shadow_constant;
+};
 
-layout(push_constant) uniform pc {ShadowPassConstant shadow_constant;};
+//vert
 
 void shadowmap_opaque_vertex() {
     MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.instance_meshlets).meshlet_index[gl_InstanceIndex];
@@ -100,7 +101,6 @@ void shadowmap_opaque_vertex() {
 
 layout(location = 0) out float2 uv;
 layout(location = 1) flat out uint32_t base_texture_index;
-layout(push_constant) uniform pc {ShadowPassConstant shadow_constant;};
 
 void shadowmap_alpha_clip_vertex() {
     MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.instance_meshlets).meshlet_index[gl_InstanceIndex];
