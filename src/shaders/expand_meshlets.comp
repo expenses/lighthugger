@@ -17,7 +17,8 @@ void main() {
         return;
     }
 
-    uint32_t meshlets_offset = atomicAdd(misc_storage.num_expanded_meshlets, mesh_info.num_meshlets);
+    uint32_t meshlets_offset =
+        atomicAdd(misc_storage.num_expanded_meshlets, mesh_info.num_meshlets);
 
     MeshletIndexBuffer buf = MeshletIndexBuffer(uniforms.expanded_meshlets);
 

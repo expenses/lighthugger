@@ -11,7 +11,6 @@ float Fd_Burley(float NoV, float NoL, float LoH, float roughness) {
     return lightScatter * viewScatter * (1.0 / PI);
 }
 
-
 float D_GGX(float NoH, float a) {
     float a2 = a * a;
     float f = (NoH * a2 - NoH) * NoH + 1.0;
@@ -42,12 +41,20 @@ float3 diffuse_color(float3 base_color, float metallic) {
     return (1.0 - metallic) * base_color;
 }
 
-float3 BRDF(float3 v, float3 l, float3 n, float perceptualRoughness, float metallic, float3 baseColor) {
+float3 BRDF(
+    float3 v,
+    float3 l,
+    float3 n,
+    float perceptualRoughness,
+    float metallic,
+    float3 baseColor
+) {
     float3 h = normalize(v + l);
 
     float3 diffuseColor = diffuse_color(baseColor, metallic);
 
-    float3 f0 = reflectance_for_ior(1.5) * (1.0 - metallic) + baseColor * metallic;
+    float3 f0 =
+        reflectance_for_ior(1.5) * (1.0 - metallic) + baseColor * metallic;
 
     float NoV = clamp(dot(n, v), 1e-5, 1.0);
     float NoL = clamp(dot(n, l), 0.0, 1.0);
@@ -58,7 +65,7 @@ float3 BRDF(float3 v, float3 l, float3 n, float perceptualRoughness, float metal
     float roughness = perceptualRoughness * perceptualRoughness;
 
     float D = D_GGX(NoH, roughness);
-    float3  F = F_Schlick(LoH, f0);
+    float3 F = F_Schlick(LoH, f0);
     float V = V_SmithGGXCorrelated(NoV, NoL, roughness);
 
     // specular BRDF

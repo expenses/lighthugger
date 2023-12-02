@@ -1,7 +1,8 @@
 // Implementations copied from https://github.com/fu5ha/ultraviolet.
 
 // In GLSL matrices are cols major or w/e, but not in HLSL.
-float4x4 create_matrix_from_cols_glsl(float4 c0, float4 c1, float4 c2, float4 c3) {
+float4x4
+create_matrix_from_cols_glsl(float4 c0, float4 c1, float4 c2, float4 c3) {
     return float4x4(c0, c1, c2, c3);
 }
 

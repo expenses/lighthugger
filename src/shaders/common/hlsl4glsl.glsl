@@ -1,11 +1,11 @@
-#extension GL_EXT_shader_explicit_arithmetic_types: require
-#extension GL_EXT_buffer_reference: require
-#extension GL_EXT_scalar_block_layout: require
-#extension GL_EXT_samplerless_texture_functions: require
+#extension GL_EXT_shader_explicit_arithmetic_types : require
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_samplerless_texture_functions : require
 #extension GL_EXT_nonuniform_qualifier : require
-#extension GL_ARB_shader_clock: require
-#extension GL_KHR_shader_subgroup_basic: require
-#extension GL_KHR_shader_subgroup_arithmetic: require
+#extension GL_ARB_shader_clock : require
+#extension GL_KHR_shader_subgroup_basic : require
+#extension GL_KHR_shader_subgroup_arithmetic : require
 
 #define float2 vec2
 #define float3 vec3

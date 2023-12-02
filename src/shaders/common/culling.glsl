@@ -1,6 +1,7 @@
 
 bool cull_bounding_sphere(Instance instance, vec4 bounding_sphere) {
-    vec3 world_space_pos = (instance.transform * vec4(bounding_sphere.xyz, 1.0)).xyz;
+    vec3 world_space_pos =
+        (instance.transform * vec4(bounding_sphere.xyz, 1.0)).xyz;
     float radius = bounding_sphere.w;
 
     vec3 scale = vec3(
@@ -14,7 +15,8 @@ bool cull_bounding_sphere(Instance instance, vec4 bounding_sphere) {
 
     radius *= scale_scalar;
 
-    vec3 view_space_pos = (uniforms.initial_view * vec4(world_space_pos, 1.0)).xyz;
+    vec3 view_space_pos =
+        (uniforms.initial_view * vec4(world_space_pos, 1.0)).xyz;
     // The view space goes from negatives in the front to positives in the back.
     // This is confusing so flipping it here makes sense I think.
     view_space_pos.z = -view_space_pos.z;
@@ -23,11 +25,21 @@ bool cull_bounding_sphere(Instance instance, vec4 bounding_sphere) {
     bool visible = view_space_pos.z + radius > NEAR_PLANE;
 
     // Do some fancy stuff by getting the frustum planes and comparing the position against them.
-    vec3 frustum_x = normalize(transpose(uniforms.perspective)[3].xyz + transpose(uniforms.perspective)[0].xyz);
-    vec3 frustum_y = normalize(transpose(uniforms.perspective)[3].xyz + transpose(uniforms.perspective)[1].xyz);
+    vec3 frustum_x = normalize(
+        transpose(uniforms.perspective)[3].xyz
+        + transpose(uniforms.perspective)[0].xyz
+    );
+    vec3 frustum_y = normalize(
+        transpose(uniforms.perspective)[3].xyz
+        + transpose(uniforms.perspective)[1].xyz
+    );
 
-    visible = visible && view_space_pos.z * frustum_x.z + abs(view_space_pos.x) * frustum_x.x < radius;
-    visible = visible && view_space_pos.z * frustum_y.z - abs(view_space_pos.y) * frustum_y.y < radius;
+    visible = visible
+        && view_space_pos.z * frustum_x.z + abs(view_space_pos.x) * frustum_x.x
+            < radius;
+    visible = visible
+        && view_space_pos.z * frustum_y.z - abs(view_space_pos.y) * frustum_y.y
+            < radius;
 
     return !visible;
 }
@@ -36,7 +48,8 @@ bool cull_cone_perspective(Instance instance, Meshlet meshlet) {
     float3 apex = (instance.transform * float4(meshlet.cone_apex, 1.0)).xyz;
     float3 axis = normalize((instance.normal_transform * meshlet.cone_axis));
 
-    return dot(normalize(apex - uniforms.camera_pos), normalize(axis)) >= meshlet.cone_cutoff;
+    return dot(normalize(apex - uniforms.camera_pos), normalize(axis))
+        >= meshlet.cone_cutoff;
 }
 
 bool cull_cone_orthographic(Instance instance, Meshlet meshlet) {

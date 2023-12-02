@@ -1,4 +1,3 @@
-#include "../common/hlsl4glsl.glsl"
 #include <shared_cpu_gpu.h>
 
 layout(push_constant) uniform PushConstant {
@@ -15,6 +14,7 @@ layout(buffer_reference, scalar, buffer_reference_align = 2) buffer Uint16_t3 {
 };
 
 layout(local_size_x = 64) in;
+
 void copy_quantized_positions() {
     uint32_t index = gl_GlobalInvocationID.x;
 

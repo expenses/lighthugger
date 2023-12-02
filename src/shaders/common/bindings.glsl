@@ -1,29 +1,36 @@
-#include "hlsl4glsl.glsl"
 #include <shared_cpu_gpu.h>
+
 #include "buffer_references.glsl"
 
 // Ensure that all of these are scalar!
 
 layout(binding = 0) uniform texture2D textures[];
+
 layout(binding = 1, scalar) buffer InstanceBuffer {
     Instance instances[];
 };
+
 layout(binding = 2, scalar) uniform UniformsBinding {
     Uniforms uniforms;
 };
+
 layout(binding = 3) uniform texture2D scene_referred_framebuffer;
 layout(binding = 4) uniform sampler clamp_sampler;
 layout(binding = 5) uniform texture3D display_transform_lut;
 layout(binding = 6) uniform sampler repeat_sampler;
 layout(binding = 7) uniform texture2D depth_buffer;
+
 layout(binding = 8, scalar) buffer MiscStorageBuffer {
     MiscStorage misc_storage;
 };
+
 layout(binding = 9) uniform texture2DArray shadowmap;
 layout(binding = 10) uniform sampler shadowmap_comparison_sampler;
+
 layout(binding = 11, scalar) buffer DrawCallBuffer {
     DrawIndirectCommand draw_calls[];
 };
+
 layout(binding = 12) uniform writeonly image2D rw_scene_referred_framebuffer;
 layout(binding = 13) uniform utexture2D visibility_buffer;
 
@@ -35,11 +42,9 @@ uint32_t load_index(MeshInfo mesh_info, uint32_t vertex_id) {
     }
 }
 
-float3 calculate_world_pos(
-    Instance instance,
-    MeshInfo mesh_info,
-    uint32_t index
-) {
-    float3 position = QuantizedPositionBuffer(mesh_info.positions).positions[index];
+float3
+calculate_world_pos(Instance instance, MeshInfo mesh_info, uint32_t index) {
+    float3 position =
+        QuantizedPositionBuffer(mesh_info.positions).positions[index];
     return (instance.transform * float4(position, 1.0)).xyz;
 }

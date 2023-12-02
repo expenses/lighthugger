@@ -1,13 +1,13 @@
 #include "common/bindings.glsl"
 #include "common/debug.glsl"
-#include "common/vbuffer.glsl"
 #include "common/pbr.glsl"
+#include "common/vbuffer.glsl"
 
 static const float4x4 bias_matrix = float4x4(
-    0.5, 0.0, 0.0, 0.0,
-    0.0, 0.5, 0.0, 0.0,
-    0.0, 0.0, 1.0, 0.0,
-    0.5, 0.5, 0.0, 1.0
+    float4(0.5, 0.0, 0.0, 0.0),
+    float4(0.0, 0.5, 0.0, 0.0),
+    float4(0.0, 0.0, 1.0, 0.0),
+    float4(0.5, 0.5, 0.0, 1.0)
 );
 
 struct Material {
@@ -39,43 +39,36 @@ float3x3 compute_cotangent_frame(
 const static float3 AMBIENT_LEVEL = vec3(0.025);
 
 const static float3 AMBIENT_SH[9] = {
-    AMBIENT_LEVEL,//float3(0.5,0.5,0.5),
-    float3(0,0,0),
-    AMBIENT_LEVEL,//float3(0.5,0.5,0.5),
-    float3(0,0,0),
-    float3(0,0,0),
-    float3(0,0,0),
-    float3(0,0,0),
-    float3(0,0,0),
-    float3(0,0,0)
-};
+    AMBIENT_LEVEL,  //float3(0.5,0.5,0.5),
+    float3(0, 0, 0),
+    AMBIENT_LEVEL,  //float3(0.5,0.5,0.5),
+    float3(0, 0, 0),
+    float3(0, 0, 0),
+    float3(0, 0, 0),
+    float3(0, 0, 0),
+    float3(0, 0, 0),
+    float3(0, 0, 0)};
 
 float3 evaluate_spherical_harmonic(float3 n, float3 sh[9]) {
-    return
-          sh[0]
-        + sh[1] * (n.x)
-        + sh[2] * (n.y)
-        + sh[3] * (n.z)
-        + sh[4] * (n.x * n.z)
-        + sh[5] * (n.z * n.y)
-        + sh[6] * (n.y * n.x)
-        + sh[7] * (3.0 * n.z * n.z - 1.0)
-        + sh[8] * (n.x * n.x - n.y * n.y);
+    return sh[0] + sh[1] * (n.x) + sh[2] * (n.y) + sh[3] * (n.z)
+        + sh[4] * (n.x * n.z) + sh[5] * (n.z * n.y) + sh[6] * (n.y * n.x)
+        + sh[7] * (3.0 * n.z * n.z - 1.0) + sh[8] * (n.x * n.x - n.y * n.y);
 }
 
 vec4 sample_texture(uint32_t index, InterpolatedVector_float2 uv) {
     return textureGrad(
-        sampler2D(
-            textures[nonuniformEXT(index)],
-            repeat_sampler
-        ),
-        uv.value, uv.dx, uv.dy
+        sampler2D(textures[nonuniformEXT(index)], repeat_sampler),
+        uv.value,
+        uv.dx,
+        uv.dy
     );
 }
 
 layout(local_size_x = 8, local_size_y = 8) in;
+
 void main() {
-    if (gl_GlobalInvocationID.x >= uniforms.window_size.x || gl_GlobalInvocationID.y >= uniforms.window_size.y) {
+    if (gl_GlobalInvocationID.x >= uniforms.window_size.x
+        || gl_GlobalInvocationID.y >= uniforms.window_size.y) {
         return;
     }
 
@@ -84,7 +77,11 @@ void main() {
     ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
 
     if (texelFetch(depth_buffer, coord, 0).x == 0.0) {
-        imageStore(rw_scene_referred_framebuffer, coord, float4(0.0, 0.0, 0.0, 1.0));
+        imageStore(
+            rw_scene_referred_framebuffer,
+            coord,
+            float4(0.0, 0.0, 0.0, 1.0)
+        );
         return;
     }
 
@@ -92,13 +89,16 @@ void main() {
     uint32_t instance_index = packed & ((1 << 24) - 1);
     uint32_t triangle_index = packed >> 24;
 
-    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.instance_meshlets).meshlet_index[instance_index];
+    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.instance_meshlets)
+                                     .meshlet_index[instance_index];
 
     Instance instance = instances[meshlet_index.instance_index];
     MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
-    Meshlet meshlet = MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_index.meshlet_index];
-    uint32_t3 micro_indices = meshlet.index_offset + MicroIndexBuffer(mesh_info.micro_indices + meshlet.triangle_offset).indices[triangle_index];
-
+    Meshlet meshlet =
+        MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_index.meshlet_index];
+    uint32_t3 micro_indices = meshlet.index_offset
+        + MicroIndexBuffer(mesh_info.micro_indices + meshlet.triangle_offset)
+              .indices[triangle_index];
 
     uint3 indices = uint3(
         load_index(mesh_info, micro_indices.x),
@@ -106,7 +106,9 @@ void main() {
         load_index(mesh_info, micro_indices.z)
     );
 
-    float2 ndc = float2(gl_GlobalInvocationID.xy) / float2(uniforms.window_size) * 2.0 - 1.0;
+    float2 ndc =
+        float2(gl_GlobalInvocationID.xy) / float2(uniforms.window_size) * 2.0
+        - 1.0;
 
     float3 pos_a = calculate_world_pos(instance, mesh_info, indices.x);
     float3 pos_b = calculate_world_pos(instance, mesh_info, indices.y);
@@ -120,15 +122,17 @@ void main() {
         uniforms.window_size
     );
 
-    InterpolatedVector_float3 world_pos = interpolate(
-        bary, pos_a, pos_b, pos_c
-    );
+    InterpolatedVector_float3 world_pos =
+        interpolate(bary, pos_a, pos_b, pos_c);
 
     InterpolatedVector_float2 uv = interpolate(
         bary,
-        float2(QuanitizedUvs(mesh_info.uvs).uvs[indices.x]) * mesh_info.texture_scale,
-        float2(QuanitizedUvs(mesh_info.uvs).uvs[indices.y]) * mesh_info.texture_scale,
-        float2(QuanitizedUvs(mesh_info.uvs).uvs[indices.z]) * mesh_info.texture_scale
+        float2(QuanitizedUvs(mesh_info.uvs).uvs[indices.x])
+            * mesh_info.texture_scale,
+        float2(QuanitizedUvs(mesh_info.uvs).uvs[indices.y])
+            * mesh_info.texture_scale,
+        float2(QuanitizedUvs(mesh_info.uvs).uvs[indices.z])
+            * mesh_info.texture_scale
     );
     // Don't need to do this per triangle uv as it doesn't affect the derivs.
     uv.value += mesh_info.texture_offset;
@@ -136,12 +140,20 @@ void main() {
     float3 view_vector = normalize(uniforms.camera_pos - world_pos.value);
 
     // Load 3 x i8 with a padding byte.
-    float3 normal = interpolate(
-        bary,
-        normalize(float3(QuanitizedNormals(mesh_info.normals).normals[indices.x].xyz)),
-        normalize(float3(QuanitizedNormals(mesh_info.normals).normals[indices.y].xyz)),
-        normalize(float3(QuanitizedNormals(mesh_info.normals).normals[indices.z].xyz))
-    ).value;
+    float3 normal =
+        interpolate(
+            bary,
+            normalize(float3(
+                QuanitizedNormals(mesh_info.normals).normals[indices.x].xyz
+            )),
+            normalize(float3(
+                QuanitizedNormals(mesh_info.normals).normals[indices.y].xyz
+            )),
+            normalize(float3(
+                QuanitizedNormals(mesh_info.normals).normals[indices.z].xyz
+            ))
+        )
+            .value;
     normal = normalize(instance.normal_transform * normal);
 
     // Calculate whether the triangle is back facing using the (unnormalized) geometric normal.
@@ -156,10 +168,11 @@ void main() {
     normal = select(is_back_facing, -normal, normal);
 
     uint32_t cascade_index;
-    float4 shadow_coord = float4(0,0,0,0);
+    float4 shadow_coord = float4(0, 0, 0, 0);
     for (cascade_index = 0; cascade_index < 4; cascade_index++) {
         // Get the coordinate in shadow view space.
-        shadow_coord = misc_storage.shadow_matrices[cascade_index] * float4(world_pos.value, 1.0);
+        shadow_coord = misc_storage.shadow_matrices[cascade_index]
+            * float4(world_pos.value, 1.0);
         // If it's inside the cascade view space (which is NDC so -1 to 1) then stop as
         // this is the highest quality cascade for the fragment.
         if (abs(shadow_coord.x) < 1.0 && abs(shadow_coord.y) < 1.0) {
@@ -169,7 +182,11 @@ void main() {
 
     // Use the tiniest shadow bias for alpha clipped meshes as they're double sided..
     // Hand-chosen for a shadow_cam_distance of 1024 with the sponza flowers in the nearest shadow frustum.
-    float shadow_bias = select(bool(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP), 0.000002, 0.0);
+    float shadow_bias = select(
+        bool(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP),
+        0.000002,
+        0.0
+    );
 
     float4 shadow_view_coord = bias_matrix * shadow_coord;
     shadow_view_coord /= shadow_view_coord.w;
@@ -178,12 +195,12 @@ void main() {
         for (int y = -1; y <= 1; y++) {
             float2 offset = float2(x, y) / 1024.0;
             shadow_sum += texture(
-                sampler2DArrayShadow(
-                    shadowmap,
-                    shadowmap_comparison_sampler
-                ),
-                float4(shadow_view_coord.xy + offset, cascade_index,
-                shadow_view_coord.z - shadow_bias)
+                sampler2DArrayShadow(shadowmap, shadowmap_comparison_sampler),
+                float4(
+                    shadow_view_coord.xy + offset,
+                    cascade_index,
+                    shadow_view_coord.z - shadow_bias
+                )
             );
         }
     }
@@ -196,35 +213,71 @@ void main() {
 
     Material material;
 
-    material.albedo = sample_texture(mesh_info.albedo_texture_index, uv).rgb * mesh_info.albedo_factor;
-    float4 metallic_roughness_sample = sample_texture(mesh_info.metallic_roughness_texture_index, uv);
+    material.albedo = sample_texture(mesh_info.albedo_texture_index, uv).rgb
+        * mesh_info.albedo_factor;
+    float4 metallic_roughness_sample =
+        sample_texture(mesh_info.metallic_roughness_texture_index, uv);
     material.roughness = metallic_roughness_sample.y;
     material.metallic = metallic_roughness_sample.z;
 
     float3 map_normal = sample_texture(mesh_info.normal_texture_index, uv).xyz;
     map_normal = map_normal * 255.0 / 127.0 - 128.0 / 127.0;
 
-    normal = normalize(compute_cotangent_frame(normal, world_pos, uv) * map_normal);
+    normal =
+        normalize(compute_cotangent_frame(normal, world_pos, uv) * map_normal);
 
-    float3 ambient_lighting = evaluate_spherical_harmonic(normal, AMBIENT_SH) * diffuse_color(material.albedo, material.metallic);
-    float sun_intensity = PI  * shadow_sum;
-    float3 sun_lighting = BRDF(view_vector, uniforms.sun_dir, normal, material.roughness, material.metallic, material.albedo) * sun_intensity;
+    float3 ambient_lighting = evaluate_spherical_harmonic(normal, AMBIENT_SH)
+        * diffuse_color(material.albedo, material.metallic);
+    float sun_intensity = PI * shadow_sum;
+    float3 sun_lighting = BRDF(
+                              view_vector,
+                              uniforms.sun_dir,
+                              normal,
+                              material.roughness,
+                              material.metallic,
+                              material.albedo
+                          )
+        * sun_intensity;
 
-    imageStore(rw_scene_referred_framebuffer, coord, float4(sun_lighting + ambient_lighting, 1.0));
+    imageStore(
+        rw_scene_referred_framebuffer,
+        coord,
+        float4(sun_lighting + ambient_lighting, 1.0)
+    );
 
     if (uniforms.debug == UNIFORMS_DEBUG_CASCADES) {
         float3 debug_col = DEBUG_COLOURS[cascade_index];
-        imageStore(rw_scene_referred_framebuffer, coord, float4(material.albedo * debug_col, 1.0));
+        imageStore(
+            rw_scene_referred_framebuffer,
+            coord,
+            float4(material.albedo * debug_col, 1.0)
+        );
     } else if (uniforms.debug == UNIFORMS_DEBUG_TRIANGLE_INDEX) {
-        imageStore(rw_scene_referred_framebuffer, coord, float4(DEBUG_COLOURS[triangle_index % 10], 1.0));
+        imageStore(
+            rw_scene_referred_framebuffer,
+            coord,
+            float4(DEBUG_COLOURS[triangle_index % 10], 1.0)
+        );
     } else if (uniforms.debug == UNIFORMS_DEBUG_INSTANCE_INDEX) {
-        imageStore(rw_scene_referred_framebuffer, coord, float4(DEBUG_COLOURS[meshlet_index.meshlet_index % 10], 1.0));
+        imageStore(
+            rw_scene_referred_framebuffer,
+            coord,
+            float4(DEBUG_COLOURS[meshlet_index.meshlet_index % 10], 1.0)
+        );
     } else if (uniforms.debug == UNIFORMS_DEBUG_SHADER_CLOCK) {
         uint64_t end_time = clockARB();
 
         float heatmapScale = 65000.0f;
-        float deltaTimeScaled =  clamp(float(timediff(start_time, end_time)) / heatmapScale, 0.0f, 1.0f );
+        float deltaTimeScaled = clamp(
+            float(timediff(start_time, end_time)) / heatmapScale,
+            0.0f,
+            1.0f
+        );
 
-        imageStore(rw_scene_referred_framebuffer, coord, float4(temperature(deltaTimeScaled), 1.0));
+        imageStore(
+            rw_scene_referred_framebuffer,
+            coord,
+            float4(temperature(deltaTimeScaled), 1.0)
+        );
     }
 }

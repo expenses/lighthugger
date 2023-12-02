@@ -1,6 +1,8 @@
 #ifndef GLSL
     #pragma once
 using namespace glm;
+#else
+    #include "shaders/common/hlsl4glsl.glsl"
 #endif
 
 const static uint32_t MESH_INFO_FLAGS_32_BIT_INDICES = 1 << 0;
