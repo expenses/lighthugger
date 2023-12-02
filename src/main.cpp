@@ -205,6 +205,12 @@ int main() {
     auto swapchain = device.createSwapchainKHR(swapchain_create_info);
 
     auto swapchain_images = swapchain.getImages();
+
+    auto swapchain_image_views = create_swapchain_image_views(
+        device,
+        swapchain_images,
+        swapchain_create_info.imageFormat
+    );
     for (size_t i = 0; i < swapchain_images.size(); i++) {
         VkImage c_image = swapchain_images[i];
         std::string name = std::string("swapchain image ") + std::to_string(i);
@@ -212,12 +218,13 @@ int main() {
             .objectType = vk::ObjectType::eImage,
             .objectHandle = reinterpret_cast<uint64_t>(c_image),
             .pObjectName = name.data()});
+        VkImageView c_image_view = *swapchain_image_views[i];
+        name = std::string("swapchain image view ") + std::to_string(i);
+        device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+            .objectType = vk::ObjectType::eImageView,
+            .objectHandle = reinterpret_cast<uint64_t>(c_image_view),
+            .pObjectName = name.data()});
     }
-    auto swapchain_image_views = create_swapchain_image_views(
-        device,
-        swapchain_images,
-        swapchain_create_info.imageFormat
-    );
 
     vk::raii::CommandPool command_pool = device.createCommandPool({
         .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -644,6 +651,15 @@ int main() {
                     vk::DebugUtilsObjectNameInfoEXT {
                         .objectType = vk::ObjectType::eImage,
                         .objectHandle = reinterpret_cast<uint64_t>(c_image),
+                        .pObjectName = name.data()}
+                );
+                VkImageView c_image_view = *swapchain_image_views[i];
+                name = std::string("swapchain image view ") + std::to_string(i);
+                device.setDebugUtilsObjectNameEXT(
+                    vk::DebugUtilsObjectNameInfoEXT {
+                        .objectType = vk::ObjectType::eImageView,
+                        .objectHandle =
+                            reinterpret_cast<uint64_t>(c_image_view),
                         .pObjectName = name.data()}
                 );
             }

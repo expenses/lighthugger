@@ -4,27 +4,6 @@
 
 const auto u32_max = std::numeric_limits<uint32_t>::max();
 
-void insert_global_barrier(
-    const vk::raii::CommandBuffer& command_buffer,
-    ThsvsAccessType prev_access,
-    ThsvsAccessType next_access
-) {
-    ThsvsGlobalBarrier global_barrier = {
-        .prevAccessCount = 1,
-        .pPrevAccesses = &prev_access,
-        .nextAccessCount = 1,
-        .pNextAccesses = &next_access};
-
-    thsvsCmdPipelineBarrier(
-        *command_buffer,
-        &global_barrier,
-        0,
-        nullptr,
-        0,
-        nullptr
-    );
-}
-
 void set_scissor_and_viewport(
     const vk::raii::CommandBuffer& command_buffer,
     uint32_t width,
@@ -61,6 +40,28 @@ void render(
     ZoneScoped;
     TracyVkZone(tracy_ctx, *command_buffer, "render");
 
+    auto draw_call_counts_offset = sizeof(glm::mat4) * 4 + 8;
+
+    {
+        TracyVkZone(tracy_ctx, *command_buffer, "buffer clears");
+
+        // Clear the depth min/max values.
+        auto offset = sizeof(glm::mat4) * 4;
+        command_buffer.fillBuffer(
+            resources.misc_storage_buffer.buffer,
+            offset,
+            4,
+            u32_max
+        );
+        // Zero out both the max depth and the draw call counts.
+        command_buffer.fillBuffer(
+            resources.misc_storage_buffer.buffer,
+            offset + 4,
+            16,
+            0
+        );
+    }
+
     insert_color_image_barriers(
         command_buffer,
         std::array {
@@ -89,7 +90,7 @@ void render(
                     }},
             // Get framebuffer ready for writing
             ImageBarrier {
-                .prev_access = THSVS_ACCESS_NONE,
+                .prev_access = THSVS_ACCESS_COMPUTE_SHADER_WRITE,
                 .next_access = THSVS_ACCESS_COMPUTE_SHADER_WRITE,
                 .next_layout = THSVS_IMAGE_LAYOUT_GENERAL,
                 .discard_contents = true,
@@ -98,7 +99,7 @@ void render(
                     resources.resizing.scene_referred_framebuffer.image.image},
             // Get swapchain image ready for rendering.
             ImageBarrier {
-                .prev_access = THSVS_ACCESS_NONE,
+                .prev_access = THSVS_ACCESS_COMPUTE_SHADER_WRITE,
                 .next_access = THSVS_ACCESS_COMPUTE_SHADER_WRITE,
                 .next_layout = THSVS_IMAGE_LAYOUT_GENERAL,
                 .discard_contents = true,
@@ -111,36 +112,10 @@ void render(
                 .discard_contents = true,
                 .queue_family = graphics_queue_family,
                 .image = resources.resizing.visbuffer.image.image},
-
-        }
-    );
-
-    auto draw_call_counts_offset = sizeof(glm::mat4) * 4 + 8;
-
-    {
-        TracyVkZone(tracy_ctx, *command_buffer, "buffer clears");
-
-        // Clear the depth min/max values.
-        auto offset = sizeof(glm::mat4) * 4;
-        command_buffer.fillBuffer(
-            resources.misc_storage_buffer.buffer,
-            offset,
-            4,
-            u32_max
-        );
-        // Zero out both the max depth and the draw call counts.
-        command_buffer.fillBuffer(
-            resources.misc_storage_buffer.buffer,
-            offset + 4,
-            16,
-            0
-        );
-    }
-
-    insert_global_barrier(
-        command_buffer,
-        THSVS_ACCESS_GENERAL,
-        THSVS_ACCESS_GENERAL
+        },
+        std::optional(GlobalBarrier<1, 1> {
+            .prev_accesses = {THSVS_ACCESS_TRANSFER_WRITE},
+            .next_accesses = {THSVS_ACCESS_COMPUTE_SHADER_READ_OTHER}})
     );
 
     command_buffer.bindDescriptorSets(
@@ -190,8 +165,12 @@ void render(
 
     insert_global_barrier(
         command_buffer,
-        THSVS_ACCESS_GENERAL,
-        THSVS_ACCESS_GENERAL
+        GlobalBarrier<1, 1> {
+            .prev_accesses =
+                std::array<ThsvsAccessType, 1> {
+                    THSVS_ACCESS_COMPUTE_SHADER_WRITE},
+            .next_accesses =
+                std::array<ThsvsAccessType, 1> {THSVS_ACCESS_INDIRECT_BUFFER}}
     );
 
     set_scissor_and_viewport(command_buffer, extent.width, extent.height);
@@ -273,7 +252,7 @@ void render(
             ImageBarrier {
                 .prev_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
                 .next_access =
-                    THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+                    THSVS_ACCESS_COMPUTE_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
                 .queue_family = graphics_queue_family,
                 .image = resources.resizing.depthbuffer.image.image,
                 .subresource_range = DEPTH_SUBRESOURCE_RANGE},
@@ -281,7 +260,7 @@ void render(
             ImageBarrier {
                 .prev_access = THSVS_ACCESS_COLOR_ATTACHMENT_WRITE,
                 .next_access =
-                    THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+                    THSVS_ACCESS_COMPUTE_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
                 .queue_family = graphics_queue_family,
                 .image = resources.resizing.visbuffer.image.image},
         }
@@ -389,7 +368,7 @@ void render(
             ImageBarrier {
                 .prev_access = THSVS_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE,
                 .next_access =
-                    THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+                    THSVS_ACCESS_COMPUTE_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
                 .queue_family = graphics_queue_family,
                 .image = resources.shadowmap.image.image,
                 .subresource_range =
@@ -425,7 +404,7 @@ void render(
             ImageBarrier {
                 .prev_access = THSVS_ACCESS_COMPUTE_SHADER_WRITE,
                 .next_access =
-                    THSVS_ACCESS_FRAGMENT_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
+                    THSVS_ACCESS_COMPUTE_SHADER_READ_SAMPLED_IMAGE_OR_UNIFORM_TEXEL_BUFFER,
                 .prev_layout = THSVS_IMAGE_LAYOUT_GENERAL,
                 .queue_family = graphics_queue_family,
                 .image =
@@ -445,6 +424,13 @@ void render(
             1
         );
     }
+
+    insert_global_barrier(
+        command_buffer,
+        GlobalBarrier<1, 1> {
+            .prev_accesses = {THSVS_ACCESS_COMPUTE_SHADER_WRITE},
+            .next_accesses = {THSVS_ACCESS_COLOR_ATTACHMENT_WRITE}}
+    );
 
     {
         TracyVkZone(tracy_ctx, *command_buffer, "imgui");

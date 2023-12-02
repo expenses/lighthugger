@@ -154,7 +154,7 @@ ImageWithView load_dds(
     insert_color_image_barriers(
         command_buffer,
         std::array {ImageBarrier {
-            .prev_access = THSVS_ACCESS_NONE,
+            .prev_access = THSVS_ACCESS_TRANSFER_WRITE,
             .next_access = THSVS_ACCESS_TRANSFER_WRITE,
             .discard_contents = true,
             .queue_family = graphics_queue_family,
@@ -335,7 +335,7 @@ ImageWithView load_ktx2_image(
     insert_color_image_barriers(
         command_buffer,
         std::array {ImageBarrier {
-            .prev_access = THSVS_ACCESS_NONE,
+            .prev_access = THSVS_ACCESS_TRANSFER_WRITE,
             .next_access = THSVS_ACCESS_TRANSFER_WRITE,
             .discard_contents = true,
             .queue_family = graphics_queue_family,

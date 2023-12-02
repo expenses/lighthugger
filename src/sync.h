@@ -13,10 +13,17 @@ struct ImageBarrier {
     vk::ImageSubresourceRange subresource_range = COLOR_SUBRESOURCE_RANGE;
 };
 
-template<size_t N>
+template<size_t P, size_t N>
+struct GlobalBarrier {
+    std::array<ThsvsAccessType, P> prev_accesses;
+    std::array<ThsvsAccessType, N> next_accesses;
+};
+
+template<size_t N, size_t GP = 0, size_t GN = 0>
 void insert_color_image_barriers(
     const vk::raii::CommandBuffer& command_buffer,
-    const std::array<ImageBarrier, N>& barriers
+    const std::array<ImageBarrier, N>& barriers,
+    std::optional<GlobalBarrier<GP, GN>> opt_global_barrier = std::nullopt
 ) {
     std::array<ThsvsImageBarrier, N> thsvs_barriers;
 
@@ -35,12 +42,46 @@ void insert_color_image_barriers(
             .subresourceRange = barriers[i].subresource_range};
     }
 
+    std::optional<ThsvsGlobalBarrier> thsvs_global_barrier = std::nullopt;
+
+    if (opt_global_barrier) {
+        auto& global_barrier = opt_global_barrier.value();
+
+        thsvs_global_barrier = {
+            .prevAccessCount = global_barrier.prev_accesses.size(),
+            .pPrevAccesses = global_barrier.prev_accesses.data(),
+            .nextAccessCount = global_barrier.prev_accesses.size(),
+            .pNextAccesses = global_barrier.next_accesses.data()};
+    }
+
     thsvsCmdPipelineBarrier(
         *command_buffer,
-        nullptr,
+        thsvs_global_barrier.has_value() ? &thsvs_global_barrier.value()
+                                         : nullptr,
         0,
         nullptr,
         thsvs_barriers.size(),
         thsvs_barriers.data()
+    );
+}
+
+template<size_t P, size_t N>
+void insert_global_barrier(
+    const vk::raii::CommandBuffer& command_buffer,
+    GlobalBarrier<P, N> global_barrier
+) {
+    ThsvsGlobalBarrier thsvs_global_barrier = {
+        .prevAccessCount = global_barrier.prev_accesses.size(),
+        .pPrevAccesses = global_barrier.prev_accesses.data(),
+        .nextAccessCount = global_barrier.prev_accesses.size(),
+        .pNextAccesses = global_barrier.next_accesses.data()};
+
+    thsvsCmdPipelineBarrier(
+        *command_buffer,
+        &thsvs_global_barrier,
+        0,
+        nullptr,
+        0,
+        nullptr
     );
 }
