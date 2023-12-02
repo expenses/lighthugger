@@ -4,7 +4,7 @@
 layout(local_size_x = 64) in;
 
 void main() {
-    uint32_t id = global_id.x;
+    uint32_t id = gl_GlobalInvocationID.x;
 
     if (id >= uniforms.num_instances) {
         return;
@@ -17,7 +17,8 @@ void main() {
         return;
     }
 
-    uint32_t meshlets_offset = atomicAdd(misc_storage.num_expanded_meshlets, mesh_info.num_meshlets);
+    uint32_t meshlets_offset =
+        atomicAdd(misc_storage.num_expanded_meshlets, mesh_info.num_meshlets);
 
     MeshletIndexBuffer buf = MeshletIndexBuffer(uniforms.expanded_meshlets);
 

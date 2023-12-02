@@ -121,6 +121,7 @@ int main() {
     auto vulkan_1_2_features = vk::PhysicalDeviceVulkan12Features {
         .pNext = &vulkan_1_1_features,
         .drawIndirectCount = true,
+        .storageBuffer8BitAccess = true,
         .shaderInt8 = true,
         .shaderSampledImageArrayNonUniformIndexing = true,
         .descriptorBindingPartiallyBound = true,
