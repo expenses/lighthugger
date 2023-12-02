@@ -12,6 +12,12 @@ const auto FILL_RASTERIZATION = vk::PipelineRasterizationStateCreateInfo {
     .cullMode = vk::CullModeFlagBits::eBack,
     .lineWidth = 1.0f};
 
+const auto FILL_RASTERIZATION_CULL_FRONT_FACES =
+    vk::PipelineRasterizationStateCreateInfo {
+        .polygonMode = vk::PolygonMode::eFill,
+        .cullMode = vk::CullModeFlagBits::eFront,
+        .lineWidth = 1.0f};
+
 const auto FILL_RASTERIZATION_DOUBLE_SIDED =
     vk::PipelineRasterizationStateCreateInfo {
         .polygonMode = vk::PolygonMode::eFill,
@@ -249,67 +255,67 @@ Pipelines Pipelines::compile_pipelines(
     auto depth_only_rendering_info = vk::PipelineRenderingCreateInfoKHR {
         .depthAttachmentFormat = vk::Format::eD32Sfloat};
 
-    auto graphics_pipeline_infos =
-        std::array {// opaque shadowmaps
-                    vk::GraphicsPipelineCreateInfo {
-                        .pNext = &depth_only_rendering_info,
-                        .stageCount = opaque_shadow_stage.size(),
-                        .pStages = opaque_shadow_stage.data(),
-                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
-                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
-                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
-                        .pRasterizationState = &FILL_RASTERIZATION,
-                        .pMultisampleState = &NO_MULTISAMPLING,
-                        .pDepthStencilState = &DEPTH_WRITE_LESS,
-                        .pColorBlendState = &EMPTY_BLEND_STATE,
-                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
-                        .layout = *pipeline_layout,
-                    },
-                    // alpha clip shadow maps
-                    vk::GraphicsPipelineCreateInfo {
-                        .pNext = &depth_only_rendering_info,
-                        .stageCount = alpha_clip_shadow_stages.size(),
-                        .pStages = alpha_clip_shadow_stages.data(),
-                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
-                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
-                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
-                        .pRasterizationState = &FILL_RASTERIZATION_DOUBLE_SIDED,
-                        .pMultisampleState = &NO_MULTISAMPLING,
-                        .pDepthStencilState = &DEPTH_WRITE_LESS,
-                        .pColorBlendState = &EMPTY_BLEND_STATE,
-                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
-                        .layout = *pipeline_layout,
-                    },
-                    // opaque visibility buffer
-                    vk::GraphicsPipelineCreateInfo {
-                        .pNext = &u32_format_rendering_info,
-                        .stageCount = visbuffer_stages.size(),
-                        .pStages = visbuffer_stages.data(),
-                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
-                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
-                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
-                        .pRasterizationState = &FILL_RASTERIZATION,
-                        .pMultisampleState = &NO_MULTISAMPLING,
-                        .pDepthStencilState = &DEPTH_WRITE_GREATER,
-                        .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
-                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
-                        .layout = *pipeline_layout,
-                    },
-                    // alpha clip visibility buffer
-                    vk::GraphicsPipelineCreateInfo {
-                        .pNext = &u32_format_rendering_info,
-                        .stageCount = visbuffer_alpha_clip_stages.size(),
-                        .pStages = visbuffer_alpha_clip_stages.data(),
-                        .pVertexInputState = &EMPTY_VERTEX_INPUT,
-                        .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
-                        .pViewportState = &DEFAULT_VIEWPORT_STATE,
-                        .pRasterizationState = &FILL_RASTERIZATION_DOUBLE_SIDED,
-                        .pMultisampleState = &NO_MULTISAMPLING,
-                        .pDepthStencilState = &DEPTH_WRITE_GREATER,
-                        .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
-                        .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
-                        .layout = *pipeline_layout,
-                    }};
+    auto graphics_pipeline_infos = std::array {
+        // opaque shadowmaps
+        vk::GraphicsPipelineCreateInfo {
+            .pNext = &depth_only_rendering_info,
+            .stageCount = opaque_shadow_stage.size(),
+            .pStages = opaque_shadow_stage.data(),
+            .pVertexInputState = &EMPTY_VERTEX_INPUT,
+            .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+            .pViewportState = &DEFAULT_VIEWPORT_STATE,
+            .pRasterizationState = &FILL_RASTERIZATION_CULL_FRONT_FACES,
+            .pMultisampleState = &NO_MULTISAMPLING,
+            .pDepthStencilState = &DEPTH_WRITE_LESS,
+            .pColorBlendState = &EMPTY_BLEND_STATE,
+            .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+            .layout = *pipeline_layout,
+        },
+        // alpha clip shadow maps
+        vk::GraphicsPipelineCreateInfo {
+            .pNext = &depth_only_rendering_info,
+            .stageCount = alpha_clip_shadow_stages.size(),
+            .pStages = alpha_clip_shadow_stages.data(),
+            .pVertexInputState = &EMPTY_VERTEX_INPUT,
+            .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+            .pViewportState = &DEFAULT_VIEWPORT_STATE,
+            .pRasterizationState = &FILL_RASTERIZATION_DOUBLE_SIDED,
+            .pMultisampleState = &NO_MULTISAMPLING,
+            .pDepthStencilState = &DEPTH_WRITE_LESS,
+            .pColorBlendState = &EMPTY_BLEND_STATE,
+            .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+            .layout = *pipeline_layout,
+        },
+        // opaque visibility buffer
+        vk::GraphicsPipelineCreateInfo {
+            .pNext = &u32_format_rendering_info,
+            .stageCount = visbuffer_stages.size(),
+            .pStages = visbuffer_stages.data(),
+            .pVertexInputState = &EMPTY_VERTEX_INPUT,
+            .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+            .pViewportState = &DEFAULT_VIEWPORT_STATE,
+            .pRasterizationState = &FILL_RASTERIZATION,
+            .pMultisampleState = &NO_MULTISAMPLING,
+            .pDepthStencilState = &DEPTH_WRITE_GREATER,
+            .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
+            .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+            .layout = *pipeline_layout,
+        },
+        // alpha clip visibility buffer
+        vk::GraphicsPipelineCreateInfo {
+            .pNext = &u32_format_rendering_info,
+            .stageCount = visbuffer_alpha_clip_stages.size(),
+            .pStages = visbuffer_alpha_clip_stages.data(),
+            .pVertexInputState = &EMPTY_VERTEX_INPUT,
+            .pInputAssemblyState = &TRIANGLE_LIST_INPUT_ASSEMBLY,
+            .pViewportState = &DEFAULT_VIEWPORT_STATE,
+            .pRasterizationState = &FILL_RASTERIZATION_DOUBLE_SIDED,
+            .pMultisampleState = &NO_MULTISAMPLING,
+            .pDepthStencilState = &DEPTH_WRITE_GREATER,
+            .pColorBlendState = &SINGLE_REPLACE_BLEND_STATE,
+            .pDynamicState = &DEFAULT_DYNAMIC_STATE_INFO,
+            .layout = *pipeline_layout,
+        }};
 
     auto graphics_pipelines =
         device.createGraphicsPipelines(nullptr, graphics_pipeline_infos);

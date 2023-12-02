@@ -66,11 +66,8 @@ void generate_shadow_matrices() {
     }
     sphere_radius = ceil(sphere_radius * 16.0f) / 16.0f;
 
-    float3 maxExtents = float3(sphere_radius);
-    float3 minExtents = -maxExtents;
-
     float4x4 shadowView = lookAt(uniforms.shadow_cam_distance * uniforms.sun_dir + frustumCenter, frustumCenter, float3(0,1,0));
-	float4x4 shadowProj = OrthographicProjection(minExtents.x, minExtents.y, maxExtents.x, maxExtents.y, 0.0f, uniforms.shadow_cam_distance * 2.0);
+	float4x4 shadowProj = OrthographicProjection(-sphere_radius, sphere_radius, -sphere_radius, sphere_radius, 0.0f, uniforms.shadow_cam_distance * 2.0);
 
     misc_storage.shadow_matrices[cascade_index] = (shadowProj * shadowView);
 }

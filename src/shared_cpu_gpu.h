@@ -1,6 +1,6 @@
 #ifndef GLSL
     #pragma once
-    using namespace glm;
+using namespace glm;
 #endif
 
 const static uint32_t MESH_INFO_FLAGS_32_BIT_INDICES = 1 << 0;
