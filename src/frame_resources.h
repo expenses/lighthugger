@@ -78,6 +78,7 @@ struct Resources {
     AllocatedBuffer draw_calls_buffer;
     std::array<vk::raii::ImageView, 4> shadowmap_layer_views;
     ImageWithView display_transform_lut;
+    ImageWithView skybox;
     vk::raii::Sampler repeat_sampler;
     vk::raii::Sampler clamp_sampler;
     vk::raii::Sampler shadowmap_comparison_sampler;

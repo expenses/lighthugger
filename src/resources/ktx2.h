@@ -1,6 +1,13 @@
 const std::array<uint8_t, 12> KTX2_IDENTIFIER =
     {0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A};
 
+enum Ktx2SupercompressionScheme : uint32_t {
+    None = 0,
+    BasisLZ = 1,
+    Zstandard = 2,
+    ZLIB = 3
+};
+
 struct Ktx2Header {
     vk::Format format;
     uint32_t type_size;
@@ -10,7 +17,7 @@ struct Ktx2Header {
     uint32_t layer_count;
     uint32_t face_count;
     uint32_t level_count;
-    uint32_t supercompression_scheme;
+    Ktx2SupercompressionScheme supercompression_scheme;
 };
 
 struct Ktx2Index {

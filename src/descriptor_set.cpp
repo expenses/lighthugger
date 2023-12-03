@@ -83,6 +83,13 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
+        // skybox
+        vk::DescriptorSetLayoutBinding {
+            .binding = 11,
+            .descriptorType = vk::DescriptorType::eSampledImage,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        },
     };
 
     std::vector<vk::DescriptorBindingFlags> flags(everything_bindings.size());
@@ -232,6 +239,10 @@ void DescriptorSet::write_descriptors(
 
     auto uniform_buffer_info = buffer_info(resources.uniform_buffer.buffer);
 
+    auto skybox_image_info = vk::DescriptorImageInfo {
+        .imageView = *resources.skybox.view,
+        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
+
     // Write initial descriptor sets.
     device.updateDescriptorSets(
         {
@@ -272,6 +283,12 @@ void DescriptorSet::write_descriptors(
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampler,
                 .pImageInfo = &shadowmap_comparison_sampler_info},
+            vk::WriteDescriptorSet {
+                .dstSet = *set,
+                .dstBinding = 11,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eSampledImage,
+                .pImageInfo = &skybox_image_info},
 
         },
         {}

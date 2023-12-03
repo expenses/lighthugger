@@ -490,6 +490,14 @@ int main() {
             graphics_queue_family,
             temp_buffers
         ),
+        .skybox = load_ktx2_image(
+            "hdr-cubemap-1024x1024.ktx2",
+            allocator,
+            device,
+            command_buffer,
+            graphics_queue_family,
+            temp_buffers
+        ),
         .repeat_sampler = device.createSampler(vk::SamplerCreateInfo {
             .magFilter = vk::Filter::eLinear,
             .minFilter = vk::Filter::eLinear,
@@ -789,6 +797,8 @@ int main() {
             uniforms->combined_perspective_view = perspective * view;
             uniforms->inv_perspective_view = glm::inverse(perspective * view);
             uniforms->perspective = perspective;
+            uniforms->perspective_inverse = glm::inverse(perspective);
+            uniforms->view_inverse = glm::inverse(view);
             if (copy_view) {
                 uniforms->initial_view = view;
                 uniforms->camera_pos = camera_params.position;

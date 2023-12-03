@@ -244,9 +244,6 @@ ImageWithView load_ktx2_image(
 
     stream.read((char*)&header, sizeof header);
 
-    // Only uncompressed images are handled for now.
-    assert(header.supercompression_scheme == 0);
-
     Ktx2Index index;
 
     stream.read((char*)&index, sizeof index);
@@ -265,11 +262,15 @@ ImageWithView load_ktx2_image(
         .baseMipLevel = 0,
         .levelCount = header.level_count,
         .baseArrayLayer = 0,
-        .layerCount = 1,
+        .layerCount = header.face_count,
     };
+
+    bool is_cubemap = header.face_count == 6;
 
     auto image = ImageWithView(
         vk::ImageCreateInfo {
+            .flags = is_cubemap ? vk::ImageCreateFlagBits::eCubeCompatible
+                                : vk::ImageCreateFlagBits(0),
             .imageType = vk::ImageType::e2D,
             .format = header.format,
             .extent =
@@ -279,14 +280,14 @@ ImageWithView load_ktx2_image(
                     .depth = std::max(header.depth, 1u),
                 },
             .mipLevels = header.level_count,
-            .arrayLayers = 1,
+            .arrayLayers = header.face_count,
             .usage = vk::ImageUsageFlagBits::eSampled
                 | vk::ImageUsageFlagBits::eTransferDst},
         allocator,
         device,
         filepath.string(),
         subresource_range,
-        vk::ImageViewType::e2D
+        is_cubemap ? vk::ImageViewType::eCube : vk::ImageViewType::e2D
     );
 
     auto staging_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
@@ -312,10 +313,32 @@ ImageWithView load_ktx2_image(
         auto level = levels[i];
 
         stream.seekg(level.byte_offset, stream.beg);
-        stream.read(
-            reinterpret_cast<char*>(staging_buffer.mapped_ptr) + offset,
-            level.uncompressed_byte_length
-        );
+
+        if (header.supercompression_scheme
+            == Ktx2SupercompressionScheme::Zstandard) {
+            std::vector<uint8_t> compressed_bytes(level.byte_length);
+            stream.read(
+                reinterpret_cast<char*>(compressed_bytes.data()),
+                level.byte_length
+            );
+            auto bytes_decompressed = ZSTD_decompress(
+                reinterpret_cast<char*>(staging_buffer.mapped_ptr) + offset,
+                level.uncompressed_byte_length,
+                compressed_bytes.data(),
+                level.byte_length
+            );
+            assert(bytes_decompressed == level.uncompressed_byte_length);
+        } else {
+            assert(
+                header.supercompression_scheme
+                == Ktx2SupercompressionScheme::None
+            );
+
+            stream.read(
+                reinterpret_cast<char*>(staging_buffer.mapped_ptr) + offset,
+                level.uncompressed_byte_length
+            );
+        }
         regions[i] = vk::BufferImageCopy {
             .bufferOffset = offset,
             .imageSubresource =
@@ -323,7 +346,7 @@ ImageWithView load_ktx2_image(
                     .aspectMask = vk::ImageAspectFlagBits::eColor,
                     .mipLevel = i,
                     .baseArrayLayer = 0,
-                    .layerCount = 1,
+                    .layerCount = header.face_count,
                 },
             .imageExtent = vk::Extent3D {
                 .width = level_width,

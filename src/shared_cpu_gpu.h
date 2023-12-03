@@ -51,6 +51,8 @@ struct Uniforms {
     mat4 view;
     mat4 initial_view;
     mat4 perspective;
+    mat4 perspective_inverse;
+    mat4 view_inverse;
     uint64_t meshlet_indices;
     uint64_t instances;
     uint64_t draw_calls;

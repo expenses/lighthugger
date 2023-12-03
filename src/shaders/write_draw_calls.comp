@@ -6,14 +6,16 @@ layout(local_size_x = 64) in;
 void write_draw_calls() {
     uint32_t id = gl_GlobalInvocationID.x;
 
-    if (id >= MiscStorageBuffer(uniforms.misc_storage).misc_storage.num_expanded_meshlets) {
+    if (id >= MiscStorageBuffer(uniforms.misc_storage)
+                  .misc_storage.num_expanded_meshlets) {
         return;
     }
 
     MeshletIndex meshlet_index =
         MeshletIndexBuffer(uniforms.meshlet_indices).meshlet_index[id];
 
-    Instance instance = InstanceBuffer(uniforms.instances).instances[meshlet_index.instance_index];
+    Instance instance = InstanceBuffer(uniforms.instances)
+                            .instances[meshlet_index.instance_index];
     MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
 
     Meshlet meshlet =
@@ -37,7 +39,8 @@ void write_draw_calls() {
     } else {
         meshlet_draw_index = atomicAdd(draw_call_buffer.num_opaque, 1);
     }
-    uint32_t meshlet_indices_buffer_offset = meshlet_draw_index + MESHLET_INDICES_BUFFER_SECTION_OFFSET;
+    uint32_t meshlet_indices_buffer_offset =
+        meshlet_draw_index + MESHLET_INDICES_BUFFER_SECTION_OFFSET;
 
     DrawIndirectCommand draw_call;
     draw_call.vertexCount = meshlet.triangle_count * 3;
@@ -56,14 +59,16 @@ layout(local_size_x = 64) in;
 void write_draw_calls_shadows() {
     uint32_t id = gl_GlobalInvocationID.x;
 
-    if (id >= MiscStorageBuffer(uniforms.misc_storage).misc_storage.num_expanded_meshlets) {
+    if (id >= MiscStorageBuffer(uniforms.misc_storage)
+                  .misc_storage.num_expanded_meshlets) {
         return;
     }
 
     MeshletIndex meshlet_index =
         MeshletIndexBuffer(uniforms.meshlet_indices).meshlet_index[id];
 
-    Instance instance = InstanceBuffer(uniforms.instances).instances[meshlet_index.instance_index];
+    Instance instance = InstanceBuffer(uniforms.instances)
+                            .instances[meshlet_index.instance_index];
     MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
 
     Meshlet meshlet =
@@ -89,7 +94,8 @@ void write_draw_calls_shadows() {
     } else {
         meshlet_draw_index = atomicAdd(draw_call_buffer.num_opaque, 1);
     }
-    uint32_t meshlet_indices_buffer_offset = meshlet_draw_index + 2 * MESHLET_INDICES_BUFFER_SECTION_OFFSET;
+    uint32_t meshlet_indices_buffer_offset =
+        meshlet_draw_index + 2 * MESHLET_INDICES_BUFFER_SECTION_OFFSET;
 
     DrawIndirectCommand draw_call;
     draw_call.vertexCount = meshlet.triangle_count * 3;

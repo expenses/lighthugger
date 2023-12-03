@@ -59,11 +59,14 @@ void display_transform() {
             shadow_uv.x = 1.0 - shadow_uv.x;
             linear_display_referred_value =
                 (textureLod(
-                    sampler2DArray(shadowmap, clamp_sampler),
-                    float3(shadow_uv, 0),
-                    0.0
-                )
-                    .xxx - 0.5) * 100 + 0.5;
+                     sampler2DArray(shadowmap, clamp_sampler),
+                     float3(shadow_uv, 0),
+                     0.0
+                 )
+                     .xxx
+                 - 0.5)
+                    * 100
+                + 0.5;
         }
     }
 

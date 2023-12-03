@@ -22,6 +22,8 @@ layout(binding = 8) uniform sampler clamp_sampler;
 layout(binding = 9) uniform sampler repeat_sampler;
 layout(binding = 10) uniform sampler shadowmap_comparison_sampler;
 
+layout(binding = 11) uniform textureCube skybox;
+
 uint32_t load_index(MeshInfo mesh_info, uint32_t vertex_id) {
     if (bool(mesh_info.flags & MESH_INFO_FLAGS_32_BIT_INDICES)) {
         return Index32Buffer(mesh_info.indices).indices[vertex_id];

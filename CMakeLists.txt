@@ -27,7 +27,7 @@ target_sources(vkcpptest PRIVATE
 )
 
 target_include_directories(vkcpptest PRIVATE src external/simple_vulkan_synchronization external/VulkanMemoryAllocator-Hpp/include external/VulkanMemoryAllocator-Hpp/VulkanMemoryAllocator/include external/dbg-macro external/tracy/public external/imgui external/meshoptimizer/src)
-target_link_libraries(vkcpptest glfw Vulkan::Vulkan fastgltf meshoptimizer)
+target_link_libraries(vkcpptest glfw Vulkan::Vulkan fastgltf meshoptimizer zstd)
 target_precompile_headers(vkcpptest PRIVATE src/pch.h)
 target_compile_features(vkcpptest PUBLIC cxx_std_20)
 target_compile_options(vkcpptest PUBLIC -Wall -Wextra -Wpedantic -Wfatal-errors -fdiagnostics-color=always)

@@ -76,12 +76,24 @@ void main() {
 
     ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
 
+    float2 ndc =
+        float2(gl_GlobalInvocationID.xy) / float2(uniforms.window_size) * 2.0
+        - 1.0;
+
     if (texelFetch(depth_buffer, coord, 0).x == 0.0) {
-        imageStore(
-            rw_scene_referred_framebuffer,
-            coord,
-            float4(0.0, 0.0, 0.0, 1.0)
-        );
+        // Get a ray in local space.
+        float4 unprojected = uniforms.perspective_inverse * float4(ndc, 0, 1);
+        float3 local_space_ray = normalize(unprojected.xyz);
+        // Transform the ray into global space.
+        float3 ray = (uniforms.view_inverse * float4(local_space_ray, 0.0)).xyz;
+
+        float exposure = 3;
+
+        float3 samp =
+            textureLod(samplerCube(skybox, repeat_sampler), ray, 0.0).xyz
+            * pow(2, exposure);
+
+        imageStore(rw_scene_referred_framebuffer, coord, float4(samp, 1.0));
         return;
     }
 
@@ -92,7 +104,8 @@ void main() {
     MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.meshlet_indices)
                                      .meshlet_index[instance_index];
 
-    Instance instance = InstanceBuffer(uniforms.instances).instances[meshlet_index.instance_index];
+    Instance instance = InstanceBuffer(uniforms.instances)
+                            .instances[meshlet_index.instance_index];
     MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
     Meshlet meshlet =
         MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_index.meshlet_index];
@@ -105,10 +118,6 @@ void main() {
         load_index(mesh_info, micro_indices.y),
         load_index(mesh_info, micro_indices.z)
     );
-
-    float2 ndc =
-        float2(gl_GlobalInvocationID.xy) / float2(uniforms.window_size) * 2.0
-        - 1.0;
 
     float3 pos_a = calculate_world_pos(instance, mesh_info, indices.x);
     float3 pos_b = calculate_world_pos(instance, mesh_info, indices.y);
@@ -171,7 +180,8 @@ void main() {
     float4 shadow_coord = float4(0, 0, 0, 0);
     for (cascade_index = 0; cascade_index < 4; cascade_index++) {
         // Get the coordinate in uv space.
-        shadow_coord = MiscStorageBuffer(uniforms.misc_storage).misc_storage.uv_space_shadow_matrices[cascade_index]
+        shadow_coord = MiscStorageBuffer(uniforms.misc_storage)
+                           .misc_storage.uv_space_shadow_matrices[cascade_index]
             * float4(world_pos.value, 1.0);
         float2 offset_coord = shadow_coord.xy - 0.5;
         // If it's inside the cascade uv space then stop as
