@@ -48,8 +48,7 @@ struct Uniforms {
     mat4 view;
     mat4 initial_view;
     mat4 perspective;
-    uint64_t instance_meshlets;
-    uint64_t expanded_meshlets;
+    uint64_t meshlet_indices;
     uint64_t instances;
     uint64_t draw_calls;
     uint64_t misc_storage;
@@ -105,6 +104,9 @@ const static uint32_t MAX_OPAQUE_DRAWS = 10000;
 const static uint32_t MAX_ALPHA_CLIP_DRAWS = 2048;
 
 const static uint32_t ALPHA_CLIP_DRAWS_OFFSET = MAX_OPAQUE_DRAWS;
+
+const static uint32_t MESHLET_INDICES_BUFFER_SECTION_OFFSET =
+    ALPHA_CLIP_DRAWS_OFFSET + MAX_ALPHA_CLIP_DRAWS;
 
 const static float NEAR_PLANE = 0.01f;
 

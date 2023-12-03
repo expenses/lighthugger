@@ -415,10 +415,12 @@ int main() {
         )
     ));
 
-    auto instance_meshlets_buf = AllocatedBuffer(
+    auto meshlets_index_buf = AllocatedBuffer(
         vk::BufferCreateInfo {
+            // Made up of 3 sections, 1 for expanded meshlets, 1 for culled + sorted meshlets
+            // for the main camera and 1 for culled + sorted meshlets for the shadow camera.
             .size = sizeof(MeshletIndex)
-                * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
+                * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS) * 3,
             .usage = vk::BufferUsageFlagBits::eStorageBuffer
                 | vk::BufferUsageFlagBits::eShaderDeviceAddress,
         },
@@ -426,21 +428,7 @@ int main() {
             .usage = vma::MemoryUsage::eAuto,
         },
         allocator,
-        "instance_meshlets_buf"
-    );
-
-    auto instance_meshlets_buf2 = AllocatedBuffer(
-        vk::BufferCreateInfo {
-            .size = sizeof(MeshletIndex)
-                * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
-            .usage = vk::BufferUsageFlagBits::eStorageBuffer
-                | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-        },
-        {
-            .usage = vma::MemoryUsage::eAuto,
-        },
-        allocator,
-        "wowwo"
+        "meshlets_index_buf"
     );
 
     auto resources = Resources {
@@ -612,10 +600,8 @@ int main() {
     // quality loss when setting this value to be absurdly high.
     uniforms->shadow_cam_distance = 1024.0;
     uniforms->cascade_split_pow = 3.0;
-    uniforms->expanded_meshlets =
-        device.getBufferAddress({.buffer = instance_meshlets_buf2.buffer});
-    uniforms->instance_meshlets =
-        device.getBufferAddress({.buffer = instance_meshlets_buf.buffer});
+    uniforms->meshlet_indices =
+        device.getBufferAddress({.buffer = meshlets_index_buf.buffer});
     uniforms->instances =
         device.getBufferAddress({.buffer = resources.instance_buffer.buffer});
     uniforms->draw_calls =

@@ -89,7 +89,7 @@ void main() {
     uint32_t instance_index = packed & ((1 << 24) - 1);
     uint32_t triangle_index = packed >> 24;
 
-    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.instance_meshlets)
+    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.meshlet_indices)
                                      .meshlet_index[instance_index];
 
     Instance instance = InstanceBuffer(uniforms.instances).instances[meshlet_index.instance_index];

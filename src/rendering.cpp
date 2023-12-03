@@ -276,6 +276,44 @@ void render(
     }
 
     {
+        TracyVkZone(tracy_ctx, *command_buffer, "reset draw calls");
+
+        command_buffer.bindPipeline(
+            vk::PipelineBindPoint::eCompute,
+            *pipelines.reset_draw_calls
+        );
+        command_buffer.dispatch(1, 1, 1);
+    }
+
+    {
+        TracyVkZone(
+            tracy_ctx,
+            *command_buffer,
+            "cull meshlets and write draw calls"
+        );
+
+        command_buffer.bindPipeline(
+            vk::PipelineBindPoint::eCompute,
+            *pipelines.write_draw_calls_shadows
+        );
+        command_buffer.dispatch(
+            dispatch_size(MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS, 64),
+            1,
+            1
+        );
+    }
+
+    insert_global_barrier(
+        command_buffer,
+        GlobalBarrier<1, 1> {
+            .prev_accesses =
+                std::array<ThsvsAccessType, 1> {
+                    THSVS_ACCESS_COMPUTE_SHADER_WRITE},
+            .next_accesses =
+                std::array<ThsvsAccessType, 1> {THSVS_ACCESS_INDIRECT_BUFFER}}
+    );
+
+    {
         TracyVkZone(tracy_ctx, *command_buffer, "shadowmap rasterization");
 
         set_scissor_and_viewport(command_buffer, 1024, 1024);
@@ -300,7 +338,8 @@ void render(
             );
             command_buffer.pushConstants<ShadowPassConstant>(
                 *pipelines.pipeline_layout,
-                vk::ShaderStageFlagBits::eVertex,
+                vk::ShaderStageFlagBits::eVertex
+                    | vk::ShaderStageFlagBits::eCompute,
                 0,
                 {{.cascade_index = i}}
             );

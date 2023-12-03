@@ -15,7 +15,7 @@ struct VertexData {
 VertexData load_vertex_data(uint32_t vertex_index, uint32_t instance_index) {
     VertexData vertex_data;
 
-    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.instance_meshlets)
+    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.meshlet_indices)
                                      .meshlet_index[instance_index];
     vertex_data.instance = InstanceBuffer(uniforms.instances).instances[meshlet_index.instance_index];
     vertex_data.mesh_info = MeshInfoBuffer(vertex_data.instance.mesh_info_address).mesh_info;

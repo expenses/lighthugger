@@ -58,12 +58,12 @@ void display_transform() {
             float2 shadow_uv = uv / shadow_screen_percentage;
             shadow_uv.x = 1.0 - shadow_uv.x;
             linear_display_referred_value =
-                textureLod(
+                (textureLod(
                     sampler2DArray(shadowmap, clamp_sampler),
                     float3(shadow_uv, 0),
                     0.0
                 )
-                    .xxx;
+                    .xxx - 0.5) * 100 + 0.5;
         }
     }
 
