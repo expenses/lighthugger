@@ -671,20 +671,13 @@ int main() {
                 int(keyboard_state.right) - int(keyboard_state.left);
             int sun_up_down = int(keyboard_state.up) - int(keyboard_state.down);
 
-            camera_params.move_camera(glm::ivec3(
-                int(keyboard_state.d) - int(keyboard_state.a),
-                int(keyboard_state.shift) - int(keyboard_state.control),
-                int(keyboard_state.w) - int(keyboard_state.s)
-            ));
-
-            camera_params.sun_latitude +=
-                static_cast<float>(sun_left_right) * 0.025f;
-            camera_params.sun_longitude +=
-                static_cast<float>(sun_up_down) * 0.025f;
-            camera_params.sun_longitude = std::clamp(
-                camera_params.sun_longitude,
-                0.0f,
-                std::numbers::pi_v<float> / 2.0f
+            camera_params.update(
+                glm::ivec3(
+                    int(keyboard_state.d) - int(keyboard_state.a),
+                    int(keyboard_state.shift) - int(keyboard_state.control),
+                    int(keyboard_state.w) - int(keyboard_state.s)
+                ),
+                glm::ivec2(sun_left_right, sun_up_down)
             );
 
             auto mouse = glm::dvec2(0.0, 0.0);

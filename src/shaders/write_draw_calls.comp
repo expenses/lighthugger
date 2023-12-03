@@ -71,6 +71,10 @@ void write_draw_calls_shadows() {
 
     bool alpha_clipped = bool(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP);
 
+    if (cull_bounding_sphere_shadows(instance, meshlet.bounding_sphere)) {
+        return;
+    }
+
     if (!alpha_clipped && cull_cone_orthographic(instance, meshlet)) {
         return;
     }

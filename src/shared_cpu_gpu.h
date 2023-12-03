@@ -30,6 +30,9 @@ struct MeshInfo {
 // Stores depth info and draw call counts.
 struct MiscStorage {
     mat4 shadow_matrices[4];
+    mat4 uv_space_shadow_matrices[4];
+    mat4 largest_cascade_view_matrix;
+    float shadow_sphere_radius;
     uint32_t min_depth;
     uint32_t max_depth;
     uint32_t num_expanded_meshlets;

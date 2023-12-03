@@ -170,12 +170,13 @@ void main() {
     uint32_t cascade_index;
     float4 shadow_coord = float4(0, 0, 0, 0);
     for (cascade_index = 0; cascade_index < 4; cascade_index++) {
-        // Get the coordinate in shadow view space.
-        shadow_coord = MiscStorageBuffer(uniforms.misc_storage).misc_storage.shadow_matrices[cascade_index]
+        // Get the coordinate in uv space.
+        shadow_coord = MiscStorageBuffer(uniforms.misc_storage).misc_storage.uv_space_shadow_matrices[cascade_index]
             * float4(world_pos.value, 1.0);
-        // If it's inside the cascade view space (which is NDC so -1 to 1) then stop as
+        float2 offset_coord = shadow_coord.xy - 0.5;
+        // If it's inside the cascade uv space then stop as
         // this is the highest quality cascade for the fragment.
-        if (abs(shadow_coord.x) < 1.0 && abs(shadow_coord.y) < 1.0) {
+        if (abs(offset_coord.x) < 0.5 && abs(offset_coord.y) < 0.5) {
             break;
         }
     }
@@ -188,8 +189,7 @@ void main() {
         0.0
     );
 
-    float4 shadow_view_coord = bias_matrix * shadow_coord;
-    shadow_view_coord /= shadow_view_coord.w;
+    shadow_coord /= shadow_coord.w;
     float shadow_sum = 0.0;
     for (int x = -1; x <= 1; x++) {
         for (int y = -1; y <= 1; y++) {
@@ -197,9 +197,9 @@ void main() {
             shadow_sum += texture(
                 sampler2DArrayShadow(shadowmap, shadowmap_comparison_sampler),
                 float4(
-                    shadow_view_coord.xy + offset,
+                    shadow_coord.xy + offset,
                     cascade_index,
-                    shadow_view_coord.z - shadow_bias
+                    shadow_coord.z - shadow_bias
                 )
             );
         }
@@ -209,7 +209,7 @@ void main() {
     // If the shadow coord clips the far plane of the shadow frustum
     // then just ignore any shadow values. If `uniforms.shadow_cam_distance`
     // is high enough then this shouldn't be needed.
-    shadow_sum = select(shadow_view_coord.z > 1, 1.0, shadow_sum);
+    shadow_sum = select(shadow_coord.z > 1, 1.0, shadow_sum);
 
     Material material;
 

@@ -44,6 +44,43 @@ bool cull_bounding_sphere(Instance instance, vec4 bounding_sphere) {
     return !visible;
 }
 
+bool cull_bounding_sphere_shadows(Instance instance, vec4 bounding_sphere) {
+    MiscStorageBuffer buf = MiscStorageBuffer(uniforms.misc_storage);
+
+    vec3 world_space_pos =
+        (instance.transform * vec4(bounding_sphere.xyz, 1.0)).xyz;
+    float radius = bounding_sphere.w;
+
+    vec3 scale = vec3(
+        length(instance.transform[0].xyz),
+        length(instance.transform[1].xyz),
+        length(instance.transform[2].xyz)
+    );
+    // 99% of the time scales will be uniform. But in the chance they're not,
+    // use the longest dimension.
+    float scale_scalar = max(max(scale.x, scale.y), scale.z);
+
+    radius *= scale_scalar;
+
+    vec3 view_space_pos = (buf.misc_storage.largest_cascade_view_matrix
+                           * vec4(world_space_pos, 1.0))
+                              .xyz;
+    // The view space goes from negatives in the front to positives in the back.
+    // This is confusing so flipping it here makes sense I think.
+    view_space_pos.z = -view_space_pos.z;
+
+    // Is the most positive/forwards point of the object in front of the near plane?
+    bool visible = view_space_pos.z + radius > NEAR_PLANE;
+
+    visible = visible
+        && abs(view_space_pos.x) - radius
+            < buf.misc_storage.shadow_sphere_radius;
+    visible = visible
+        && abs(view_space_pos.y) - radius
+            < buf.misc_storage.shadow_sphere_radius;
+    return !visible;
+}
+
 bool cull_cone_perspective(Instance instance, Meshlet meshlet) {
     float3 apex = (instance.transform * float4(meshlet.cone_apex, 1.0)).xyz;
     float3 axis = normalize((instance.normal_transform * meshlet.cone_axis));

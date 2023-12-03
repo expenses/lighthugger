@@ -1,6 +1,14 @@
 #include "../common/bindings.glsl"
 #include "../common/matrices.glsl"
 
+// Transforms the matrix output from NDC to UV space.
+mat4 bias_matrix = mat4(
+    vec4(0.5, 0.0, 0.0, 0.0),
+    vec4(0.0, 0.5, 0.0, 0.0),
+    vec4(0.0, 0.0, 1.0, 0.0),
+    vec4(0.5, 0.5, 0.0, 1.0)
+);
+
 // Super easy.
 float convert_infinite_reverze_z_depth(float depth) {
     return NEAR_PLANE / depth;
@@ -9,16 +17,14 @@ float convert_infinite_reverze_z_depth(float depth) {
 layout(local_size_x = 4) in;
 
 void generate_shadow_matrices() {
+    MiscStorageBuffer buf = MiscStorageBuffer(uniforms.misc_storage);
+
     // https://github.com/SaschaWillems/Vulkan/blob/master/examples/shadowmappingcascade/shadowmappingcascade.cpp#L650-L663
 
     // Note: these values are misleading. As 0.0 is the infinite plane,
     // the max_depth is actually the closer value!
-    float min_depth =
-        asfloat(MiscStorageBuffer(uniforms.misc_storage).misc_storage.min_depth
-        );
-    float max_depth =
-        asfloat(MiscStorageBuffer(uniforms.misc_storage).misc_storage.max_depth
-        );
+    float min_depth = asfloat(buf.misc_storage.min_depth);
+    float max_depth = asfloat(buf.misc_storage.max_depth);
 
     float4x4 invCam = uniforms.inv_perspective_view;
 
@@ -93,7 +99,14 @@ void generate_shadow_matrices() {
         uniforms.shadow_cam_distance * 2.0
     );
 
-    MiscStorageBuffer(uniforms.misc_storage)
-        .misc_storage.shadow_matrices[cascade_index] =
-        (shadowProj * shadowView);
+    mat4 matrix = shadowProj * shadowView;
+
+    buf.misc_storage.shadow_matrices[cascade_index] = matrix;
+    buf.misc_storage.uv_space_shadow_matrices[cascade_index] =
+        bias_matrix * matrix;
+
+    if (cascade_index == 3) {
+        buf.misc_storage.largest_cascade_view_matrix = shadowView;
+        buf.misc_storage.shadow_sphere_radius = sphere_radius;
+    }
 }
