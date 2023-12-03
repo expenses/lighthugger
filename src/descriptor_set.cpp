@@ -11,99 +11,75 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
             .stageFlags = vk::ShaderStageFlagBits::eCompute
                 | vk::ShaderStageFlagBits::eFragment,
         },
-
-        // instance buffer
-        vk::DescriptorSetLayoutBinding {
-            .binding = 1,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute
-                | vk::ShaderStageFlagBits::eVertex
-                | vk::ShaderStageFlagBits::eFragment,
-        },
         // Uniforms
         vk::DescriptorSetLayoutBinding {
-            .binding = 2,
+            .binding = 1,
             .descriptorType = vk::DescriptorType::eUniformBuffer,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eVertex
                 | vk::ShaderStageFlagBits::eCompute,
         },
-        // hdr framebuffer
+        // scene_referred_framebuffer
+        vk::DescriptorSetLayoutBinding {
+            .binding = 2,
+            .descriptorType = vk::DescriptorType::eSampledImage,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        },
+        // display transform LUT
         vk::DescriptorSetLayoutBinding {
             .binding = 3,
             .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
-        // clamp sampler
+        // depthbuffer
         vk::DescriptorSetLayoutBinding {
             .binding = 4,
-            .descriptorType = vk::DescriptorType::eSampler,
+            .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
-        // display transform LUT
+        // shadow map
         vk::DescriptorSetLayoutBinding {
             .binding = 5,
             .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
-        // repeat sampler
+        // rw scene referred framebuffer
         vk::DescriptorSetLayoutBinding {
             .binding = 6,
-            .descriptorType = vk::DescriptorType::eSampler,
+            .descriptorType = vk::DescriptorType::eStorageImage,
             .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute
-                | vk::ShaderStageFlagBits::eFragment,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
-        // depthbuffer
+        // visibility buffer
         vk::DescriptorSetLayoutBinding {
             .binding = 7,
             .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
-        // misc storage (depth info etc.) buffer
+        // clamp sampler
         vk::DescriptorSetLayoutBinding {
             .binding = 8,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute
-                | vk::ShaderStageFlagBits::eVertex,
-        },
-        // shadow map
-        vk::DescriptorSetLayoutBinding {
-            .binding = 9,
-            .descriptorType = vk::DescriptorType::eSampledImage,
+            .descriptorType = vk::DescriptorType::eSampler,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        },
+        // repeat sampler
+        vk::DescriptorSetLayoutBinding {
+            .binding = 9,
+            .descriptorType = vk::DescriptorType::eSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute
+                | vk::ShaderStageFlagBits::eFragment,
         },
         // Shadowmap comparison sampler
         vk::DescriptorSetLayoutBinding {
             .binding = 10,
             .descriptorType = vk::DescriptorType::eSampler,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-        },
-        // draw calls buffer
-        vk::DescriptorSetLayoutBinding {
-            .binding = 11,
-            .descriptorType = vk::DescriptorType::eStorageBuffer,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-        },
-        // rw scene referred framebuffer
-        vk::DescriptorSetLayoutBinding {
-            .binding = 12,
-            .descriptorType = vk::DescriptorType::eStorageImage,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-        },
-        vk::DescriptorSetLayoutBinding {
-            .binding = 13,
-            .descriptorType = vk::DescriptorType::eSampledImage,
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eCompute,
         },
@@ -184,25 +160,25 @@ void DescriptorSet::write_resizing_descriptors(
     device.updateDescriptorSets(
         {vk::WriteDescriptorSet {
              .dstSet = *set,
-             .dstBinding = 3,
+             .dstBinding = 2,
              .descriptorCount = 1,
              .descriptorType = vk::DescriptorType::eSampledImage,
              .pImageInfo = &image_info},
          vk::WriteDescriptorSet {
              .dstSet = *set,
-             .dstBinding = 7,
+             .dstBinding = 4,
              .descriptorCount = 1,
              .descriptorType = vk::DescriptorType::eSampledImage,
              .pImageInfo = &depthbuffer_image_info},
          vk::WriteDescriptorSet {
              .dstSet = *set,
-             .dstBinding = 12,
+             .dstBinding = 6,
              .descriptorCount = 1,
              .descriptorType = vk::DescriptorType::eStorageImage,
              .pImageInfo = &rw_scene_referred_framebuffer_info},
          vk::WriteDescriptorSet {
              .dstSet = *set,
-             .dstBinding = 13,
+             .dstBinding = 7,
              .descriptorCount = 1,
              .descriptorType = vk::DescriptorType::eSampledImage,
              .pImageInfo = &visbuffer_image_info}},
@@ -255,9 +231,6 @@ void DescriptorSet::write_descriptors(
         .sampler = *resources.shadowmap_comparison_sampler};
 
     auto uniform_buffer_info = buffer_info(resources.uniform_buffer.buffer);
-    auto misc_storage_buffer_info = buffer_info(resources.misc_storage_buffer);
-    auto draw_calls_buffer_info = buffer_info(resources.draw_calls_buffer);
-    auto instance_buffer_info = buffer_info(resources.instance_buffer);
 
     // Write initial descriptor sets.
     device.updateDescriptorSets(
@@ -266,56 +239,40 @@ void DescriptorSet::write_descriptors(
                 .dstSet = *set,
                 .dstBinding = 1,
                 .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eStorageBuffer,
-                .pBufferInfo = &instance_buffer_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *set,
-                .dstBinding = 2,
-                .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eUniformBuffer,
                 .pBufferInfo = &uniform_buffer_info},
             vk::WriteDescriptorSet {
                 .dstSet = *set,
-                .dstBinding = 4,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampler,
-                .pImageInfo = &clamp_sampler_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *set,
-                .dstBinding = 5,
+                .dstBinding = 3,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampledImage,
                 .pImageInfo = &lut_image_info},
             vk::WriteDescriptorSet {
                 .dstSet = *set,
-                .dstBinding = 6,
+                .dstBinding = 5,
                 .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampler,
-                .pImageInfo = &repeat_sampler_info},
+                .descriptorType = vk::DescriptorType::eSampledImage,
+                .pImageInfo = &shadowmap_image_info},
+
             vk::WriteDescriptorSet {
                 .dstSet = *set,
                 .dstBinding = 8,
                 .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eStorageBuffer,
-                .pBufferInfo = &misc_storage_buffer_info},
+                .descriptorType = vk::DescriptorType::eSampler,
+                .pImageInfo = &clamp_sampler_info},
             vk::WriteDescriptorSet {
                 .dstSet = *set,
                 .dstBinding = 9,
                 .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eSampledImage,
-                .pImageInfo = &shadowmap_image_info},
+                .descriptorType = vk::DescriptorType::eSampler,
+                .pImageInfo = &repeat_sampler_info},
             vk::WriteDescriptorSet {
                 .dstSet = *set,
                 .dstBinding = 10,
                 .descriptorCount = 1,
                 .descriptorType = vk::DescriptorType::eSampler,
                 .pImageInfo = &shadowmap_comparison_sampler_info},
-            vk::WriteDescriptorSet {
-                .dstSet = *set,
-                .dstBinding = 11,
-                .descriptorCount = 1,
-                .descriptorType = vk::DescriptorType::eStorageBuffer,
-                .pBufferInfo = &draw_calls_buffer_info},
+
         },
         {}
     );

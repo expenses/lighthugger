@@ -13,8 +13,12 @@ void generate_shadow_matrices() {
 
     // Note: these values are misleading. As 0.0 is the infinite plane,
     // the max_depth is actually the closer value!
-    float min_depth = asfloat(misc_storage.min_depth);
-    float max_depth = asfloat(misc_storage.max_depth);
+    float min_depth =
+        asfloat(MiscStorageBuffer(uniforms.misc_storage).misc_storage.min_depth
+        );
+    float max_depth =
+        asfloat(MiscStorageBuffer(uniforms.misc_storage).misc_storage.max_depth
+        );
 
     float4x4 invCam = uniforms.inv_perspective_view;
 
@@ -89,5 +93,7 @@ void generate_shadow_matrices() {
         uniforms.shadow_cam_distance * 2.0
     );
 
-    misc_storage.shadow_matrices[cascade_index] = (shadowProj * shadowView);
+    MiscStorageBuffer(uniforms.misc_storage)
+        .misc_storage.shadow_matrices[cascade_index] =
+        (shadowProj * shadowView);
 }

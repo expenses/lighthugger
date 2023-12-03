@@ -6,27 +6,41 @@ uint32_t pack(uint32_t triangle_index, uint32_t instance_index) {
 
 //vert
 
+struct VertexData {
+    Instance instance;
+    MeshInfo mesh_info;
+    uint32_t index;
+};
+
+VertexData load_vertex_data(uint32_t vertex_index, uint32_t instance_index) {
+    VertexData vertex_data;
+
+    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.instance_meshlets)
+                                     .meshlet_index[instance_index];
+    vertex_data.instance = InstanceBuffer(uniforms.instances).instances[meshlet_index.instance_index];
+    vertex_data.mesh_info = MeshInfoBuffer(vertex_data.instance.mesh_info_address).mesh_info;
+    Meshlet meshlet =
+        MeshletBuffer(vertex_data.mesh_info.meshlets).meshlets[meshlet_index.meshlet_index];
+
+    uint32_t micro_index = meshlet.index_offset
+        + MicroIndexBufferSingle(
+              vertex_data.mesh_info.micro_indices + meshlet.triangle_offset
+        )
+              .indices[vertex_index];
+
+    vertex_data.index = load_index(vertex_data.mesh_info, micro_index);
+
+    return vertex_data;
+}
+
 layout(location = 0) flat out uint32_t packed;
 
 void visbuffer_opaque_vertex() {
     uint32_t triangle_index = gl_VertexIndex / 3;
 
-    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.instance_meshlets)
-                                     .meshlet_index[gl_InstanceIndex];
-    Instance instance = instances[meshlet_index.instance_index];
-    MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
-    Meshlet meshlet =
-        MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_index.meshlet_index];
+    VertexData data = load_vertex_data(gl_VertexIndex, gl_InstanceIndex);
 
-    uint32_t micro_index = meshlet.index_offset
-        + MicroIndexBufferSingle(
-              mesh_info.micro_indices + meshlet.triangle_offset
-        )
-              .indices[gl_VertexIndex];
-
-    uint32_t index = load_index(mesh_info, micro_index);
-
-    float3 position = calculate_world_pos(instance, mesh_info, index);
+    float3 position = calculate_world_pos(data.instance, data.mesh_info, data.index);
 
     gl_Position = uniforms.combined_perspective_view * float4(position, 1.0);
     packed = pack(triangle_index, gl_InstanceIndex);
@@ -50,29 +64,16 @@ layout(location = 2) flat out uint32_t base_texture_index;
 void visbuffer_alpha_clip_vertex() {
     uint32_t triangle_index = gl_VertexIndex / 3;
 
-    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.instance_meshlets)
-                                     .meshlet_index[gl_InstanceIndex];
-    Instance instance = instances[meshlet_index.instance_index];
-    MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
-    Meshlet meshlet =
-        MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_index.meshlet_index];
+    VertexData data = load_vertex_data(gl_VertexIndex, gl_InstanceIndex);
 
-    uint32_t micro_index = meshlet.index_offset
-        + MicroIndexBufferSingle(
-              mesh_info.micro_indices + meshlet.triangle_offset
-        )
-              .indices[gl_VertexIndex];
-
-    uint32_t index = load_index(mesh_info, micro_index);
-
-    float3 position = calculate_world_pos(instance, mesh_info, index);
+    float3 position = calculate_world_pos(data.instance, data.mesh_info, data.index);
 
     gl_Position = uniforms.combined_perspective_view * float4(position, 1.0);
     packed = pack(triangle_index, gl_InstanceIndex);
-    base_texture_index = mesh_info.albedo_texture_index;
-    uv = float2(QuanitizedUvs(mesh_info.uvs).uvs[index])
-            * mesh_info.texture_scale
-        + mesh_info.texture_offset;
+    base_texture_index = data.mesh_info.albedo_texture_index;
+    uv = float2(QuanitizedUvs(data.mesh_info.uvs).uvs[data.index])
+            * data.mesh_info.texture_scale
+        + data.mesh_info.texture_offset;
 }
 
 //frag
@@ -98,24 +99,11 @@ layout(push_constant) uniform PushConstant {
 //vert
 
 void shadowmap_opaque_vertex() {
-    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.instance_meshlets)
-                                     .meshlet_index[gl_InstanceIndex];
-    Instance instance = instances[meshlet_index.instance_index];
-    MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
-    Meshlet meshlet =
-        MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_index.meshlet_index];
+    VertexData data = load_vertex_data(gl_VertexIndex, gl_InstanceIndex);
 
-    uint32_t micro_index = meshlet.index_offset
-        + MicroIndexBufferSingle(
-              mesh_info.micro_indices + meshlet.triangle_offset
-        )
-              .indices[gl_VertexIndex];
+    float3 position = calculate_world_pos(data.instance, data.mesh_info, data.index);
 
-    uint32_t index = load_index(mesh_info, micro_index);
-
-    float3 position = calculate_world_pos(instance, mesh_info, index);
-
-    gl_Position = misc_storage.shadow_matrices[shadow_constant.cascade_index]
+    gl_Position = MiscStorageBuffer(uniforms.misc_storage).misc_storage.shadow_matrices[shadow_constant.cascade_index]
         * float4(position, 1.0);
 }
 
@@ -125,29 +113,17 @@ layout(location = 0) out float2 uv;
 layout(location = 1) flat out uint32_t base_texture_index;
 
 void shadowmap_alpha_clip_vertex() {
-    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.instance_meshlets)
-                                     .meshlet_index[gl_InstanceIndex];
-    Instance instance = instances[meshlet_index.instance_index];
-    MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
-    Meshlet meshlet =
-        MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_index.meshlet_index];
+    VertexData data = load_vertex_data(gl_VertexIndex, gl_InstanceIndex);
 
-    uint32_t micro_index = meshlet.index_offset
-        + MicroIndexBufferSingle(
-              mesh_info.micro_indices + meshlet.triangle_offset
-        )
-              .indices[gl_VertexIndex];
+    float3 position = calculate_world_pos(data.instance, data.mesh_info, data.index);
 
-    uint32_t index = load_index(mesh_info, micro_index);
-
-    float3 position = calculate_world_pos(instance, mesh_info, index);
-    gl_Position = misc_storage.shadow_matrices[shadow_constant.cascade_index]
+    gl_Position = MiscStorageBuffer(uniforms.misc_storage).misc_storage.shadow_matrices[shadow_constant.cascade_index]
         * float4(position, 1.0);
 
-    base_texture_index = mesh_info.albedo_texture_index;
-    uv = float2(QuanitizedUvs(mesh_info.uvs).uvs[index])
-            * mesh_info.texture_scale
-        + mesh_info.texture_offset;
+    base_texture_index = data.mesh_info.albedo_texture_index;
+    uv = float2(QuanitizedUvs(data.mesh_info.uvs).uvs[data.index])
+            * data.mesh_info.texture_scale
+        + data.mesh_info.texture_offset;
 }
 
 //frag

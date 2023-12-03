@@ -6,33 +6,21 @@
 
 layout(binding = 0) uniform texture2D textures[];
 
-layout(binding = 1, scalar) buffer InstanceBuffer {
-    Instance instances[];
-};
-
-layout(binding = 2, scalar) uniform UniformsBinding {
+layout(binding = 1, scalar) uniform UniformsBinding {
     Uniforms uniforms;
 };
 
-layout(binding = 3) uniform texture2D scene_referred_framebuffer;
-layout(binding = 4) uniform sampler clamp_sampler;
-layout(binding = 5) uniform texture3D display_transform_lut;
-layout(binding = 6) uniform sampler repeat_sampler;
-layout(binding = 7) uniform texture2D depth_buffer;
+layout(binding = 2) uniform texture2D scene_referred_framebuffer;
+layout(binding = 3) uniform texture3D display_transform_lut;
+layout(binding = 4) uniform texture2D depth_buffer;
 
-layout(binding = 8, scalar) buffer MiscStorageBuffer {
-    MiscStorage misc_storage;
-};
+layout(binding = 5) uniform texture2DArray shadowmap;
+layout(binding = 6) uniform writeonly image2D rw_scene_referred_framebuffer;
+layout(binding = 7) uniform utexture2D visibility_buffer;
 
-layout(binding = 9) uniform texture2DArray shadowmap;
+layout(binding = 8) uniform sampler clamp_sampler;
+layout(binding = 9) uniform sampler repeat_sampler;
 layout(binding = 10) uniform sampler shadowmap_comparison_sampler;
-
-layout(binding = 11, scalar) buffer DrawCallBuffer {
-    DrawIndirectCommand draw_calls[];
-};
-
-layout(binding = 12) uniform writeonly image2D rw_scene_referred_framebuffer;
-layout(binding = 13) uniform utexture2D visibility_buffer;
 
 uint32_t load_index(MeshInfo mesh_info, uint32_t vertex_id) {
     if (bool(mesh_info.flags & MESH_INFO_FLAGS_32_BIT_INDICES)) {

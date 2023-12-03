@@ -92,7 +92,7 @@ void main() {
     MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.instance_meshlets)
                                      .meshlet_index[instance_index];
 
-    Instance instance = instances[meshlet_index.instance_index];
+    Instance instance = InstanceBuffer(uniforms.instances).instances[meshlet_index.instance_index];
     MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
     Meshlet meshlet =
         MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_index.meshlet_index];
@@ -171,7 +171,7 @@ void main() {
     float4 shadow_coord = float4(0, 0, 0, 0);
     for (cascade_index = 0; cascade_index < 4; cascade_index++) {
         // Get the coordinate in shadow view space.
-        shadow_coord = misc_storage.shadow_matrices[cascade_index]
+        shadow_coord = MiscStorageBuffer(uniforms.misc_storage).misc_storage.shadow_matrices[cascade_index]
             * float4(world_pos.value, 1.0);
         // If it's inside the cascade view space (which is NDC so -1 to 1) then stop as
         // this is the highest quality cascade for the fragment.

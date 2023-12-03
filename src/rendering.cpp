@@ -40,26 +40,30 @@ void render(
     ZoneScoped;
     TracyVkZone(tracy_ctx, *command_buffer, "render");
 
-    auto draw_call_counts_offset = sizeof(glm::mat4) * 4 + 8;
+    command_buffer.bindDescriptorSets(
+        vk::PipelineBindPoint::eCompute,
+        *pipelines.pipeline_layout,
+        0,
+        {*descriptor_set.set,
+         *descriptor_set.swapchain_image_sets[swapchain_image_index]},
+        {}
+    );
+    command_buffer.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics,
+        *pipelines.pipeline_layout,
+        0,
+        {*descriptor_set.set},
+        {}
+    );
 
     {
         TracyVkZone(tracy_ctx, *command_buffer, "buffer clears");
 
-        // Clear the depth min/max values.
-        auto offset = sizeof(glm::mat4) * 4;
-        command_buffer.fillBuffer(
-            resources.misc_storage_buffer.buffer,
-            offset,
-            4,
-            u32_max
+        command_buffer.bindPipeline(
+            vk::PipelineBindPoint::eCompute,
+            *pipelines.reset_buffers
         );
-        // Zero out both the max depth and the draw call counts.
-        command_buffer.fillBuffer(
-            resources.misc_storage_buffer.buffer,
-            offset + 4,
-            16,
-            0
-        );
+        command_buffer.dispatch(1, 1, 1);
     }
 
     insert_color_image_barriers(
@@ -116,22 +120,6 @@ void render(
         std::optional(GlobalBarrier<1, 1> {
             .prev_accesses = {THSVS_ACCESS_TRANSFER_WRITE},
             .next_accesses = {THSVS_ACCESS_COMPUTE_SHADER_READ_OTHER}})
-    );
-
-    command_buffer.bindDescriptorSets(
-        vk::PipelineBindPoint::eCompute,
-        *pipelines.pipeline_layout,
-        0,
-        {*descriptor_set.set,
-         *descriptor_set.swapchain_image_sets[swapchain_image_index]},
-        {}
-    );
-    command_buffer.bindDescriptorSets(
-        vk::PipelineBindPoint::eGraphics,
-        *pipelines.pipeline_layout,
-        0,
-        {*descriptor_set.set},
-        {}
     );
 
     {
@@ -215,9 +203,9 @@ void render(
 
             command_buffer.drawIndirectCount(
                 resources.draw_calls_buffer.buffer,
+                8,
+                resources.draw_calls_buffer.buffer,
                 0,
-                resources.misc_storage_buffer.buffer,
-                draw_call_counts_offset,
                 MAX_OPAQUE_DRAWS,
                 sizeof(vk::DrawIndirectCommand)
             );
@@ -235,9 +223,9 @@ void render(
 
             command_buffer.drawIndirectCount(
                 resources.draw_calls_buffer.buffer,
-                ALPHA_CLIP_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
-                resources.misc_storage_buffer.buffer,
-                draw_call_counts_offset + 4,
+                8 + ALPHA_CLIP_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
+                resources.draw_calls_buffer.buffer,
+                4,
                 MAX_ALPHA_CLIP_DRAWS,
                 sizeof(vk::DrawIndirectCommand)
             );
@@ -312,8 +300,7 @@ void render(
             );
             command_buffer.pushConstants<ShadowPassConstant>(
                 *pipelines.pipeline_layout,
-                vk::ShaderStageFlagBits::eVertex
-                    | vk::ShaderStageFlagBits::eCompute,
+                vk::ShaderStageFlagBits::eVertex,
                 0,
                 {{.cascade_index = i}}
             );
@@ -330,9 +317,9 @@ void render(
 
                 command_buffer.drawIndirectCount(
                     resources.draw_calls_buffer.buffer,
+                    8,
+                    resources.draw_calls_buffer.buffer,
                     0,
-                    resources.misc_storage_buffer.buffer,
-                    draw_call_counts_offset,
                     MAX_OPAQUE_DRAWS,
                     sizeof(vk::DrawIndirectCommand)
                 );
@@ -350,9 +337,11 @@ void render(
 
                 command_buffer.drawIndirectCount(
                     resources.draw_calls_buffer.buffer,
-                    ALPHA_CLIP_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
-                    resources.misc_storage_buffer.buffer,
-                    draw_call_counts_offset + 4,
+                    8
+                        + ALPHA_CLIP_DRAWS_OFFSET
+                            * sizeof(vk::DrawIndirectCommand),
+                    resources.draw_calls_buffer.buffer,
+                    4,
                     MAX_ALPHA_CLIP_DRAWS,
                     sizeof(vk::DrawIndirectCommand)
                 );

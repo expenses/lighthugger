@@ -10,7 +10,7 @@ void main() {
         return;
     }
 
-    Instance instance = instances[id];
+    Instance instance = InstanceBuffer(uniforms.instances).instances[id];
     MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
 
     if (cull_bounding_sphere(instance, mesh_info.bounding_sphere)) {
@@ -18,11 +18,11 @@ void main() {
     }
 
     uint32_t meshlets_offset =
-        atomicAdd(misc_storage.num_expanded_meshlets, mesh_info.num_meshlets);
+        atomicAdd(MiscStorageBuffer(uniforms.misc_storage).misc_storage.num_expanded_meshlets, mesh_info.num_meshlets);
 
     MeshletIndexBuffer buf = MeshletIndexBuffer(uniforms.expanded_meshlets);
 
-    for (uint32_t i = 0; i < mesh_info.num_meshlets; i++) {
+    for (uint16_t i = uint16_t(0u); i < mesh_info.num_meshlets; i++) {
         MeshletIndex index;
         index.instance_index = id;
         index.meshlet_index = i;

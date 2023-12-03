@@ -6,14 +6,14 @@ layout(local_size_x = 64) in;
 void main() {
     uint32_t id = gl_GlobalInvocationID.x;
 
-    if (id >= misc_storage.num_expanded_meshlets) {
+    if (id >= MiscStorageBuffer(uniforms.misc_storage).misc_storage.num_expanded_meshlets) {
         return;
     }
 
     MeshletIndex meshlet_index =
         MeshletIndexBuffer(uniforms.expanded_meshlets).meshlet_index[id];
 
-    Instance instance = instances[meshlet_index.instance_index];
+    Instance instance = InstanceBuffer(uniforms.instances).instances[meshlet_index.instance_index];
     MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
 
     Meshlet meshlet =
@@ -29,17 +29,22 @@ void main() {
 
     uint meshlet_offset;
 
+    DrawCallBuffer draw_call_buffer = DrawCallBuffer(uniforms.draw_calls);
+
     if (bool(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP)) {
         meshlet_offset = ALPHA_CLIP_DRAWS_OFFSET
-            + atomicAdd(misc_storage.num_alpha_clip_meshlets, 1);
+            + atomicAdd(draw_call_buffer.num_alpha_clip, 1);
     } else {
-        meshlet_offset = atomicAdd(misc_storage.num_opaque_meshlets, 1);
+        meshlet_offset = atomicAdd(draw_call_buffer.num_opaque, 1);
     }
 
-    draw_calls[meshlet_offset].vertexCount = meshlet.triangle_count * 3;
-    draw_calls[meshlet_offset].instanceCount = 1;
-    draw_calls[meshlet_offset].firstVertex = 0;
-    draw_calls[meshlet_offset].firstInstance = meshlet_offset;
+    DrawIndirectCommand draw_call;
+    draw_call.vertexCount = meshlet.triangle_count * 3;
+    draw_call.instanceCount = 1;
+    draw_call.firstVertex = 0;
+    draw_call.firstInstance = meshlet_offset;
+
+    draw_call_buffer.draw_calls[meshlet_offset] = draw_call;
 
     MeshletIndexBuffer(uniforms.instance_meshlets)
         .meshlet_index[meshlet_offset] = meshlet_index;

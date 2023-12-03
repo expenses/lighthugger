@@ -15,7 +15,7 @@ struct MeshInfo {
     uint64_t uvs;
     uint64_t micro_indices;
     uint64_t meshlets;
-    uint32_t num_meshlets;
+    uint16_t num_meshlets;
     uint32_t num_indices;
     uint32_t flags;
     vec4 bounding_sphere;
@@ -32,12 +32,7 @@ struct MiscStorage {
     mat4 shadow_matrices[4];
     uint32_t min_depth;
     uint32_t max_depth;
-    uint32_t num_opaque_meshlets;
-    uint32_t num_alpha_clip_meshlets;
     uint32_t num_expanded_meshlets;
-    uint32_t _padding0;
-    uint32_t _padding1;
-    uint32_t _padding2;
 };
 
 // This is only an int32_t because of imgui.
@@ -55,17 +50,17 @@ struct Uniforms {
     mat4 perspective;
     uint64_t instance_meshlets;
     uint64_t expanded_meshlets;
+    uint64_t instances;
+    uint64_t draw_calls;
+    uint64_t misc_storage;
     vec3 camera_pos;
-    uint32_t _padding0;
     vec3 sun_dir;
-    uint32_t _padding1;
     vec3 sun_intensity;
     uint32_t num_instances;
     uvec2 window_size;
     float shadow_cam_distance;
     float cascade_split_pow;
     int32_t debug;
-    uint32_t _padding2;
     bool debug_shadowmaps;
 };
 
@@ -96,10 +91,6 @@ struct ShadowPassConstant {
     uint32_t cascade_index;
 };
 
-struct DisplayTransformConstant {
-    uint32_t swapchain_image_index;
-};
-
 struct CalcBoundingSphereConstant {
     uint32_t num_vertices;
 };
@@ -125,15 +116,13 @@ struct Meshlet {
     // The buffers these index into are often large enough to require 32-bit offsets.
     uint32_t triangle_offset;
     uint32_t index_offset;
-    // hlsl doesn't support 8-bit types so we just pack these two
-    // together.
-    uint16_t triangle_count;
-    uint16_t index_count;
+    uint8_t triangle_count;
+    uint8_t index_count;
 };
 
 struct MeshletIndex {
     uint32_t instance_index;
-    uint32_t meshlet_index;
+    uint16_t meshlet_index;
 };
 
 const static uint32_t MAX_MESHLET_TRIANGLES = 124;

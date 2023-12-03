@@ -61,7 +61,10 @@ void read_depth() {
         // Note: naming is ambiguous but this means the first
         // _active_ lane.
         if (subgroupElect()) {
-            atomicMin(misc_storage.min_depth, subgroup_min);
+            atomicMin(
+                MiscStorageBuffer(uniforms.misc_storage).misc_storage.min_depth,
+                subgroup_min
+            );
         }
     }
 
@@ -70,6 +73,9 @@ void read_depth() {
     uint32_t subgroup_max = subgroupMax(depth_max);
 
     if (subgroupElect()) {
-        atomicMax(misc_storage.max_depth, subgroup_max);
+        atomicMax(
+            MiscStorageBuffer(uniforms.misc_storage).misc_storage.max_depth,
+            subgroup_max
+        );
     }
 }

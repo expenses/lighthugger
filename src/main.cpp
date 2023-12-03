@@ -462,8 +462,7 @@ int main() {
             vk::BufferCreateInfo {
                 .size = sizeof(MiscStorage),
                 .usage = vk::BufferUsageFlagBits::eStorageBuffer
-                    | vk::BufferUsageFlagBits::eTransferDst
-                    | vk::BufferUsageFlagBits::eIndirectBuffer},
+                    | vk::BufferUsageFlagBits::eShaderDeviceAddress},
             {
                 .usage = vma::MemoryUsage::eAuto,
             },
@@ -474,17 +473,20 @@ int main() {
             instances.data(),
             instances.size() * sizeof(Instance),
             allocator,
-            vk::BufferUsageFlagBits::eStorageBuffer,
+            vk::BufferUsageFlagBits::eStorageBuffer
+                | vk::BufferUsageFlagBits::eShaderDeviceAddress,
             "instance buffer",
             command_buffer,
             temp_buffers
         ),
         .draw_calls_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
-                .size = sizeof(vk::DrawIndirectCommand)
-                    * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
+                .size = 8
+                    + sizeof(vk::DrawIndirectCommand)
+                        * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
                 .usage = vk::BufferUsageFlagBits::eIndirectBuffer
-                    | vk::BufferUsageFlagBits::eStorageBuffer},
+                    | vk::BufferUsageFlagBits::eStorageBuffer
+                    | vk::BufferUsageFlagBits::eShaderDeviceAddress},
             {
                 .usage = vma::MemoryUsage::eAuto,
             },
@@ -614,6 +616,13 @@ int main() {
         device.getBufferAddress({.buffer = instance_meshlets_buf2.buffer});
     uniforms->instance_meshlets =
         device.getBufferAddress({.buffer = instance_meshlets_buf.buffer});
+    uniforms->instances =
+        device.getBufferAddress({.buffer = resources.instance_buffer.buffer});
+    uniforms->draw_calls =
+        device.getBufferAddress({.buffer = resources.draw_calls_buffer.buffer});
+    uniforms->misc_storage =
+        device.getBufferAddress({.buffer = resources.misc_storage_buffer.buffer}
+        );
 
     auto copy_view = true;
 

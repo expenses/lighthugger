@@ -136,15 +136,10 @@ Pipelines Pipelines::compile_pipelines(
         *descriptor_set_layouts.swapchain_storage_image};
 
     // Simple push constant for instructing the shadow pass which shadowmap to render to.
-    auto push_constants = std::array {
-        vk::PushConstantRange {
-            .stageFlags = vk::ShaderStageFlagBits::eVertex,
-            .offset = 0,
-            .size = sizeof(ShadowPassConstant)},
-        vk::PushConstantRange {
-            .stageFlags = vk::ShaderStageFlagBits::eCompute,
-            .offset = 0,
-            .size = sizeof(DisplayTransformConstant)}};
+    auto push_constants = std::array {vk::PushConstantRange {
+        .stageFlags = vk::ShaderStageFlagBits::eVertex,
+        .offset = 0,
+        .size = sizeof(ShadowPassConstant)}};
 
     auto pipeline_layout =
         device.createPipelineLayout(vk::PipelineLayoutCreateInfo {
@@ -372,6 +367,11 @@ Pipelines Pipelines::compile_pipelines(
             device,
             pipeline_layout,
             "compiled_shaders/expand_meshlets.spv"
+        ),
+        .reset_buffers = create_compute_pipeline_from_shader(
+            device,
+            pipeline_layout,
+            "compiled_shaders/compute/reset_buffers.spv"
         ),
         .pipeline_layout = std::move(pipeline_layout),
         .copy_quantized_positions =

@@ -32,10 +32,6 @@ float3 linear_to_srgb_transfer_function(float3 value) {
     );
 }
 
-layout(push_constant) uniform PushConstant {
-    DisplayTransformConstant display_transform_constant;
-};
-
 layout(local_size_x = 8, local_size_y = 8) in;
 
 //comp

@@ -43,3 +43,17 @@ layout(buffer_reference, scalar) buffer QuanitizedUvs {
 layout(buffer_reference, scalar) buffer QuanitizedNormals {
     int8_t4 normals[];
 };
+
+layout(buffer_reference, scalar) buffer InstanceBuffer {
+    Instance instances[];
+};
+
+layout(buffer_reference, scalar) buffer DrawCallBuffer {
+    uint32_t num_opaque;
+    uint32_t num_alpha_clip;
+    DrawIndirectCommand draw_calls[];
+};
+
+layout(buffer_reference, scalar) buffer MiscStorageBuffer {
+    MiscStorage misc_storage;
+};
