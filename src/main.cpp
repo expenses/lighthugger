@@ -491,8 +491,8 @@ int main() {
             graphics_queue_family,
             temp_buffers
         ),
-        .skybox = load_ktx2_image(
-            "hdr-cubemap-1024x1024.ktx2",
+        .skybox = load_dds(
+            "hdr-cubemap-1024x1024.dds",
             allocator,
             device,
             command_buffer,

@@ -1,3 +1,5 @@
+#pragma once
+
 struct FsCache {
     static std::filesystem::path filepath_for_key(std::string key) {
         return std::filesystem::path("cache")

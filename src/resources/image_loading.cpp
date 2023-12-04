@@ -109,19 +109,22 @@ ImageWithView load_dds(
     stream.seekg(static_cast<std::ifstream::off_type>(data_offset), stream.beg);
 
     auto mip_levels = header.dwMipMapCount;
+    bool is_cubemap = header.dwCaps2 & DDSCAPS2_CUBEMAP;
 
     auto subresource_range = vk::ImageSubresourceRange {
         .aspectMask = vk::ImageAspectFlagBits::eColor,
         .baseMipLevel = 0,
         .levelCount = mip_levels,
         .baseArrayLayer = 0,
-        .layerCount = 1,
+        .layerCount = is_cubemap ? 6 : 1,
     };
 
     auto image_name = std::string("'") + filepath.string() + "'";
 
     auto image = ImageWithView(
         vk::ImageCreateInfo {
+            .flags = is_cubemap ? vk::ImageCreateFlagBits::eCubeCompatible
+                                : vk::ImageCreateFlagBits(0),
             .imageType = dimension.type,
             .format = format.format,
             .extent =
@@ -131,14 +134,14 @@ ImageWithView load_dds(
                     .depth = depth,
                 },
             .mipLevels = mip_levels,
-            .arrayLayers = 1,
+            .arrayLayers = is_cubemap ? 6 : 1,
             .usage = vk::ImageUsageFlagBits::eSampled
                 | vk::ImageUsageFlagBits::eTransferDst},
         allocator,
         device,
         image_name.data(),
         subresource_range,
-        dimension.view_type
+        is_cubemap ? vk::ImageViewType::eCube : dimension.view_type
     );
 
     auto staging_buffer_name = filepath.string() + " staging buffer";
@@ -187,7 +190,7 @@ ImageWithView load_dds(
                     .aspectMask = vk::ImageAspectFlagBits::eColor,
                     .mipLevel = static_cast<uint32_t>(i),
                     .baseArrayLayer = 0,
-                    .layerCount = 1,
+                    .layerCount = is_cubemap ? 6 : 1,
                 },
             .imageExtent = vk::Extent3D {
                 .width = level_width,
@@ -203,7 +206,8 @@ ImageWithView load_dds(
             ? round_up(level_height, 4)
             : level_height;
 
-        buffer_offset += (rounded_width * rounded_height * depth)
+        buffer_offset +=
+            (rounded_width * rounded_height * depth * (is_cubemap ? 6 : 1))
             * format.bits_per_pixel / 8;
     }
 

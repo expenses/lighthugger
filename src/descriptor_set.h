@@ -34,12 +34,17 @@ struct IndexTracker {
     void free(uint32_t index) {
         free_indices.push_back(index);
     }
+
+    ~IndexTracker() {
+        // Ensure that we've freed all images.
+        assert(free_indices.size() == next_index);
+    }
 };
 
 struct DescriptorSet {
     vk::raii::DescriptorSet set;
     std::vector<vk::raii::DescriptorSet> swapchain_image_sets;
-    IndexTracker tracker;
+    std::shared_ptr<IndexTracker> tracker = std::make_shared<IndexTracker>();
 
     DescriptorSet(
         vk::raii::DescriptorSet set_,

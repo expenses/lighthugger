@@ -123,7 +123,7 @@ create_descriptor_set_layouts(const vk::raii::Device& device) {
 
 uint32_t
 DescriptorSet::write_image(const ImageWithView& image, vk::Device device) {
-    auto index = tracker.push();
+    auto index = tracker->push();
 
     if (index >= 512) {
         dbg(index);

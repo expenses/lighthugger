@@ -129,16 +129,17 @@ MeshletBuffers upload_meshlet_buffers_from_cache(
         temp_buffers
     );
 
-    auto [meshlets_buffer, num_meshlet_bytes] = upload_from_file_via_staging_buffer(
-        std::move(meshlets),
+    auto [meshlets_buffer, num_meshlet_bytes] =
+        upload_from_file_via_staging_buffer(
+            std::move(meshlets),
 
-        allocator,
-        vk::BufferUsageFlagBits::eStorageBuffer
-            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-        primitive_name + " meshlets buffer",
-        command_buffer,
-        temp_buffers
-    );
+            allocator,
+            vk::BufferUsageFlagBits::eStorageBuffer
+                | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            primitive_name + " meshlets buffer",
+            command_buffer,
+            temp_buffers
+        );
 
     return {
         .meshlets = std::move(meshlets_buffer),
@@ -710,5 +711,6 @@ GltfMesh load_gltf(
     return {
         .images = std::move(images),
         .image_indices = std::move(image_indices),
-        .primitives = std::move(primitives)};
+        .primitives = std::move(primitives),
+        .image_index_tracker = descriptor_set.tracker};
 }

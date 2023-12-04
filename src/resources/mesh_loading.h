@@ -34,6 +34,13 @@ struct GltfMesh {
     std::vector<ImageWithView> images;
     std::vector<uint32_t> image_indices;
     std::vector<GltfPrimitive> primitives;
+    std::shared_ptr<IndexTracker> image_index_tracker;
+
+    ~GltfMesh() {
+        for (auto index : image_indices) {
+            image_index_tracker->free(index);
+        }
+    }
 };
 
 GltfMesh load_gltf(

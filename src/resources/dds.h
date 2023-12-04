@@ -14,6 +14,8 @@ struct DDS_PIXELFORMAT {
     DWORD dwABitMask;
 };
 
+DWORD DDSCAPS2_CUBEMAP = 0x200;
+
 struct DDS_HEADER {
     DWORD dwSize;
     DWORD dwFlags;
