@@ -2,6 +2,7 @@
 
 #include "../allocations/staging.h"
 #include "bounding_sphere.h"
+#include "fs_cache.h"
 #include "image_loading.h"
 
 struct NodeTreeNode {
@@ -90,6 +91,123 @@ void copy_uint16_t4_to_uint16_3(
           .count = count}}
     );
     command_buffer.dispatch(dispatch_size(count, 64), 1, 1);
+}
+
+struct MeshletBuffers {
+    AllocatedBuffer meshlets;
+    AllocatedBuffer indices;
+    AllocatedBuffer micro_indices;
+    uint32_t num_meshlets;
+};
+
+MeshletBuffers upload_meshlet_buffers_from_cache(
+    std::ifstream meshlets,
+    std::ifstream indices,
+    std::ifstream micro_indices,
+    vma::Allocator allocator,
+    const std::string& primitive_name,
+    const vk::raii::CommandBuffer& command_buffer,
+    std::vector<AllocatedBuffer>& temp_buffers
+) {
+    auto [indices_buffer, _] = upload_from_file_via_staging_buffer(
+        std::move(indices),
+        allocator,
+        vk::BufferUsageFlagBits::eStorageBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        primitive_name + " indices buffer",
+        command_buffer,
+        temp_buffers
+    );
+
+    auto [micro_indices_buffer, __] = upload_from_file_via_staging_buffer(
+        std::move(micro_indices),
+        allocator,
+        vk::BufferUsageFlagBits::eStorageBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        primitive_name + " micro indices buffer",
+        command_buffer,
+        temp_buffers
+    );
+
+    auto [meshlets_buffer, num_meshlet_bytes] = upload_from_file_via_staging_buffer(
+        std::move(meshlets),
+
+        allocator,
+        vk::BufferUsageFlagBits::eStorageBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        primitive_name + " meshlets buffer",
+        command_buffer,
+        temp_buffers
+    );
+
+    return {
+        .meshlets = std::move(meshlets_buffer),
+        .indices = std::move(indices_buffer),
+        .micro_indices = std::move(micro_indices_buffer),
+        .num_meshlets = num_meshlet_bytes / sizeof(Meshlet)};
+}
+
+MeshletBuffers upload_meshlet_buffers(
+    Meshlets meshlets,
+    bool uses_32_bit_indices,
+    vma::Allocator allocator,
+    const std::string& primitive_name,
+    const vk::raii::CommandBuffer& command_buffer,
+    std::vector<AllocatedBuffer>& temp_buffers
+) {
+    std::optional<AllocatedBuffer> indices_buffer = std::nullopt;
+
+    if (uses_32_bit_indices) {
+        indices_buffer = upload_via_staging_buffer(
+            meshlets.indices_32bit.data(),
+            meshlets.indices_32bit.size() * sizeof(uint32_t),
+            allocator,
+            vk::BufferUsageFlagBits::eStorageBuffer
+                | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            primitive_name + " indices buffer",
+            command_buffer,
+            temp_buffers
+        );
+    } else {
+        indices_buffer = upload_via_staging_buffer(
+            meshlets.indices_16bit.data(),
+            meshlets.indices_16bit.size() * sizeof(uint16_t),
+            allocator,
+            vk::BufferUsageFlagBits::eStorageBuffer
+                | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            primitive_name + " indices buffer",
+            command_buffer,
+            temp_buffers
+        );
+    }
+
+    auto micro_indices = upload_via_staging_buffer(
+        meshlets.micro_indices.data(),
+        meshlets.micro_indices.size(),
+        allocator,
+        vk::BufferUsageFlagBits::eStorageBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        primitive_name + " micro indices buffer",
+        command_buffer,
+        temp_buffers
+    );
+
+    auto meshlets_buffer = upload_via_staging_buffer(
+        meshlets.meshlets.data(),
+        meshlets.meshlets.size() * sizeof(Meshlet),
+        allocator,
+        vk::BufferUsageFlagBits::eStorageBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        primitive_name + " meshlets buffer",
+        command_buffer,
+        temp_buffers
+    );
+
+    return {
+        .meshlets = std::move(meshlets_buffer),
+        .indices = std::move(indices_buffer.value()),
+        .micro_indices = std::move(micro_indices),
+        .num_meshlets = meshlets.meshlets.size()};
 }
 
 GltfMesh load_gltf(
@@ -226,11 +344,11 @@ GltfMesh load_gltf(
 
             auto& mesh = asset.meshes[node.meshIndex.value()];
 
-            for (size_t i = 0; i < mesh.primitives.size(); i++) {
-                auto& primitive = mesh.primitives[i];
+            for (size_t j = 0; j < mesh.primitives.size(); j++) {
+                auto& primitive = mesh.primitives[j];
 
-                auto primitive_name =
-                    filepath.string() + " primitive " + std::to_string(i);
+                auto primitive_name = filepath.string() + " mesh "
+                    + std::to_string(i) + " primitive " + std::to_string(j);
 
                 auto create_buffer = [&](uint64_t size, const char* name) {
                     return AllocatedBuffer(
@@ -454,62 +572,56 @@ GltfMesh load_gltf(
                 auto& indices_buffer_view =
                     asset.bufferViews[indices.bufferViewIndex.value()];
 
-                auto meshlets = build_meshlets(
-                    source_buffers[indices_buffer_view.bufferIndex].data()
-                        + indices_buffer_view.byteOffset + indices.byteOffset,
-                    indices.count,
-                    float_positions.data(),
-                    positions.count,
-                    uses_32_bit_indices
-                );
+                std::optional<MeshletBuffers> opt_meshlet_buffers;
 
-                std::optional<AllocatedBuffer> indices_buffer = std::nullopt;
+                auto meshlets_key = primitive_name + " meshlets";
+                auto indices_key = primitive_name + " indices";
+                auto micro_indices_key = primitive_name + " micro indices";
 
-                if (uses_32_bit_indices) {
-                    indices_buffer = upload_via_staging_buffer(
-                        meshlets.indices_32bit.data(),
-                        meshlets.indices_32bit.size() * sizeof(uint32_t),
+                auto opt_meshlets = FsCache::get(meshlets_key);
+                auto opt_indices = FsCache::get(indices_key);
+                auto opt_micro_indices = FsCache::get(micro_indices_key);
+
+                if (opt_meshlets && opt_indices && opt_micro_indices) {
+                    opt_meshlet_buffers = upload_meshlet_buffers_from_cache(
+                        std::move(opt_meshlets.value()),
+                        std::move(opt_indices.value()),
+                        std::move(opt_micro_indices.value()),
                         allocator,
-                        vk::BufferUsageFlagBits::eStorageBuffer
-                            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-                        primitive_name + " indices buffer",
+                        primitive_name,
                         command_buffer,
                         temp_buffers
                     );
                 } else {
-                    indices_buffer = upload_via_staging_buffer(
-                        meshlets.indices_16bit.data(),
-                        meshlets.indices_16bit.size() * sizeof(uint16_t),
+                    auto meshlets = build_meshlets(
+                        source_buffers[indices_buffer_view.bufferIndex].data()
+                            + indices_buffer_view.byteOffset
+                            + indices.byteOffset,
+                        indices.count,
+                        float_positions.data(),
+                        positions.count,
+                        uses_32_bit_indices
+                    );
+
+                    FsCache::insert(meshlets_key, meshlets.meshlets);
+                    FsCache::insert(micro_indices_key, meshlets.micro_indices);
+                    if (uses_32_bit_indices) {
+                        FsCache::insert(indices_key, meshlets.indices_32bit);
+                    } else {
+                        FsCache::insert(indices_key, meshlets.indices_16bit);
+                    }
+
+                    opt_meshlet_buffers = upload_meshlet_buffers(
+                        meshlets,
+                        uses_32_bit_indices,
                         allocator,
-                        vk::BufferUsageFlagBits::eStorageBuffer
-                            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-                        primitive_name + " indices buffer",
+                        primitive_name,
                         command_buffer,
                         temp_buffers
                     );
                 }
 
-                auto micro_indices = upload_via_staging_buffer(
-                    meshlets.micro_indices.data(),
-                    meshlets.micro_indices.size(),
-                    allocator,
-                    vk::BufferUsageFlagBits::eStorageBuffer
-                        | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-                    primitive_name + " micro indices buffer",
-                    command_buffer,
-                    temp_buffers
-                );
-
-                auto meshlets_buffer = upload_via_staging_buffer(
-                    meshlets.meshlets.data(),
-                    meshlets.meshlets.size() * sizeof(Meshlet),
-                    allocator,
-                    vk::BufferUsageFlagBits::eStorageBuffer
-                        | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-                    primitive_name + " meshlets buffer",
-                    command_buffer,
-                    temp_buffers
-                );
+                auto meshlet_buffers = std::move(opt_meshlet_buffers.value());
 
                 float bounding_sphere[4];
                 computeBoundingSphere(
@@ -523,20 +635,20 @@ GltfMesh load_gltf(
                         {.buffer = position_buffer.buffer}
                     ),
                     .indices = device.getBufferAddress(
-                        {.buffer = indices_buffer.value().buffer}
+                        {.buffer = meshlet_buffers.indices.buffer}
                     ),
                     .normals = device.getBufferAddress(
                         {.buffer = normals_buffer.buffer}
                     ),
                     .uvs =
                         device.getBufferAddress({.buffer = uvs_buffer.buffer}),
-                    .micro_indices =
-                        device.getBufferAddress({.buffer = micro_indices.buffer}
-                        ),
-                    .meshlets = device.getBufferAddress(
-                        {.buffer = meshlets_buffer.buffer}
+                    .micro_indices = device.getBufferAddress(
+                        {.buffer = meshlet_buffers.micro_indices.buffer}
                     ),
-                    .num_meshlets = meshlets.meshlets.size(),
+                    .meshlets = device.getBufferAddress(
+                        {.buffer = meshlet_buffers.meshlets.buffer}
+                    ),
+                    .num_meshlets = meshlet_buffers.num_meshlets,
 
                     .num_indices = static_cast<uint32_t>(indices.count),
                     .flags = flags,
@@ -569,23 +681,22 @@ GltfMesh load_gltf(
                     temp_buffers
                 );
 
-                auto num_meshlets = meshlets.meshlets.size();
-                if (num_meshlets >= (1 << 16)) {
-                    dbg(num_meshlets);
+                if (meshlet_buffers.num_meshlets >= (1 << 16)) {
+                    dbg(meshlet_buffers.num_meshlets);
                     abort();
                 }
 
                 primitives.push_back(GltfPrimitive {
                     .position = std::move(position_buffer),
-                    .indices = std::move(indices_buffer.value()),
+                    .indices = std::move(meshlet_buffers.indices),
                     .uvs = std::move(uvs_buffer),
                     .normals = std::move(normals_buffer),
                     .mesh_info = std::move(mesh_info_buffer),
-                    .micro_indices = std::move(micro_indices),
-                    .meshlets = std::move(meshlets_buffer),
+                    .micro_indices = std::move(meshlet_buffers.micro_indices),
+                    .meshlets = std::move(meshlet_buffers.meshlets),
                     .transform = transform});
 
-                total_num_meshlets += meshlets.meshlets.size();
+                total_num_meshlets += meshlet_buffers.num_meshlets;
             }
         }
     }
