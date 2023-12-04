@@ -74,5 +74,9 @@ float3 BRDF(
     // diffuse BRDF
     float3 Fd = diffuseColor * Fd_Burley(NoV, NoL, LoH, roughness);
 
-    return (Fd + Fr) * NoL;
+    float3 irradiance = (Fd + Fr) * NoL;
+
+    // Guard against divisions by zero. Mostly from
+    // `V_SmithGGXCorrelated` and (I think) backfacing geometry.
+    return mix(irradiance, float3(0.0), isnan(irradiance));
 }

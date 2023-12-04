@@ -41,17 +41,19 @@ uint32_t dispatch_size(uint32_t width, uint32_t workgroup_size) {
 }
 
 std::vector<uint8_t> read_file_to_bytes(const std::filesystem::path& filepath) {
-    std::ifstream file_stream(filepath, std::ios::binary);
+    std::ifstream stream(filepath, std::ios::binary);
 
-    if (!file_stream) {
+    if (!stream) {
         dbg(filepath);
         abort();
     }
 
-    std::vector<uint8_t> contents(
-        (std::istreambuf_iterator<char>(file_stream)),
-        {}
-    );
+    stream.seekg(0, stream.end);
+    auto length = stream.tellg();
+    stream.seekg(0, stream.beg);
+
+    std::vector<uint8_t> contents(length);
+    stream.read((char*)contents.data(), length);
 
     return contents;
 }

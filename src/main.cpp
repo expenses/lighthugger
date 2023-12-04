@@ -345,6 +345,7 @@ int main() {
         pipelines,
         temp_descriptor_sets
     );
+
     dbg(sizeof(Instance));
 
     // Load all resources

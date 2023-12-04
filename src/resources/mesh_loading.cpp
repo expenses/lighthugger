@@ -175,21 +175,42 @@ GltfMesh load_gltf(
     images.reserve(asset.images.size());
     image_indices.reserve(asset.images.size());
 
-    for (auto& img : asset.images) {
+    auto total_num_meshlets = 0;
+
+    for (size_t i = 0; i < asset.images.size(); i++) {
+        auto& img = asset.images[i];
+
         if (auto* uri = std::get_if<fastgltf::sources::URI>(&img.data)) {
             auto image_path = parent_path / uri->uri.fspath();
-            assert(image_path.extension() == ".ktx2");
-            auto image = load_ktx2_image(
-                image_path,
-                allocator,
-                device,
-                command_buffer,
-                graphics_queue_family,
-                temp_buffers
-            );
-            auto index = descriptor_set.write_image(image, *device);
-            images.push_back(std::move(image));
-            image_indices.push_back(index);
+
+            if (image_path.extension() == ".ktx2") {
+                auto image = load_ktx2_image(
+                    image_path,
+                    allocator,
+                    device,
+                    command_buffer,
+                    graphics_queue_family,
+                    temp_buffers
+                );
+                auto index = descriptor_set.write_image(image, *device);
+                images.push_back(std::move(image));
+                image_indices.push_back(index);
+            } else if (image_path.extension() == ".dds") {
+                auto image = load_dds(
+                    image_path,
+                    allocator,
+                    device,
+                    command_buffer,
+                    graphics_queue_family,
+                    temp_buffers
+                );
+                auto index = descriptor_set.write_image(image, *device);
+                images.push_back(std::move(image));
+                image_indices.push_back(index);
+            } else {
+                dbg(image_path);
+                abort();
+            }
         }
     }
 
@@ -230,9 +251,18 @@ GltfMesh load_gltf(
                 auto get_accessor = [&](const char* name
                                     ) -> fastgltf::Accessor& {
                     auto iterator = primitive.findAttribute(name);
-                    assert(iterator != primitive.attributes.end());
+                    if (iterator == primitive.attributes.end()) {
+                        dbg(primitive_name, name);
+                        abort();
+                    }
                     return asset.accessors[iterator->second];
                 };
+
+                if (primitive.findAttribute("TEXCOORD_0")
+                    == primitive.attributes.end()) {
+                    dbg(primitive_name, "missing uvs. Skipping.");
+                    continue;
+                }
 
                 auto& positions = get_accessor("POSITION");
                 assert(
@@ -280,8 +310,7 @@ GltfMesh load_gltf(
                 );
                 assert(uvs.type == fastgltf::AccessorType::Vec2);
                 auto uvs_buffer_size = uvs.count * sizeof(uint16_t) * 2;
-                auto uvs_buffer =
-                    create_buffer(uvs.count * sizeof(uint16_t) * 2, "uvs");
+                auto uvs_buffer = create_buffer(uvs_buffer_size, "uvs");
                 copy_buffer_to_final(
                     uvs,
                     asset,
@@ -399,10 +428,11 @@ GltfMesh load_gltf(
                     != material.doubleSided) {
                     dbg((material.alphaMode == fastgltf::AlphaMode::Mask),
                         material.doubleSided);
-                    abort();
                 }
 
-                assert(material.pbrData.baseColorFactor[3] == 1.0);
+                if (material.pbrData.baseColorFactor[3] != 1.0) {
+                    dbg(material.pbrData.baseColorFactor);
+                }
 
                 // todo: albedo factor, proper pbr.
 
@@ -539,9 +569,9 @@ GltfMesh load_gltf(
                     temp_buffers
                 );
 
-                auto triangle_count = indices.count / 3;
-                if (triangle_count >= (1 << 16)) {
-                    dbg(triangle_count);
+                auto num_meshlets = meshlets.meshlets.size();
+                if (num_meshlets >= (1 << 16)) {
+                    dbg(num_meshlets);
                     abort();
                 }
 
@@ -554,9 +584,13 @@ GltfMesh load_gltf(
                     .micro_indices = std::move(micro_indices),
                     .meshlets = std::move(meshlets_buffer),
                     .transform = transform});
+
+                total_num_meshlets += meshlets.meshlets.size();
             }
         }
     }
+
+    dbg(total_num_meshlets);
 
     for (auto& staging_buffer : staging_buffers) {
         temp_buffers.push_back(std::move(staging_buffer.buffer));

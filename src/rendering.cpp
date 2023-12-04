@@ -133,6 +133,17 @@ void render(
             .dispatch(dispatch_size(resources.num_instances, 64), 1, 1);
     }
 
+    insert_global_barrier(
+        command_buffer,
+        GlobalBarrier<1, 1> {
+            .prev_accesses =
+                std::array<ThsvsAccessType, 1> {
+                    THSVS_ACCESS_COMPUTE_SHADER_WRITE},
+            .next_accesses =
+                std::array<ThsvsAccessType, 1> {
+                    THSVS_ACCESS_COMPUTE_SHADER_READ_OTHER}}
+    );
+
     {
         TracyVkZone(
             tracy_ctx,

@@ -79,7 +79,6 @@ Meshlets build_meshlets(
             dbg(meshlet.triangle_count,
                 meshlet.vertex_count,
                 meshlet.triangle_offset);
-            abort();
         }
     }
 

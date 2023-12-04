@@ -22,6 +22,16 @@ FormatInfo translate_format(DXGI_FORMAT dxgi_format) {
                 .format = vk::Format::eBc1RgbSrgbBlock,
                 .bits_per_pixel = 4,
                 .is_block_compressed = true};
+        case DXGI_FORMAT_BC7_UNORM:
+            return {
+                .format = vk::Format::eBc7UnormBlock,
+                .bits_per_pixel = 8,
+                .is_block_compressed = true};
+        case DXGI_FORMAT_BC7_UNORM_SRGB:
+            return {
+                .format = vk::Format::eBc7SrgbBlock,
+                .bits_per_pixel = 8,
+                .is_block_compressed = true};
         default:
             dbg(dxgi_format);
             abort();
@@ -238,7 +248,10 @@ ImageWithView load_ktx2_image(
     std::array<uint8_t, 12> identifier;
     stream.read((char*)identifier.data(), identifier.size());
 
-    assert(identifier == KTX2_IDENTIFIER);
+    if (identifier != KTX2_IDENTIFIER) {
+        dbg(filepath);
+        abort();
+    }
 
     Ktx2Header header;
 
@@ -353,6 +366,10 @@ ImageWithView load_ktx2_image(
                 .height = level_height,
                 .depth = std::max(header.depth, 1u)}};
         offset += level.uncompressed_byte_length;
+    }
+    if (offset != total_size) {
+        dbg(offset, total_size);
+        abort();
     }
 
     insert_color_image_barriers(

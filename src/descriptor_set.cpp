@@ -125,6 +125,11 @@ uint32_t
 DescriptorSet::write_image(const ImageWithView& image, vk::Device device) {
     auto index = tracker.push();
 
+    if (index >= 512) {
+        dbg(index);
+        abort();
+    }
+
     auto image_info = vk::DescriptorImageInfo {
         .imageView = *image.view,
         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
