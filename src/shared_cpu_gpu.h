@@ -31,8 +31,8 @@ struct MeshInfo {
 struct MiscStorage {
     mat4 shadow_matrices[4];
     mat4 uv_space_shadow_matrices[4];
-    mat4 largest_cascade_view_matrix;
-    float shadow_sphere_radius;
+    mat4 shadow_view_matrices[4];
+    float shadow_sphere_radii[4];
     uint32_t min_depth;
     uint32_t max_depth;
     uint32_t num_expanded_meshlets;
@@ -44,6 +44,7 @@ const static int32_t UNIFORMS_DEBUG_CASCADES = 1;
 const static int32_t UNIFORMS_DEBUG_TRIANGLE_INDEX = 2;
 const static int32_t UNIFORMS_DEBUG_INSTANCE_INDEX = 3;
 const static int32_t UNIFORMS_DEBUG_SHADER_CLOCK = 4;
+const static int32_t UNIFORMS_DEBUG_NORMALS = 5;
 
 struct Uniforms {
     mat4 combined_perspective_view;
@@ -112,6 +113,9 @@ const static uint32_t ALPHA_CLIP_DRAWS_OFFSET = MAX_OPAQUE_DRAWS;
 
 const static uint32_t MESHLET_INDICES_BUFFER_SECTION_OFFSET =
     ALPHA_CLIP_DRAWS_OFFSET + MAX_ALPHA_CLIP_DRAWS;
+
+// sizeof(uint32_t4) * 2
+const static uint32_t DRAW_CALLS_COUNTS_SIZE = 4 * 4 * 2;
 
 const static float NEAR_PLANE = 0.01f;
 

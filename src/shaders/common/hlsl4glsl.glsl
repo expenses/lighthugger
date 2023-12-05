@@ -6,6 +6,7 @@
 #extension GL_ARB_shader_clock : require
 #extension GL_KHR_shader_subgroup_basic : require
 #extension GL_KHR_shader_subgroup_arithmetic : require
+#extension GL_EXT_control_flow_attributes : require
 
 #define float2 vec2
 #define float3 vec3
@@ -49,4 +50,8 @@ uint32_t select(bool boolean, uint32_t true_value, uint32_t false_value) {
 
 float3 select(bool boolean, float3 true_value, float3 false_value) {
     return mix(false_value, true_value, bvec3(boolean));
+}
+
+float3 saturate(float3 value) {
+    return clamp(value, float3(0), float3(1));
 }

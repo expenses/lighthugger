@@ -245,7 +245,8 @@ void main() {
                               normal,
                               material.roughness,
                               material.metallic,
-                              material.albedo
+                              material.albedo,
+                              bool(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP)
                           )
         * sun_intensity;
 
@@ -288,6 +289,12 @@ void main() {
             rw_scene_referred_framebuffer,
             coord,
             float4(temperature(deltaTimeScaled), 1.0)
+        );
+    } else if (uniforms.debug == UNIFORMS_DEBUG_NORMALS) {
+        imageStore(
+            rw_scene_referred_framebuffer,
+            coord,
+            float4(normal * 0.5 + 0.5, 1.0)
         );
     }
 }

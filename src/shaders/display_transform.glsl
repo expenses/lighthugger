@@ -51,16 +51,19 @@ void display_transform() {
         float2 uv = (float2(gl_GlobalInvocationID.xy) + 0.5)
             / float2(uniforms.window_size);
 
-        float shadow_screen_percentage = 0.3;
+        float shadow_screen_percentage = 0.5;
 
         if (uv.x < shadow_screen_percentage
             && uv.y < shadow_screen_percentage) {
-            float2 shadow_uv = uv / shadow_screen_percentage;
-            shadow_uv.x = 1.0 - shadow_uv.x;
+            float2 shadow_uv = uv * 2 / shadow_screen_percentage;
+
+            uint32_t cascade_index =
+                uint32_t(shadow_uv.y > 1.0) * 2 + uint32_t(shadow_uv.x > 1.0);
+
             linear_display_referred_value =
                 (textureLod(
                      sampler2DArray(shadowmap, clamp_sampler),
-                     float3(shadow_uv, 0),
+                     float3(mod(shadow_uv, float2(1.0)), cascade_index),
                      0.0
                  )
                      .xxx

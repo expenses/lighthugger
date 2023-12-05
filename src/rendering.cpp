@@ -214,7 +214,7 @@ void render(
 
             command_buffer.drawIndirectCount(
                 resources.draw_calls_buffer.buffer,
-                8,
+                DRAW_CALLS_COUNTS_SIZE,
                 resources.draw_calls_buffer.buffer,
                 0,
                 MAX_OPAQUE_DRAWS,
@@ -234,9 +234,10 @@ void render(
 
             command_buffer.drawIndirectCount(
                 resources.draw_calls_buffer.buffer,
-                8 + ALPHA_CLIP_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
+                DRAW_CALLS_COUNTS_SIZE
+                    + ALPHA_CLIP_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
                 resources.draw_calls_buffer.buffer,
-                4,
+                sizeof(uint32_t) * 4,
                 MAX_ALPHA_CLIP_DRAWS,
                 sizeof(vk::DrawIndirectCommand)
             );
@@ -308,7 +309,7 @@ void render(
             *pipelines.write_draw_calls_shadows
         );
         command_buffer.dispatch(
-            dispatch_size(MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS, 64),
+            dispatch_size(MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS, 16),
             1,
             1
         );
@@ -367,9 +368,11 @@ void render(
 
                 command_buffer.drawIndirectCount(
                     resources.draw_calls_buffer.buffer,
-                    8,
+                    DRAW_CALLS_COUNTS_SIZE
+                        + (MESHLET_INDICES_BUFFER_SECTION_OFFSET * i)
+                            * sizeof(vk::DrawIndirectCommand),
                     resources.draw_calls_buffer.buffer,
-                    0,
+                    i * sizeof(uint32_t),
                     MAX_OPAQUE_DRAWS,
                     sizeof(vk::DrawIndirectCommand)
                 );
@@ -387,11 +390,12 @@ void render(
 
                 command_buffer.drawIndirectCount(
                     resources.draw_calls_buffer.buffer,
-                    8
-                        + ALPHA_CLIP_DRAWS_OFFSET
+                    DRAW_CALLS_COUNTS_SIZE
+                        + (ALPHA_CLIP_DRAWS_OFFSET
+                           + MESHLET_INDICES_BUFFER_SECTION_OFFSET * i)
                             * sizeof(vk::DrawIndirectCommand),
                     resources.draw_calls_buffer.buffer,
-                    4,
+                    sizeof(uint32_t) * 4 + i * sizeof(uint32_t),
                     MAX_ALPHA_CLIP_DRAWS,
                     sizeof(vk::DrawIndirectCommand)
                 );

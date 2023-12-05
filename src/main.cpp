@@ -418,10 +418,10 @@ int main() {
 
     auto meshlets_index_buf = AllocatedBuffer(
         vk::BufferCreateInfo {
-            // Made up of 3 sections, 1 for expanded meshlets, 1 for culled + sorted meshlets
-            // for the main camera and 1 for culled + sorted meshlets for the shadow camera.
+            // Made up of 6 sections, 1 for expanded meshlets, 1 for culled + sorted meshlets
+            // for the main camera and 4 for culled + sorted meshlets for the shadow camera.
             .size = sizeof(MeshletIndex)
-                * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS) * 3,
+                * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS) * 6,
             .usage = vk::BufferUsageFlagBits::eStorageBuffer
                 | vk::BufferUsageFlagBits::eShaderDeviceAddress,
         },
@@ -470,9 +470,9 @@ int main() {
         ),
         .draw_calls_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
-                .size = 8
+                .size = DRAW_CALLS_COUNTS_SIZE
                     + sizeof(vk::DrawIndirectCommand)
-                        * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
+                        * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS) * 4,
                 .usage = vk::BufferUsageFlagBits::eIndirectBuffer
                     | vk::BufferUsageFlagBits::eStorageBuffer
                     | vk::BufferUsageFlagBits::eShaderDeviceAddress},
@@ -767,6 +767,11 @@ int main() {
                 "Debug: Shader Clock",
                 &uniforms->debug,
                 UNIFORMS_DEBUG_SHADER_CLOCK
+            );
+            ImGui::RadioButton(
+                "Debug: Normals",
+                &uniforms->debug,
+                UNIFORMS_DEBUG_NORMALS
             );
         }
         ImGui::Render();

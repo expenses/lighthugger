@@ -11,12 +11,12 @@ void reset_buffers() {
     buf.misc_storage.num_expanded_meshlets = 0;
 
     DrawCallBuffer draw_call_buf = DrawCallBuffer(uniforms.draw_calls);
-    draw_call_buf.num_opaque = 0;
-    draw_call_buf.num_alpha_clip = 0;
+    draw_call_buf.num_opaque = uint32_t4(0);
+    draw_call_buf.num_alpha_clip = uint32_t4(0);
 }
 
 void reset_draw_calls() {
     DrawCallBuffer draw_call_buf = DrawCallBuffer(uniforms.draw_calls);
-    draw_call_buf.num_opaque = 0;
-    draw_call_buf.num_alpha_clip = 0;
+    draw_call_buf.num_opaque = uint32_t4(0);
+    draw_call_buf.num_alpha_clip = uint32_t4(0);
 }

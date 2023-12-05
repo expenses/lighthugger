@@ -25,7 +25,9 @@ void write_draw_calls() {
         return;
     }
 
-    if (cull_cone_perspective(instance, meshlet)) {
+    bool alpha_clipped = bool(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP);
+
+    if (!alpha_clipped && cull_cone_perspective(instance, meshlet)) {
         return;
     }
 
@@ -33,11 +35,11 @@ void write_draw_calls() {
 
     DrawCallBuffer draw_call_buffer = DrawCallBuffer(uniforms.draw_calls);
 
-    if (bool(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP)) {
+    if (alpha_clipped) {
         meshlet_draw_index = ALPHA_CLIP_DRAWS_OFFSET
-            + atomicAdd(draw_call_buffer.num_alpha_clip, 1);
+            + atomicAdd(draw_call_buffer.num_alpha_clip[0], 1);
     } else {
-        meshlet_draw_index = atomicAdd(draw_call_buffer.num_opaque, 1);
+        meshlet_draw_index = atomicAdd(draw_call_buffer.num_opaque[0], 1);
     }
     uint32_t meshlet_indices_buffer_offset =
         meshlet_draw_index + MESHLET_INDICES_BUFFER_SECTION_OFFSET;
@@ -54,10 +56,11 @@ void write_draw_calls() {
         .meshlet_index[meshlet_indices_buffer_offset] = meshlet_index;
 }
 
-layout(local_size_x = 64) in;
+layout(local_size_x = 16, local_size_y = 4) in;
 
 void write_draw_calls_shadows() {
     uint32_t id = gl_GlobalInvocationID.x;
+    uint32_t cascade_index = gl_GlobalInvocationID.y;
 
     if (id >= MiscStorageBuffer(uniforms.misc_storage)
                   .misc_storage.num_expanded_meshlets) {
@@ -76,7 +79,11 @@ void write_draw_calls_shadows() {
 
     bool alpha_clipped = bool(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP);
 
-    if (cull_bounding_sphere_shadows(instance, meshlet.bounding_sphere)) {
+    if (cull_bounding_sphere_shadows(
+            instance,
+            meshlet.bounding_sphere,
+            cascade_index
+        )) {
         return;
     }
 
@@ -90,10 +97,12 @@ void write_draw_calls_shadows() {
 
     if (alpha_clipped) {
         meshlet_draw_index = ALPHA_CLIP_DRAWS_OFFSET
-            + atomicAdd(draw_call_buffer.num_alpha_clip, 1);
+            + atomicAdd(draw_call_buffer.num_alpha_clip[cascade_index], 1);
     } else {
-        meshlet_draw_index = atomicAdd(draw_call_buffer.num_opaque, 1);
+        meshlet_draw_index =
+            atomicAdd(draw_call_buffer.num_opaque[cascade_index], 1);
     }
+    meshlet_draw_index += cascade_index * MESHLET_INDICES_BUFFER_SECTION_OFFSET;
     uint32_t meshlet_indices_buffer_offset =
         meshlet_draw_index + 2 * MESHLET_INDICES_BUFFER_SECTION_OFFSET;
 

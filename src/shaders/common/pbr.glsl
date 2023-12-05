@@ -47,7 +47,8 @@ float3 BRDF(
     float3 n,
     float perceptualRoughness,
     float metallic,
-    float3 baseColor
+    float3 baseColor,
+    bool thin_walled
 ) {
     float3 h = normalize(v + l);
 
@@ -75,6 +76,19 @@ float3 BRDF(
     float3 Fd = diffuseColor * Fd_Burley(NoV, NoL, LoH, roughness);
 
     float3 irradiance = (Fd + Fr) * NoL;
+
+    // Clamp at 0 so that the thin walled stuff isn't fighting against negative values.
+    irradiance = max(irradiance, float3(0));
+
+    // Thin walled
+    // todo: use oren-nayar instead.
+    float rev_NoV = clamp(dot(-n, v), 1e-5, 1.0);
+    float rev_NoL = clamp(dot(-n, l), 0.0, 1.0);
+    irradiance += select(
+        thin_walled,
+        diffuseColor * Fd_Burley(rev_NoV, rev_NoL, LoH, roughness) * rev_NoL,
+        float3(0)
+    );
 
     // Guard against divisions by zero. Mostly from
     // `V_SmithGGXCorrelated` and (I think) backfacing geometry.

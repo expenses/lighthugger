@@ -49,8 +49,8 @@ layout(buffer_reference, scalar) buffer InstanceBuffer {
 };
 
 layout(buffer_reference, scalar) buffer DrawCallBuffer {
-    uint32_t num_opaque;
-    uint32_t num_alpha_clip;
+    uint32_t4 num_opaque;
+    uint32_t4 num_alpha_clip;
     DrawIndirectCommand draw_calls[];
 };
 

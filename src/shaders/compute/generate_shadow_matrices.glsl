@@ -105,8 +105,6 @@ void generate_shadow_matrices() {
     buf.misc_storage.uv_space_shadow_matrices[cascade_index] =
         bias_matrix * matrix;
 
-    if (cascade_index == 3) {
-        buf.misc_storage.largest_cascade_view_matrix = shadowView;
-        buf.misc_storage.shadow_sphere_radius = sphere_radius;
-    }
+    buf.misc_storage.shadow_view_matrices[cascade_index] = shadowView;
+    buf.misc_storage.shadow_sphere_radii[cascade_index] = sphere_radius;
 }

@@ -44,7 +44,11 @@ bool cull_bounding_sphere(Instance instance, vec4 bounding_sphere) {
     return !visible;
 }
 
-bool cull_bounding_sphere_shadows(Instance instance, vec4 bounding_sphere) {
+bool cull_bounding_sphere_shadows(
+    Instance instance,
+    vec4 bounding_sphere,
+    uint32_t cascade_index
+) {
     MiscStorageBuffer buf = MiscStorageBuffer(uniforms.misc_storage);
 
     vec3 world_space_pos =
@@ -62,7 +66,7 @@ bool cull_bounding_sphere_shadows(Instance instance, vec4 bounding_sphere) {
 
     radius *= scale_scalar;
 
-    vec3 view_space_pos = (buf.misc_storage.largest_cascade_view_matrix
+    vec3 view_space_pos = (buf.misc_storage.shadow_view_matrices[cascade_index]
                            * vec4(world_space_pos, 1.0))
                               .xyz;
     // The view space goes from negatives in the front to positives in the back.
@@ -74,10 +78,30 @@ bool cull_bounding_sphere_shadows(Instance instance, vec4 bounding_sphere) {
 
     visible = visible
         && abs(view_space_pos.x) - radius
-            < buf.misc_storage.shadow_sphere_radius;
+            < buf.misc_storage.shadow_sphere_radii[cascade_index];
     visible = visible
         && abs(view_space_pos.y) - radius
-            < buf.misc_storage.shadow_sphere_radius;
+            < buf.misc_storage.shadow_sphere_radii[cascade_index];
+
+    // If the object fits entirely within a smaller cascade then it can be culled.
+    for (uint32_t i = 0; i < cascade_index; i++) {
+        if (!visible) {
+            break;
+        }
+
+        vec3 smaller_view_space_pos = (buf.misc_storage.shadow_view_matrices[i]
+                                       * vec4(world_space_pos, 1.0))
+                                          .xyz;
+
+        bool fits_in_smaller = abs(smaller_view_space_pos.x) + radius
+            < buf.misc_storage.shadow_sphere_radii[i];
+        fits_in_smaller = fits_in_smaller
+            && abs(smaller_view_space_pos.y) + radius
+                < buf.misc_storage.shadow_sphere_radii[i];
+
+        visible = visible && !fits_in_smaller;
+    }
+
     return !visible;
 }
 
