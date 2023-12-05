@@ -702,8 +702,6 @@ GltfMesh load_gltf(
         }
     }
 
-    dbg(total_num_meshlets);
-
     for (auto& staging_buffer : staging_buffers) {
         temp_buffers.push_back(std::move(staging_buffer.buffer));
     }
@@ -712,5 +710,6 @@ GltfMesh load_gltf(
         .images = std::move(images),
         .image_indices = std::move(image_indices),
         .primitives = std::move(primitives),
-        .image_index_tracker = descriptor_set.tracker};
+        .image_index_tracker = descriptor_set.tracker,
+        .total_num_meshlets = total_num_meshlets};
 }

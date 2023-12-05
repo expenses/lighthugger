@@ -35,6 +35,7 @@ struct GltfMesh {
     std::vector<uint32_t> image_indices;
     std::vector<GltfPrimitive> primitives;
     std::shared_ptr<IndexTracker> image_index_tracker;
+    uint32_t total_num_meshlets;
 
     ~GltfMesh() {
         for (auto index : image_indices) {

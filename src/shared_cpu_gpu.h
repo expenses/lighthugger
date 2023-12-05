@@ -106,8 +106,8 @@ struct CopyQuantizedPositionsConstant {
     uint32_t count;
 };
 
-const static uint32_t MAX_OPAQUE_DRAWS = 10000;
-const static uint32_t MAX_ALPHA_CLIP_DRAWS = 2048;
+const static uint32_t MAX_OPAQUE_DRAWS = 200000;
+const static uint32_t MAX_ALPHA_CLIP_DRAWS = 200000;
 
 const static uint32_t ALPHA_CLIP_DRAWS_OFFSET = MAX_OPAQUE_DRAWS;
 
@@ -136,5 +136,7 @@ struct MeshletIndex {
     uint16_t meshlet_index;
 };
 
+// Defaults from https://github.com/zeux/meshoptimizer#mesh-shading
+const static uint32_t MAX_MESHLET_UNIQUE_VERTICES = 64;
 const static uint32_t MAX_MESHLET_TRIANGLES = 124;
 const static uint32_t MAX_MESHLET_VERTICES = MAX_MESHLET_TRIANGLES * 3;

@@ -23,10 +23,10 @@ FormatInfo translate_format(DXGI_FORMAT dxgi_format) {
                 .bits_per_pixel = 4,
                 .is_block_compressed = true};
         case DXGI_FORMAT_BC7_UNORM:
-            return {
-                .format = vk::Format::eBc7UnormBlock,
-                .bits_per_pixel = 8,
-                .is_block_compressed = true};
+            return {// todo: this is only to work around a bug in compressonator
+                    .format = vk::Format::eBc7SrgbBlock,
+                    .bits_per_pixel = 8,
+                    .is_block_compressed = true};
         case DXGI_FORMAT_BC7_UNORM_SRGB:
             return {
                 .format = vk::Format::eBc7SrgbBlock,

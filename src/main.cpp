@@ -322,8 +322,8 @@ int main() {
         {.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit}
     );
 
-    auto helmet = load_gltf(
-        "glTF/out.gltf",
+    auto san_mig = load_gltf(
+        "San_Miguel/packed.gltf",
         allocator,
         device,
         command_buffer,
@@ -334,19 +334,7 @@ int main() {
         temp_descriptor_sets
     );
 
-    auto sponza = load_gltf(
-        "Sponza/glTF/hmm.gltf",
-        allocator,
-        device,
-        command_buffer,
-        graphics_queue_family,
-        temp_buffers,
-        descriptor_set,
-        pipelines,
-        temp_descriptor_sets
-    );
-
-    dbg(sizeof(Instance));
+    dbg(sizeof(Instance), san_mig.total_num_meshlets);
 
     // Load all resources
 
@@ -400,21 +388,12 @@ int main() {
 
     std::vector<Instance> instances;
 
-    for (auto& primitive : sponza.primitives) {
+    for (auto& primitive : san_mig.primitives) {
         instances.push_back(Instance(
-            primitive.transform * glm::scale(glm::mat4(1), glm::vec3(5)),
+            primitive.transform,
             device.getBufferAddress({.buffer = primitive.mesh_info.buffer})
         ));
     }
-
-    instances.push_back(Instance(
-        glm::translate(glm::mat4(1), glm::vec3(75.0, 20.0, 45.0))
-            * glm::scale(glm::mat4(1), glm::vec3(1))
-            * helmet.primitives[0].transform,
-        device.getBufferAddress(
-            {.buffer = helmet.primitives[0].mesh_info.buffer}
-        )
-    ));
 
     auto meshlets_index_buf = AllocatedBuffer(
         vk::BufferCreateInfo {
