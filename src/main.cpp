@@ -398,7 +398,7 @@ int main() {
     auto meshlets_index_buf = AllocatedBuffer(
         vk::BufferCreateInfo {
             // Made up of 6 sections, 1 for expanded meshlets, 1 for culled + sorted meshlets
-            // for the main camera and 4 for culled + sorted meshlets for the shadow camera.
+            // for the main view and 4 for culled + sorted meshlets for each shadow view.
             .size = sizeof(MeshletIndex)
                 * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS) * 6,
             .usage = vk::BufferUsageFlagBits::eStorageBuffer
@@ -449,6 +449,9 @@ int main() {
         ),
         .draw_calls_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
+                // Store the draw call counts as well as 2 sets of commands (opaque + alpha clip)
+                // for each view in use at the same time. As we're rendering the visbuffer before
+                // everything else, we can reset things before rendering the shadow views and can reuse the first set.
                 .size = DRAW_CALLS_COUNTS_SIZE
                     + sizeof(vk::DrawIndirectCommand)
                         * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS) * 4,
