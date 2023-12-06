@@ -5,8 +5,8 @@ using namespace glm;
     #include "shaders/common/hlsl4glsl.glsl"
 #endif
 
-const static uint32_t MESH_INFO_FLAGS_32_BIT_INDICES = 1 << 0;
-const static uint32_t MESH_INFO_FLAGS_ALPHA_CLIP = 1 << 1;
+const static uint8_t MESH_INFO_FLAGS_32_BIT_INDICES = uint8_t(1 << 0);
+const static uint8_t MESH_INFO_FLAGS_ALPHA_CLIP = uint8_t(1 << 1);
 
 struct MeshInfo {
     uint64_t positions;
@@ -16,14 +16,13 @@ struct MeshInfo {
     uint64_t micro_indices;
     uint64_t meshlets;
     uint16_t num_meshlets;
-    uint32_t num_indices;
-    uint32_t flags;
+    uint8_t flags;
     vec4 bounding_sphere;
     vec2 texture_scale;
     vec2 texture_offset;
-    uint32_t albedo_texture_index;
-    uint32_t metallic_roughness_texture_index;
-    uint32_t normal_texture_index;
+    uint16_t albedo_texture_index;
+    uint16_t metallic_roughness_texture_index;
+    uint16_t normal_texture_index;
     vec3 albedo_factor;
 };
 
@@ -35,7 +34,6 @@ struct MiscStorage {
     float shadow_sphere_radii[4];
     uint32_t min_depth;
     uint32_t max_depth;
-    uint32_t num_expanded_meshlets;
 };
 
 // This is only an int32_t because of imgui.
@@ -58,10 +56,12 @@ struct Uniforms {
     uint64_t instances;
     uint64_t draw_calls;
     uint64_t misc_storage;
+    uint64_t num_meshlets_prefix_sum;
     vec3 camera_pos;
     vec3 sun_dir;
     vec3 sun_intensity;
     uint32_t num_instances;
+    uint32_t total_num_meshlets;
     uvec2 window_size;
     float shadow_cam_distance;
     float cascade_split_pow;

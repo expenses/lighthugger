@@ -28,6 +28,7 @@ struct GltfPrimitive {
     AllocatedBuffer micro_indices;
     AllocatedBuffer meshlets;
     glm::mat4 transform;
+    uint32_t num_meshlets;
 };
 
 struct GltfMesh {
@@ -35,7 +36,6 @@ struct GltfMesh {
     std::vector<uint32_t> image_indices;
     std::vector<GltfPrimitive> primitives;
     std::shared_ptr<IndexTracker> image_index_tracker;
-    uint32_t total_num_meshlets;
 
     ~GltfMesh() {
         for (auto index : image_indices) {
@@ -52,6 +52,5 @@ GltfMesh load_gltf(
     uint32_t graphics_queue_family,
     std::vector<AllocatedBuffer>& temp_buffers,
     DescriptorSet& descriptor_set,
-    const Pipelines& pipelines,
-    std::vector<DescriptorPoolAndSet>& temp_descriptor_sets
+    const Pipelines& pipelines
 );

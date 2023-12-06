@@ -374,11 +374,6 @@ Pipelines Pipelines::compile_pipelines(
             pipeline_layout,
             "compiled_shaders/compute/reset_buffers.spv"
         ),
-        .reset_draw_calls = create_compute_pipeline_from_shader(
-            device,
-            pipeline_layout,
-            "compiled_shaders/compute/reset_draw_calls.spv"
-        ),
         .write_draw_calls_shadows = create_compute_pipeline_from_shader(
             device,
             pipeline_layout,

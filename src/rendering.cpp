@@ -123,14 +123,14 @@ void render(
     );
 
     {
-        TracyVkZone(tracy_ctx, *command_buffer, "expand instances to meshlets");
+        TracyVkZone(tracy_ctx, *command_buffer, "gather meshlets from instances");
 
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eCompute,
             *pipelines.expand_meshlets
         );
         command_buffer
-            .dispatch(dispatch_size(resources.num_instances, 64), 1, 1);
+            .dispatch(dispatch_size(resources.total_num_meshlets, 64), 1, 1);
     }
 
     insert_global_barrier(
@@ -279,20 +279,10 @@ void render(
         );
     }
     {
-        TracyVkZone(tracy_ctx, *command_buffer, "generate_matrices");
+        TracyVkZone(tracy_ctx, *command_buffer, "generate shadow matrices and reset draw calls");
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eCompute,
             *pipelines.generate_matrices
-        );
-        command_buffer.dispatch(1, 1, 1);
-    }
-
-    {
-        TracyVkZone(tracy_ctx, *command_buffer, "reset draw calls");
-
-        command_buffer.bindPipeline(
-            vk::PipelineBindPoint::eCompute,
-            *pipelines.reset_draw_calls
         );
         command_buffer.dispatch(1, 1, 1);
     }

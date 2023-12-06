@@ -57,3 +57,7 @@ layout(buffer_reference, scalar) buffer DrawCallBuffer {
 layout(buffer_reference, scalar) buffer MiscStorageBuffer {
     MiscStorage misc_storage;
 };
+
+layout(buffer_reference, scalar) buffer PrefixSumValues {
+    uint32_t values[];
+};

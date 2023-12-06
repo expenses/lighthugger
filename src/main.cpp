@@ -315,7 +315,6 @@ int main() {
         std::move(swapchain_image_sets)
     );
 
-    std::vector<DescriptorPoolAndSet> temp_descriptor_sets;
     std::vector<AllocatedBuffer> temp_buffers;
 
     command_buffer.begin(
@@ -330,11 +329,9 @@ int main() {
         graphics_queue_family,
         temp_buffers,
         descriptor_set,
-        pipelines,
-        temp_descriptor_sets
+        pipelines
     );
-
-    dbg(sizeof(Instance), san_mig.total_num_meshlets);
+    dbg(sizeof(Instance));
 
     // Load all resources
 
@@ -387,13 +384,30 @@ int main() {
         create_shadow_view(3)};
 
     std::vector<Instance> instances;
+    std::vector<uint32_t> num_meshlets_prefix_sum;
+    uint32_t total_num_meshlets;
 
     for (auto& primitive : san_mig.primitives) {
         instances.push_back(Instance(
             primitive.transform,
             device.getBufferAddress({.buffer = primitive.mesh_info.buffer})
         ));
+        total_num_meshlets += primitive.num_meshlets;
+        num_meshlets_prefix_sum.push_back(total_num_meshlets);
     }
+
+    auto num_meshlets_prefix_sum_buf = upload_via_staging_buffer(
+            num_meshlets_prefix_sum.data(),
+            num_meshlets_prefix_sum.size() * sizeof(uint32_t),
+            allocator,
+            vk::BufferUsageFlagBits::eStorageBuffer
+                | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            "num meshlets prefix sum buffer",
+            command_buffer,
+            temp_buffers
+        );
+
+    dbg(num_meshlets_prefix_sum, total_num_meshlets);
 
     auto meshlets_index_buf = AllocatedBuffer(
         vk::BufferCreateInfo {
@@ -513,7 +527,8 @@ int main() {
                 .compareOp = vk::CompareOp::eLess,
                 .minLod = 0.0f,
                 .maxLod = VK_LOD_CLAMP_NONE}),
-        .num_instances = instances.size()};
+        .num_instances = static_cast<uint32_t>(instances.size()),
+        .total_num_meshlets = total_num_meshlets};
 
     command_buffer.end();
 
@@ -533,17 +548,16 @@ int main() {
 
         // Drop temp buffers.
         temp_buffers.clear();
-        temp_descriptor_sets.clear();
     }
 
     // Write initial descriptor sets.
     descriptor_set.write_descriptors(resources, device, swapchain_image_views);
 
     auto camera_params = CameraParams {
-        .position = glm::vec3(76.03, 21.91, 50.30),
+        .position = glm::vec3(42.923, 14.952, 23.50),
         .fov = 45.0f,
-        .yaw = 10.986,
-        .pitch = -0.11,
+        .yaw = 9.98,
+        .pitch = -0.598,
         .sun_latitude = -5.6,
         .sun_longitude = 1.37,
     };
@@ -585,6 +599,7 @@ int main() {
     Uniforms* uniforms =
         reinterpret_cast<Uniforms*>(resources.uniform_buffer.mapped_ptr);
     uniforms->num_instances = instances.size();
+    uniforms->total_num_meshlets = total_num_meshlets;
     uniforms->sun_intensity = glm::vec3(1.0);
     // Set the camera to be a fixed distance away from the frustum center, so that
     // we don't get clipping on the near plane or far planes. I haven't observed any
@@ -599,6 +614,8 @@ int main() {
         device.getBufferAddress({.buffer = resources.draw_calls_buffer.buffer});
     uniforms->misc_storage =
         device.getBufferAddress({.buffer = resources.misc_storage_buffer.buffer}
+        );
+    uniforms->num_meshlets_prefix_sum = device.getBufferAddress({.buffer = num_meshlets_prefix_sum_buf.buffer}
         );
 
     auto copy_view = true;

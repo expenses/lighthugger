@@ -1,29 +1,72 @@
 #include "common/bindings.glsl"
+#include "common/culling.glsl"
+#include "common/util.glsl"
 
 layout(local_size_x = 64) in;
 
 void main() {
-    uint32_t id = gl_GlobalInvocationID.x;
+    uint32_t global_meshlet_index = gl_GlobalInvocationID.x;
 
-    if (id >= uniforms.num_instances) {
+    if (global_meshlet_index >= uniforms.total_num_meshlets) {
         return;
     }
 
-    Instance instance = InstanceBuffer(uniforms.instances).instances[id];
+    InstanceBuffer instance_buffer = InstanceBuffer(uniforms.instances);
+    MeshletIndexBuffer meshlet_index_buffer = MeshletIndexBuffer(uniforms.meshlet_indices);
+    DrawCallBuffer draw_call_buffer = DrawCallBuffer(uniforms.draw_calls);
+    PrefixSumValues prefix_sum_values = PrefixSumValues(uniforms.num_meshlets_prefix_sum);
+
+    // Find the appropriate instance by doing a binary search over the prefix sum of number of instances.
+    uint32_t instance_index = binary_search_upper_bound(prefix_sum_values, uniforms.num_instances, global_meshlet_index);
+    Instance instance = instance_buffer.instances[instance_index];
     MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
+    uint32_t num_meshlets_sum = prefix_sum_values.values[instance_index];
 
-    uint32_t meshlets_offset = atomicAdd(
-        MiscStorageBuffer(uniforms.misc_storage)
-            .misc_storage.num_expanded_meshlets,
-        mesh_info.num_meshlets
-    );
+    uint32_t mesh_meshlet_index = global_meshlet_index - (num_meshlets_sum - mesh_info.num_meshlets);
 
-    MeshletIndexBuffer buf = MeshletIndexBuffer(uniforms.meshlet_indices);
+    MeshletIndex index;
+    index.instance_index = instance_index;
+    index.meshlet_index = uint16_t(mesh_meshlet_index);
 
-    for (uint16_t i = uint16_t(0u); i < mesh_info.num_meshlets; i++) {
-        MeshletIndex index;
-        index.instance_index = id;
-        index.meshlet_index = i;
-        buf.meshlet_index[meshlets_offset + i] = index;
+    // Write the meshlet index into the buffer.
+    meshlet_index_buffer.meshlet_index[global_meshlet_index] = index;
+
+    // Combining these two shaders seems to slow things down rather than speed them up. Not sure why!
+    /*
+
+    // Perform culling and draw call writing for the meshlet for the main view.
+
+    Meshlet meshlet =
+        MeshletBuffer(mesh_info.meshlets).meshlets[mesh_meshlet_index];
+
+    if (cull_bounding_sphere(instance, meshlet.bounding_sphere)) {
+        return;
     }
+
+    bool alpha_clipped = bool(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP);
+
+    if (!alpha_clipped && cull_cone_perspective(instance, meshlet)) {
+        return;
+    }
+
+    uint meshlet_draw_index;
+
+    if (alpha_clipped) {
+        meshlet_draw_index = ALPHA_CLIP_DRAWS_OFFSET
+            + atomicAdd(draw_call_buffer.num_alpha_clip[0], 1);
+    } else {
+        meshlet_draw_index = atomicAdd(draw_call_buffer.num_opaque[0], 1);
+    }
+    uint32_t meshlet_indices_buffer_offset =
+        meshlet_draw_index + MESHLET_INDICES_BUFFER_SECTION_OFFSET;
+
+    DrawIndirectCommand draw_call;
+    draw_call.vertexCount = meshlet.triangle_count * 3;
+    draw_call.instanceCount = 1;
+    draw_call.firstVertex = 0;
+    draw_call.firstInstance = meshlet_indices_buffer_offset;
+
+    draw_call_buffer.draw_calls[meshlet_draw_index] = draw_call;
+
+    meshlet_index_buffer.meshlet_index[meshlet_indices_buffer_offset] = index;*/
 }

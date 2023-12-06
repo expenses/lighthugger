@@ -6,8 +6,7 @@ layout(local_size_x = 64) in;
 void write_draw_calls() {
     uint32_t id = gl_GlobalInvocationID.x;
 
-    if (id >= MiscStorageBuffer(uniforms.misc_storage)
-                  .misc_storage.num_expanded_meshlets) {
+    if (id >= uniforms.total_num_meshlets) {
         return;
     }
 
@@ -62,8 +61,7 @@ void write_draw_calls_shadows() {
     uint32_t id = gl_GlobalInvocationID.x;
     uint32_t cascade_index = gl_GlobalInvocationID.y;
 
-    if (id >= MiscStorageBuffer(uniforms.misc_storage)
-                  .misc_storage.num_expanded_meshlets) {
+    if (id >= uniforms.total_num_meshlets) {
         return;
     }
 

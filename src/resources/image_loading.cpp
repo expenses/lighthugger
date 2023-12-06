@@ -116,7 +116,7 @@ ImageWithView load_dds(
         .baseMipLevel = 0,
         .levelCount = mip_levels,
         .baseArrayLayer = 0,
-        .layerCount = is_cubemap ? 6 : 1,
+        .layerCount = is_cubemap ? 6u : 1u,
     };
 
     auto image_name = std::string("'") + filepath.string() + "'";
@@ -134,7 +134,7 @@ ImageWithView load_dds(
                     .depth = depth,
                 },
             .mipLevels = mip_levels,
-            .arrayLayers = is_cubemap ? 6 : 1,
+            .arrayLayers = is_cubemap ? 6u : 1u,
             .usage = vk::ImageUsageFlagBits::eSampled
                 | vk::ImageUsageFlagBits::eTransferDst},
         allocator,
@@ -190,7 +190,7 @@ ImageWithView load_dds(
                     .aspectMask = vk::ImageAspectFlagBits::eColor,
                     .mipLevel = static_cast<uint32_t>(i),
                     .baseArrayLayer = 0,
-                    .layerCount = is_cubemap ? 6 : 1,
+                    .layerCount = is_cubemap ? 6u : 1u,
                 },
             .imageExtent = vk::Extent3D {
                 .width = level_width,
