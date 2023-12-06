@@ -294,8 +294,6 @@ GltfMesh load_gltf(
     images.reserve(asset.images.size());
     image_indices.reserve(asset.images.size());
 
-    auto total_num_meshlets = 0;
-
     for (size_t i = 0; i < asset.images.size(); i++) {
         auto& img = asset.images[i];
 
@@ -694,14 +692,11 @@ GltfMesh load_gltf(
                     .mesh_info = std::move(mesh_info_buffer),
                     .micro_indices = std::move(meshlet_buffers.micro_indices),
                     .meshlets = std::move(meshlet_buffers.meshlets),
-                    .transform = transform});
-
-                total_num_meshlets += meshlet_buffers.num_meshlets;
+                    .transform = transform,
+                    .num_meshlets = meshlet_buffers.num_meshlets});
             }
         }
     }
-
-    dbg(total_num_meshlets);
 
     for (auto& staging_buffer : staging_buffers) {
         temp_buffers.push_back(std::move(staging_buffer.buffer));

@@ -34,7 +34,6 @@ struct MiscStorage {
     float shadow_sphere_radii[4];
     uint32_t min_depth;
     uint32_t max_depth;
-    uint32_t num_expanded_meshlets;
 };
 
 // This is only an int32_t because of imgui.
@@ -61,6 +60,7 @@ struct Uniforms {
     vec3 sun_dir;
     vec3 sun_intensity;
     uint32_t num_instances;
+    uint32_t total_num_meshlets;
     uvec2 window_size;
     float shadow_cam_distance;
     float cascade_split_pow;

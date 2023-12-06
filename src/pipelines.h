@@ -22,7 +22,6 @@ struct Pipelines {
     vk::raii::Pipeline render_geometry;
     vk::raii::Pipeline expand_meshlets;
     vk::raii::Pipeline reset_buffers;
-    vk::raii::Pipeline reset_draw_calls;
     vk::raii::Pipeline write_draw_calls_shadows;
 
     vk::raii::PipelineLayout pipeline_layout;

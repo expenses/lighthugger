@@ -23,18 +23,3 @@ layout(binding = 9) uniform sampler repeat_sampler;
 layout(binding = 10) uniform sampler shadowmap_comparison_sampler;
 
 layout(binding = 11) uniform textureCube skybox;
-
-uint32_t load_index(MeshInfo mesh_info, uint32_t vertex_id) {
-    if (bool(mesh_info.flags & MESH_INFO_FLAGS_32_BIT_INDICES)) {
-        return Index32Buffer(mesh_info.indices).indices[vertex_id];
-    } else {
-        return Index16Buffer(mesh_info.indices).indices[vertex_id];
-    }
-}
-
-float3
-calculate_world_pos(Instance instance, MeshInfo mesh_info, uint32_t index) {
-    float3 position =
-        QuantizedPositionBuffer(mesh_info.positions).positions[index];
-    return (instance.transform * float4(position, 1.0)).xyz;
-}

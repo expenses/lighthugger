@@ -28,6 +28,7 @@ struct GltfPrimitive {
     AllocatedBuffer micro_indices;
     AllocatedBuffer meshlets;
     glm::mat4 transform;
+    uint32_t num_meshlets;
 };
 
 struct GltfMesh {

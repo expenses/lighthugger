@@ -1,5 +1,6 @@
 #include "../common/bindings.glsl"
 #include "../common/matrices.glsl"
+#include "../common/util.glsl"
 
 // Transforms the matrix output from NDC to UV space.
 mat4 bias_matrix = mat4(
@@ -8,11 +9,6 @@ mat4 bias_matrix = mat4(
     vec4(0.0, 0.0, 1.0, 0.0),
     vec4(0.5, 0.5, 0.0, 1.0)
 );
-
-// Super easy.
-float convert_infinite_reverze_z_depth(float depth) {
-    return NEAR_PLANE / depth;
-}
 
 layout(local_size_x = 4) in;
 
@@ -107,4 +103,6 @@ void generate_shadow_matrices() {
 
     buf.misc_storage.shadow_view_matrices[cascade_index] = shadowView;
     buf.misc_storage.shadow_sphere_radii[cascade_index] = sphere_radius;
+
+    reset_draw_calls();
 }

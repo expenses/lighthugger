@@ -1,8 +1,5 @@
 #include "common/bindings.glsl"
-
-uint32_t pack(uint32_t triangle_index, uint32_t instance_index) {
-    return triangle_index << 24 | instance_index;
-}
+#include "common/util.glsl"
 
 //vert
 

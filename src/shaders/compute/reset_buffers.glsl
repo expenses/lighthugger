@@ -1,4 +1,5 @@
 #include "../common/bindings.glsl"
+#include "../common/util.glsl"
 
 layout(local_size_x = 1) in;
 
@@ -8,15 +9,6 @@ void reset_buffers() {
     MiscStorageBuffer buf = MiscStorageBuffer(uniforms.misc_storage);
     buf.misc_storage.min_depth = UINT32_T_MAX_VALUE;
     buf.misc_storage.max_depth = 0;
-    buf.misc_storage.num_expanded_meshlets = 0;
 
-    DrawCallBuffer draw_call_buf = DrawCallBuffer(uniforms.draw_calls);
-    draw_call_buf.num_opaque = uint32_t4(0);
-    draw_call_buf.num_alpha_clip = uint32_t4(0);
-}
-
-void reset_draw_calls() {
-    DrawCallBuffer draw_call_buf = DrawCallBuffer(uniforms.draw_calls);
-    draw_call_buf.num_opaque = uint32_t4(0);
-    draw_call_buf.num_alpha_clip = uint32_t4(0);
+    reset_draw_calls();
 }

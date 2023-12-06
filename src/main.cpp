@@ -396,12 +396,16 @@ int main() {
         create_shadow_view(3)};
 
     std::vector<Instance> instances;
+    std::vector<uint32_t> num_meshlets_prefix_sum;
+    uint32_t total_num_meshlets;
 
     for (auto& primitive : sponza.primitives) {
         instances.push_back(Instance(
             primitive.transform * glm::scale(glm::mat4(1), glm::vec3(5)),
             device.getBufferAddress({.buffer = primitive.mesh_info.buffer})
         ));
+        total_num_meshlets += primitive.num_meshlets;
+        num_meshlets_prefix_sum.push_back(total_num_meshlets);
     }
 
     instances.push_back(Instance(
@@ -412,6 +416,11 @@ int main() {
             {.buffer = helmet.primitives[0].mesh_info.buffer}
         )
     ));
+
+    total_num_meshlets += helmet.primitives[0].num_meshlets;
+    num_meshlets_prefix_sum.push_back(total_num_meshlets);
+
+    dbg(num_meshlets_prefix_sum, total_num_meshlets);
 
     auto meshlets_index_buf = AllocatedBuffer(
         vk::BufferCreateInfo {
@@ -531,7 +540,8 @@ int main() {
                 .compareOp = vk::CompareOp::eLess,
                 .minLod = 0.0f,
                 .maxLod = VK_LOD_CLAMP_NONE}),
-        .num_instances = static_cast<uint32_t>(instances.size())};
+        .num_instances = static_cast<uint32_t>(instances.size()),
+        .total_num_meshlets = total_num_meshlets};
 
     command_buffer.end();
 
@@ -602,6 +612,7 @@ int main() {
     Uniforms* uniforms =
         reinterpret_cast<Uniforms*>(resources.uniform_buffer.mapped_ptr);
     uniforms->num_instances = instances.size();
+    uniforms->total_num_meshlets = total_num_meshlets;
     uniforms->sun_intensity = glm::vec3(1.0);
     // Set the camera to be a fixed distance away from the frustum center, so that
     // we don't get clipping on the near plane or far planes. I haven't observed any
