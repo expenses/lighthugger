@@ -36,12 +36,9 @@ uint32_t binary_search_upper_bound(PrefixSumValues values, uint32_t count, uint3
     while (count > 0) {
         uint32_t step = (count / 2);
         uint32_t current = first + step;
-
-        // There might be a better way of making this branchless
-        // but this works well enough.
         bool greater = target >= values.values[current];
-        count = select(greater, count - step + 1, step);
         first = select(greater, current + 1, first);
+        count = select(greater, count - (step + 1), step);
     }
 
     return first;

@@ -385,7 +385,7 @@ int main() {
 
     std::vector<Instance> instances;
     std::vector<uint32_t> num_meshlets_prefix_sum;
-    uint32_t total_num_meshlets;
+    uint32_t total_num_meshlets = 0;
 
     for (auto& primitive : san_mig.primitives) {
         instances.push_back(Instance(
