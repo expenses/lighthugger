@@ -28,3 +28,18 @@ uint32_t pack(uint32_t triangle_index, uint32_t instance_index) {
 float convert_infinite_reverze_z_depth(float depth) {
     return NEAR_PLANE / depth;
 }
+
+// See https://en.cppreference.com/w/cpp/algorithm/upper_bound.
+uint32_t binary_search_upper_bound(PrefixSumValues values, uint32_t count, uint32_t target) {
+    uint32_t first = 0;
+
+    while (count > 0) {
+        uint32_t step = (count / 2);
+        uint32_t current = first + step;
+        bool greater = target >= values.values[current];
+        first = select(greater, current + 1, first);
+        count = select(greater, count - (step + 1), step);
+    }
+
+    return first;
+}

@@ -7,9 +7,12 @@ Meshlets build_meshlets(
     size_t vertices_count,
     bool uses_32_bit_indices
 ) {
-    auto max_vertices = 64;
+    auto max_vertices = MAX_MESHLET_UNIQUE_VERTICES;
     auto max_triangles = MAX_MESHLET_TRIANGLES;
-    auto cone_weight = 1.0f;
+    // Given that I want to render a lot of foliage
+    // which is double-sided and doesn't benefit from
+    // cone culling, we can turn this down.
+    auto cone_weight = 0.25f;
 
     size_t max_meshlets =
         meshopt_buildMeshletsBound(indices_count, max_vertices, max_triangles);

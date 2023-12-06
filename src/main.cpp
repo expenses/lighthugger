@@ -397,7 +397,7 @@ int main() {
 
     std::vector<Instance> instances;
     std::vector<uint32_t> num_meshlets_prefix_sum;
-    uint32_t total_num_meshlets;
+    uint32_t total_num_meshlets = 0;
 
     for (auto& primitive : sponza.primitives) {
         instances.push_back(Instance(
@@ -419,6 +419,17 @@ int main() {
 
     total_num_meshlets += helmet.primitives[0].num_meshlets;
     num_meshlets_prefix_sum.push_back(total_num_meshlets);
+
+    auto num_meshlets_prefix_sum_buf = upload_via_staging_buffer(
+            num_meshlets_prefix_sum.data(),
+            num_meshlets_prefix_sum.size() * sizeof(uint32_t),
+            allocator,
+            vk::BufferUsageFlagBits::eStorageBuffer
+                | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            "num meshlets prefix sum buffer",
+            command_buffer,
+            temp_buffers
+        );
 
     dbg(num_meshlets_prefix_sum, total_num_meshlets);
 
@@ -627,6 +638,8 @@ int main() {
         device.getBufferAddress({.buffer = resources.draw_calls_buffer.buffer});
     uniforms->misc_storage =
         device.getBufferAddress({.buffer = resources.misc_storage_buffer.buffer}
+        );
+    uniforms->num_meshlets_prefix_sum = device.getBufferAddress({.buffer = num_meshlets_prefix_sum_buf.buffer}
         );
 
     auto copy_view = true;

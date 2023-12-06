@@ -133,7 +133,6 @@ void render(
             .dispatch(dispatch_size(resources.total_num_meshlets, 64), 1, 1);
     }
 
-    /*
     insert_global_barrier(
         command_buffer,
         GlobalBarrier<1, 1> {
@@ -162,7 +161,6 @@ void render(
             1
         );
     }
-    */
 
     insert_global_barrier(
         command_buffer,

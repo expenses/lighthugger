@@ -1,5 +1,6 @@
 #include "common/bindings.glsl"
 #include "common/culling.glsl"
+#include "common/util.glsl"
 
 layout(local_size_x = 64) in;
 
@@ -13,23 +14,14 @@ void main() {
     InstanceBuffer instance_buffer = InstanceBuffer(uniforms.instances);
     MeshletIndexBuffer meshlet_index_buffer = MeshletIndexBuffer(uniforms.meshlet_indices);
     DrawCallBuffer draw_call_buffer = DrawCallBuffer(uniforms.draw_calls);
+    PrefixSumValues prefix_sum_values = PrefixSumValues(uniforms.num_meshlets_prefix_sum);
 
-    Instance instance;
-    MeshInfo mesh_info;
+    // Find the appropriate instance by doing a binary search over the prefix sum of number of instances.
+    uint32_t instance_index = binary_search_upper_bound(prefix_sum_values, uniforms.num_instances, global_meshlet_index);
+    Instance instance = instance_buffer.instances[instance_index];
+    MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
+    uint32_t num_meshlets_sum = prefix_sum_values.values[instance_index];
 
-    // Find the appropriate instance by doing a linear scan over all instances
-    // Todo: can be replaced with a binary search using the num_meshlets prefix scan result.
-    uint32_t num_meshlets_sum = 0;
-    uint32_t instance_index = 0;
-    while (instance_index < uniforms.num_instances) {
-        instance = instance_buffer.instances[instance_index];
-        mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
-        num_meshlets_sum += mesh_info.num_meshlets;
-        if (global_meshlet_index < num_meshlets_sum) {
-            break;
-        }
-        instance_index ++;
-    }
     uint32_t mesh_meshlet_index = global_meshlet_index - (num_meshlets_sum - mesh_info.num_meshlets);
 
     MeshletIndex index;
@@ -38,6 +30,9 @@ void main() {
 
     // Write the meshlet index into the buffer.
     meshlet_index_buffer.meshlet_index[global_meshlet_index] = index;
+
+    // Combining these two shaders seems to slow things down rather than speed them up. Not sure why!
+    /*
 
     // Perform culling and draw call writing for the meshlet for the main view.
 
@@ -73,5 +68,5 @@ void main() {
 
     draw_call_buffer.draw_calls[meshlet_draw_index] = draw_call;
 
-    meshlet_index_buffer.meshlet_index[meshlet_indices_buffer_offset] = index;
+    meshlet_index_buffer.meshlet_index[meshlet_indices_buffer_offset] = index;*/
 }

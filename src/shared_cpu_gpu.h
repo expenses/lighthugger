@@ -56,6 +56,7 @@ struct Uniforms {
     uint64_t instances;
     uint64_t draw_calls;
     uint64_t misc_storage;
+    uint64_t num_meshlets_prefix_sum;
     vec3 camera_pos;
     vec3 sun_dir;
     vec3 sun_intensity;
@@ -135,5 +136,7 @@ struct MeshletIndex {
     uint16_t meshlet_index;
 };
 
+// Defaults from https://github.com/zeux/meshoptimizer#mesh-shading
+const static uint32_t MAX_MESHLET_UNIQUE_VERTICES = 64;
 const static uint32_t MAX_MESHLET_TRIANGLES = 124;
 const static uint32_t MAX_MESHLET_VERTICES = MAX_MESHLET_TRIANGLES * 3;
