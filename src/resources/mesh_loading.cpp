@@ -145,7 +145,8 @@ MeshletBuffers upload_meshlet_buffers_from_cache(
         .meshlets = std::move(meshlets_buffer),
         .indices = std::move(indices_buffer),
         .micro_indices = std::move(micro_indices_buffer),
-        .num_meshlets = num_meshlet_bytes / sizeof(Meshlet)};
+        .num_meshlets =
+            static_cast<uint32_t>(num_meshlet_bytes / sizeof(Meshlet))};
 }
 
 MeshletBuffers upload_meshlet_buffers(
@@ -208,7 +209,7 @@ MeshletBuffers upload_meshlet_buffers(
         .meshlets = std::move(meshlets_buffer),
         .indices = std::move(indices_buffer.value()),
         .micro_indices = std::move(micro_indices),
-        .num_meshlets = meshlets.meshlets.size()};
+        .num_meshlets = static_cast<uint32_t>(meshlets.meshlets.size())};
 }
 
 GltfMesh load_gltf(
@@ -219,8 +220,7 @@ GltfMesh load_gltf(
     uint32_t graphics_queue_family,
     std::vector<AllocatedBuffer>& temp_buffers,
     DescriptorSet& descriptor_set,
-    const Pipelines& pipelines,
-    std::vector<DescriptorPoolAndSet>& temp_descriptor_sets
+    const Pipelines& pipelines
 ) {
     if (!std::filesystem::exists(filepath)) {
         dbg(filepath, "does not exist");
@@ -462,11 +462,11 @@ GltfMesh load_gltf(
                 auto texture_scale = glm::vec2(1.0);
                 auto texture_offset = glm::vec2(0.0);
                 auto albedo_texture_index =
-                    std::numeric_limits<uint32_t>::max();
+                    std::numeric_limits<uint16_t>::max();
                 auto metallic_roughness_texture_index =
-                    std::numeric_limits<uint32_t>::max();
+                    std::numeric_limits<uint16_t>::max();
                 auto normal_texture_index =
-                    std::numeric_limits<uint32_t>::max();
+                    std::numeric_limits<uint16_t>::max();
 
                 if (material.pbrData.baseColorTexture) {
                     auto& tex = material.pbrData.baseColorTexture.value();
@@ -528,7 +528,7 @@ GltfMesh load_gltf(
                     texture_scale /= float((1 << 16) - 1);
                 }
 
-                uint32_t flags = 0;
+                uint8_t flags = 0u;
                 if (uses_32_bit_indices) {
                     flags |= MESH_INFO_FLAGS_32_BIT_INDICES;
                 }
@@ -649,9 +649,8 @@ GltfMesh load_gltf(
                     .meshlets = device.getBufferAddress(
                         {.buffer = meshlet_buffers.meshlets.buffer}
                     ),
-                    .num_meshlets = meshlet_buffers.num_meshlets,
-
-                    .num_indices = static_cast<uint32_t>(indices.count),
+                    .num_meshlets =
+                        static_cast<uint16_t>(meshlet_buffers.num_meshlets),
                     .flags = flags,
                     .bounding_sphere = glm::vec4(
                         bounding_sphere[0],

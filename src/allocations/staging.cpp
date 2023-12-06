@@ -55,7 +55,7 @@ std::pair<AllocatedBuffer, size_t> upload_from_file_via_staging_buffer(
     std::vector<AllocatedBuffer>& temp_buffers
 ) {
     stream.seekg(0, stream.end);
-    auto length = stream.tellg();
+    uint32_t length = stream.tellg();
     stream.seekg(0, stream.beg);
     auto staging_buffer_name = name + " staging buffer";
     auto staging_buffer = PersistentlyMappedBuffer(AllocatedBuffer(

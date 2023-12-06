@@ -315,7 +315,6 @@ int main() {
         std::move(swapchain_image_sets)
     );
 
-    std::vector<DescriptorPoolAndSet> temp_descriptor_sets;
     std::vector<AllocatedBuffer> temp_buffers;
 
     command_buffer.begin(
@@ -330,8 +329,7 @@ int main() {
         graphics_queue_family,
         temp_buffers,
         descriptor_set,
-        pipelines,
-        temp_descriptor_sets
+        pipelines
     );
 
     auto sponza = load_gltf(
@@ -342,8 +340,7 @@ int main() {
         graphics_queue_family,
         temp_buffers,
         descriptor_set,
-        pipelines,
-        temp_descriptor_sets
+        pipelines
     );
 
     dbg(sizeof(Instance));
@@ -534,7 +531,7 @@ int main() {
                 .compareOp = vk::CompareOp::eLess,
                 .minLod = 0.0f,
                 .maxLod = VK_LOD_CLAMP_NONE}),
-        .num_instances = instances.size()};
+        .num_instances = static_cast<uint32_t>(instances.size())};
 
     command_buffer.end();
 
@@ -554,7 +551,6 @@ int main() {
 
         // Drop temp buffers.
         temp_buffers.clear();
-        temp_descriptor_sets.clear();
     }
 
     // Write initial descriptor sets.

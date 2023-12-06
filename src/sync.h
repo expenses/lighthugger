@@ -48,9 +48,11 @@ void insert_color_image_barriers(
         auto& global_barrier = opt_global_barrier.value();
 
         thsvs_global_barrier = {
-            .prevAccessCount = global_barrier.prev_accesses.size(),
+            .prevAccessCount =
+                static_cast<uint32_t>(global_barrier.prev_accesses.size()),
             .pPrevAccesses = global_barrier.prev_accesses.data(),
-            .nextAccessCount = global_barrier.prev_accesses.size(),
+            .nextAccessCount =
+                static_cast<uint32_t>(global_barrier.prev_accesses.size()),
             .pNextAccesses = global_barrier.next_accesses.data()};
     }
 
@@ -71,9 +73,11 @@ void insert_global_barrier(
     GlobalBarrier<P, N> global_barrier
 ) {
     ThsvsGlobalBarrier thsvs_global_barrier = {
-        .prevAccessCount = global_barrier.prev_accesses.size(),
+        .prevAccessCount =
+            static_cast<uint32_t>(global_barrier.prev_accesses.size()),
         .pPrevAccesses = global_barrier.prev_accesses.data(),
-        .nextAccessCount = global_barrier.prev_accesses.size(),
+        .nextAccessCount =
+            static_cast<uint32_t>(global_barrier.prev_accesses.size()),
         .pNextAccesses = global_barrier.next_accesses.data()};
 
     thsvsCmdPipelineBarrier(

@@ -51,6 +51,5 @@ GltfMesh load_gltf(
     uint32_t graphics_queue_family,
     std::vector<AllocatedBuffer>& temp_buffers,
     DescriptorSet& descriptor_set,
-    const Pipelines& pipelines,
-    std::vector<DescriptorPoolAndSet>& temp_descriptor_sets
+    const Pipelines& pipelines
 );
