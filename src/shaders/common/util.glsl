@@ -36,7 +36,7 @@ uint32_t total_num_meshlets_for_cascade(uint32_t cascade_index) {
 }
 
 uint32_t dispatch_size(uint32_t width, uint32_t workgroup_size) {
-    return ((width - 1) / workgroup_size) + 1;
+    return (select(width == 0, 1, width - 1) / workgroup_size) + 1;
 }
 
 MeshletReference

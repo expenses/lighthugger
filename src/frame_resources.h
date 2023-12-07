@@ -1,4 +1,5 @@
 #pragma once
+#include "allocations/image_with_view.h"
 #include "util.h"
 
 struct ResizingResources {
