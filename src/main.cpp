@@ -213,11 +213,6 @@ int main() {
         swapchain_create_info.imageFormat
     );
 
-    vk::raii::CommandPool command_pool = device.createCommandPool({
-        .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-        .queueFamilyIndex = graphics_queue_family,
-    });
-
     // AMD VMA allocator
 
     vma::AllocatorCreateInfo allocatorCreateInfo = {
@@ -235,18 +230,21 @@ int main() {
     // after all allocated objects are destroyed.
     RaiiAllocator raii_allocator = {.allocator = allocator};
 
-    auto command_buffers =
-        device.allocateCommandBuffers(vk::CommandBufferAllocateInfo {
-            .commandPool = *command_pool,
-            .level = vk::CommandBufferLevel::ePrimary,
-            .commandBufferCount = 1});
-    auto command_buffer = std::move(command_buffers[0]);
-
-    auto sync_resources = SyncResources {
-        .present_semaphore = device.createSemaphore({}),
-        .render_semaphore = device.createSemaphore({}),
-        .render_fence =
-            device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled})};
+    auto command_buffer = FlipFlipResource(std::array {
+        create_frame_command_data(
+            device,
+            phys_device,
+            graphics_queue,
+            allocator,
+            graphics_queue_family
+        ),
+        create_frame_command_data(
+            device,
+            phys_device,
+            graphics_queue,
+            allocator,
+            graphics_queue_family
+        )});
 
     auto descriptor_set_layouts = create_descriptor_set_layouts(device);
     auto pipelines =
@@ -305,7 +303,7 @@ int main() {
 
     std::vector<AllocatedBuffer> temp_buffers;
 
-    command_buffer.begin(
+    command_buffer.get().buffer.begin(
         {.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit}
     );
 
@@ -313,7 +311,7 @@ int main() {
         "San_Miguel/packed.gltf",
         allocator,
         device,
-        command_buffer,
+        command_buffer.get().buffer,
         graphics_queue_family,
         temp_buffers,
         descriptor_set,
@@ -386,7 +384,7 @@ int main() {
             vk::BufferUsageFlagBits::eStorageBuffer
                 | vk::BufferUsageFlagBits::eShaderDeviceAddress,
             "instance buffer",
-            command_buffer,
+            command_buffer.get().buffer,
             temp_buffers
         ),
         .meshlet_references = AllocatedBuffer(
@@ -422,8 +420,7 @@ int main() {
     auto uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
         vk::BufferCreateInfo {
             .size = sizeof(Uniforms),
-            .usage = vk::BufferUsageFlagBits::eUniformBuffer
-                | vk::BufferUsageFlagBits::eShaderDeviceAddress},
+            .usage = vk::BufferUsageFlagBits::eTransferSrc},
         {
             .flags = vma::AllocationCreateFlagBits::eMapped
                 | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
@@ -482,7 +479,7 @@ int main() {
             "external/tony-mc-mapface/shader/tony_mc_mapface.dds",
             allocator,
             device,
-            command_buffer,
+            command_buffer.get().buffer,
             graphics_queue_family,
             temp_buffers
         ),
@@ -490,7 +487,7 @@ int main() {
             "hdr-cubemap-1024x1024.dds",
             allocator,
             device,
-            command_buffer,
+            command_buffer.get().buffer,
             graphics_queue_family,
             temp_buffers
         ),
@@ -527,7 +524,7 @@ int main() {
                 .minLod = 0.0f,
                 .maxLod = VK_LOD_CLAMP_NONE})};
 
-    command_buffer.end();
+    command_buffer.get().buffer.end();
 
     {
         vk::PipelineStageFlags dst_stage_mask =
@@ -536,7 +533,7 @@ int main() {
         vk::SubmitInfo submit_info = {
             .pWaitDstStageMask = &dst_stage_mask,
             .commandBufferCount = 1,
-            .pCommandBuffers = &*command_buffer,
+            .pCommandBuffers = &*command_buffer.get().buffer,
         };
         auto init_fence = device.createFence({});
         graphics_queue.submit(submit_info, *init_fence);
@@ -558,9 +555,6 @@ int main() {
         .sun_latitude = -5.6,
         .sun_longitude = 1.37,
     };
-
-    auto tracy_ctx =
-        TracyVkContext(*phys_device, *device, *graphics_queue, *command_buffer);
 
     ImGui::CreateContext();
     ImGui_ImplGlfw_InitForVulkan(window, true);
@@ -617,9 +611,6 @@ int main() {
     );
     uniforms->dispatches =
         device.getBufferAddress({.buffer = resources.dispatches_buffer.buffer});
-
-    auto uniform_buffer_address =
-        device.getBufferAddress({.buffer = uniform_buffer.buffer.buffer});
 
     auto copy_view = true;
 
@@ -692,81 +683,9 @@ int main() {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        {
-            ImGui::Checkbox("debug shadowmaps", &uniforms->debug_shadowmaps);
-            ImGui::Checkbox("copy view", &copy_view);
-            ImGui::SliderFloat(
-                "shadow_cam_distance",
-                &uniforms->shadow_cam_distance,
-                0.0f,
-                10000.0f
-            );
-            ImGui::SliderFloat(
-                "cascade_split_pow",
-                &uniforms->cascade_split_pow,
-                0.0f,
-                10.0f
-            );
-            ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
-            ImGui::SliderFloat(
-                "sun_intensity",
-                &uniforms->sun_intensity.x,
-                0.0f,
-                100.0f
-            );
-            ImGui::Text(
-                "camera pos: (%f, %f, %f)",
-                camera_params.position.x,
-                camera_params.position.y,
-                camera_params.position.z
-            );
-            ImGui::Text("yaw: %f", camera_params.yaw);
-            ImGui::Text("pitch: %f", camera_params.pitch);
-            ImGui::Text("sun_latitude: %f", camera_params.sun_latitude);
-            ImGui::Text("sun_longitude: %f", camera_params.sun_longitude);
-            ImGui::Text("grab_toggled: %u", keyboard_state.grab_toggled);
-            ImGui::RadioButton(
-                "Debug: Off",
-                &uniforms->debug,
-                UNIFORMS_DEBUG_OFF
-            );
-            ImGui::RadioButton(
-                "Debug: Cascades",
-                &uniforms->debug,
-                UNIFORMS_DEBUG_CASCADES
-            );
-            ImGui::RadioButton(
-                "Debug: Triangle index",
-                &uniforms->debug,
-                UNIFORMS_DEBUG_TRIANGLE_INDEX
-            );
-            ImGui::RadioButton(
-                "Debug: Instance Index",
-                &uniforms->debug,
-                UNIFORMS_DEBUG_INSTANCE_INDEX
-            );
-            ImGui::RadioButton(
-                "Debug: Shader Clock",
-                &uniforms->debug,
-                UNIFORMS_DEBUG_SHADER_CLOCK
-            );
-            ImGui::RadioButton(
-                "Debug: Normals",
-                &uniforms->debug,
-                UNIFORMS_DEBUG_NORMALS
-            );
-        }
+        draw_imgui_window(uniforms, camera_params, keyboard_state, copy_view);
         ImGui::Render();
 
-        // Wait on the render fence to be signaled
-        // (it's signaled before this loop starts so that we don't just block forever on the first frame)
-        check_vk_result(
-            device.waitForFences({*sync_resources.render_fence}, true, u64_max)
-        );
-        device.resetFences({*sync_resources.render_fence});
-
-        // Important! This needs to happen after waiting on the fence because otherwise we get race conditions
-        // due to writing to a value that the previous frame is reading from.
         {
             auto view = glm::lookAt(
                 camera_params.position,
@@ -795,23 +714,38 @@ int main() {
             }
         }
 
-        // Reset the command pool instead of resetting the single command buffer as
-        // it's cheaper (afaik). Obviously don't do this if multiple command buffers are used.
-        command_pool.reset();
+        auto& data = command_buffer.get();
+
+        // Wait on the render fence to be signaled
+        // (it's signaled before this loop starts so that we don't just block forever on the first frame)
+        check_vk_result(
+            device.waitForFences({*data.render_fence}, true, 1000000000)
+        );
+        device.resetFences({*data.render_fence});
 
         // Acquire the next swapchain image (waiting on the gpu-side and signaling the present semaphore when finished).
-        auto [acquire_err, swapchain_image_index] = swapchain.acquireNextImage(
-            u64_max,
-            *sync_resources.present_semaphore
-        );
+        auto [acquire_err, swapchain_image_index] =
+            swapchain.acquireNextImage(1000000000, *data.swapchain_semaphore);
+
+        // Reset the command pool instead of resetting the single command buffer as
+        // it's cheaper (afaik). Obviously don't do this if multiple command buffers are used.
+        data.pool.reset();
 
         // This wraps vkBeginCommandBuffer.
-        command_buffer.begin(
+        data.buffer.begin(
             {.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit}
         );
 
+        data.buffer.copyBuffer(uniform_buffer.buffer.buffer, data.uniform_buffer.buffer, {
+            vk::BufferCopy {
+                .srcOffset = 0,
+                .dstOffset = 0,
+                .size = sizeof(Uniforms)
+            }
+        });
+
         render(
-            command_buffer,
+            data.buffer,
             pipelines,
             descriptor_set,
             resources,
@@ -819,13 +753,15 @@ int main() {
             swapchain_image_views[swapchain_image_index],
             extent,
             graphics_queue_family,
-            tracy_ctx,
+            data.tracy_ctx,
             swapchain_image_index,
-            uniform_buffer_address
+            device.getBufferAddress(
+                {.buffer = data.uniform_buffer.buffer}
+            )
         );
-        TracyVkCollect(tracy_ctx, *command_buffer);
+        TracyVkCollect(data.tracy_ctx, *data.buffer);
 
-        command_buffer.end();
+        data.buffer.end();
 
         vk::PipelineStageFlags dst_stage_mask =
             vk::PipelineStageFlagBits::eTransfer;
@@ -833,25 +769,27 @@ int main() {
         // signaling the render semaphore when the commands are finished.
         vk::SubmitInfo submit_info = {
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &*sync_resources.present_semaphore,
+            .pWaitSemaphores = &*data.swapchain_semaphore,
             .pWaitDstStageMask = &dst_stage_mask,
             .commandBufferCount = 1,
-            .pCommandBuffers = &*command_buffer,
+            .pCommandBuffers = &*data.buffer,
             .signalSemaphoreCount = 1,
-            .pSignalSemaphores = &*sync_resources.render_semaphore,
+            .pSignalSemaphores = &*data.render_semaphore,
         };
         // This wraps vkQueueSubmit.
-        graphics_queue.submit(submit_info, *sync_resources.render_fence);
+        graphics_queue.submit(submit_info, *data.render_fence);
 
         // Present the swapchain image after having wated on the render semaphore.
         // This wraps vkQueuePresentKHR.
         check_vk_result(graphics_queue.presentKHR({
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &*sync_resources.render_semaphore,
+            .pWaitSemaphores = &*data.render_semaphore,
             .swapchainCount = 1,
             .pSwapchains = &*swapchain,
             .pImageIndices = &swapchain_image_index,
         }));
+
+        command_buffer.flip();
 
         FrameMark;
     }
@@ -860,7 +798,10 @@ int main() {
     device.waitIdle();
 
     ImGui_ImplVulkan_Shutdown();
-    TracyVkDestroy(tracy_ctx);
+
+    command_buffer.get().destroy();
+    command_buffer.flip();
+    command_buffer.get().destroy();
 
     return 0;
 }

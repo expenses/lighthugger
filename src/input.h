@@ -1,3 +1,4 @@
+#include "shared_cpu_gpu.h"
 
 struct CameraParams {
     glm::vec3 position;
@@ -56,3 +57,5 @@ void glfw_key_callback(
     int action,
     int /*mods*/
 );
+
+void draw_imgui_window(Uniforms* uniforms, CameraParams& camera_params, KeyboardState& keyboard_state, bool& copy_view);

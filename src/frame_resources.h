@@ -1,5 +1,7 @@
 #pragma once
 #include "allocations/image_with_view.h"
+#include "allocations/base.h"
+#include "shared_cpu_gpu.h"
 #include "util.h"
 
 struct ResizingResources {
@@ -90,8 +92,42 @@ struct Resources {
     vk::raii::Sampler shadowmap_comparison_sampler;
 };
 
-struct SyncResources {
-    vk::raii::Semaphore present_semaphore;
+template<class T>
+struct FlipFlipResource {
+    std::array<T, 2> items;
+    bool flipped;
+
+    FlipFlipResource(std::array<T, 2> items_) :
+        items(std::move(items_)),
+        flipped(false) {}
+
+    void flip() {
+        flipped = !flipped;
+    }
+
+    T& get() {
+        return items[flipped];
+    }
+};
+
+struct FrameCommandData {
+    vk::raii::CommandPool pool;
+    vk::raii::CommandBuffer buffer;
+    vk::raii::Semaphore swapchain_semaphore;
     vk::raii::Semaphore render_semaphore;
     vk::raii::Fence render_fence;
+    AllocatedBuffer uniform_buffer;
+    tracy::VkCtx* tracy_ctx;
+
+    void destroy() {
+        TracyVkDestroy(tracy_ctx);
+    }
 };
+
+FrameCommandData create_frame_command_data(
+    const vk::raii::Device& device,
+    const vk::raii::PhysicalDevice& phys_device,
+    const vk::raii::Queue& queue,
+    vma::Allocator allocator,
+    uint32_t graphics_queue_family
+);

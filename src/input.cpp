@@ -100,3 +100,68 @@ void glfw_key_callback(
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
 }
+
+void draw_imgui_window(Uniforms* uniforms, CameraParams& camera_params, KeyboardState& keyboard_state, bool& copy_view) {
+    ImGui::Checkbox("debug shadowmaps", &uniforms->debug_shadowmaps);
+    ImGui::Checkbox("copy view", &copy_view);
+    ImGui::SliderFloat(
+        "shadow_cam_distance",
+        &uniforms->shadow_cam_distance,
+        0.0f,
+        10000.0f
+    );
+    ImGui::SliderFloat(
+        "cascade_split_pow",
+        &uniforms->cascade_split_pow,
+        0.0f,
+        10.0f
+    );
+    ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
+    ImGui::SliderFloat(
+        "sun_intensity",
+        &uniforms->sun_intensity.x,
+        0.0f,
+        100.0f
+    );
+    ImGui::Text(
+        "camera pos: (%f, %f, %f)",
+        camera_params.position.x,
+        camera_params.position.y,
+        camera_params.position.z
+    );
+    ImGui::Text("yaw: %f", camera_params.yaw);
+    ImGui::Text("pitch: %f", camera_params.pitch);
+    ImGui::Text("sun_latitude: %f", camera_params.sun_latitude);
+    ImGui::Text("sun_longitude: %f", camera_params.sun_longitude);
+    ImGui::Text("grab_toggled: %u", keyboard_state.grab_toggled);
+    ImGui::RadioButton(
+        "Debug: Off",
+        &uniforms->debug,
+        UNIFORMS_DEBUG_OFF
+    );
+    ImGui::RadioButton(
+        "Debug: Cascades",
+        &uniforms->debug,
+        UNIFORMS_DEBUG_CASCADES
+    );
+    ImGui::RadioButton(
+        "Debug: Triangle index",
+        &uniforms->debug,
+        UNIFORMS_DEBUG_TRIANGLE_INDEX
+    );
+    ImGui::RadioButton(
+        "Debug: Instance Index",
+        &uniforms->debug,
+        UNIFORMS_DEBUG_INSTANCE_INDEX
+    );
+    ImGui::RadioButton(
+        "Debug: Shader Clock",
+        &uniforms->debug,
+        UNIFORMS_DEBUG_SHADER_CLOCK
+    );
+    ImGui::RadioButton(
+        "Debug: Normals",
+        &uniforms->debug,
+        UNIFORMS_DEBUG_NORMALS
+    );
+}
