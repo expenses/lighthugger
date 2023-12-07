@@ -375,6 +375,11 @@ Pipelines Pipelines::compile_pipelines(
             pipeline_layout,
             "compiled_shaders/compute/reset_buffers_b.spv"
         ),
+        .reset_buffers_c = create_compute_pipeline_from_shader(
+            device,
+            pipeline_layout,
+            "compiled_shaders/compute/reset_buffers_c.spv"
+        ),
         .write_draw_calls_shadows = create_compute_pipeline_from_shader(
             device,
             pipeline_layout,
@@ -384,6 +389,11 @@ Pipelines Pipelines::compile_pipelines(
             device,
             pipeline_layout,
             "compiled_shaders/cull_instances.spv"
+        ),
+        .cull_instances_shadows = create_compute_pipeline_from_shader(
+            device,
+            pipeline_layout,
+            "compiled_shaders/cull_instances_shadows.spv"
         ),
         .pipeline_layout = std::move(pipeline_layout),
         .copy_quantized_positions =

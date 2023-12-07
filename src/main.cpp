@@ -319,8 +319,6 @@ int main() {
         descriptor_set,
         pipelines
     );
-    dbg(sizeof(Instance));
-
     // Load all resources
 
     auto shadowmap = ImageWithView(
@@ -408,8 +406,9 @@ int main() {
         ),
         .num_meshlets_prefix_sum = AllocatedBuffer(
             vk::BufferCreateInfo {
-                .size = sizeof(NumMeshletsPrefixSumResult) * instances.size()
-                    + sizeof(uint64_t),
+                .size =
+                    (sizeof(PrefixSumValue) * MAX_INSTANCES + sizeof(uint64_t))
+                    * 4,
                 .usage = vk::BufferUsageFlagBits::eStorageBuffer
                     | vk::BufferUsageFlagBits::eShaderDeviceAddress,
             },

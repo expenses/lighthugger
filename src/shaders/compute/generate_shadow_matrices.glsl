@@ -106,5 +106,5 @@ void generate_shadow_matrices() {
     buf.misc_storage.shadow_view_matrices[cascade_index] = shadowView;
     buf.misc_storage.shadow_sphere_radii[cascade_index] = sphere_radius;
 
-    reset_draw_calls();
+    reset_counters();
 }

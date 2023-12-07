@@ -41,6 +41,9 @@ void render(
     ZoneScoped;
     TracyVkZone(tracy_ctx, *command_buffer, "render");
 
+    auto shadow_instance_dispatch_command_offset =
+        sizeof(MiscStorage) - sizeof(DispatchIndirectCommand) * 4;
+
     auto instance_dispatch_command_offset =
         sizeof(MiscStorage) - sizeof(DispatchIndirectCommand) * 3;
     auto dispatch_command_offset =
@@ -171,10 +174,14 @@ void render(
 
     insert_global_barrier(
         command_buffer,
-        GlobalBarrier<1, 2> {
-            .prev_accesses = {THSVS_ACCESS_COMPUTE_SHADER_WRITE},
+        GlobalBarrier<3, 3> {
+            .prev_accesses =
+                {THSVS_ACCESS_COMPUTE_SHADER_WRITE,
+                 THSVS_ACCESS_COMPUTE_SHADER_READ_OTHER,
+                 THSVS_ACCESS_INDIRECT_BUFFER},
             .next_accesses =
-                {THSVS_ACCESS_COMPUTE_SHADER_READ_OTHER,
+                {THSVS_ACCESS_COMPUTE_SHADER_WRITE,
+                 THSVS_ACCESS_COMPUTE_SHADER_READ_OTHER,
                  THSVS_ACCESS_INDIRECT_BUFFER}}
     );
 
@@ -311,6 +318,7 @@ void render(
             1
         );
     }
+
     {
         TracyVkZone(
             tracy_ctx,
@@ -320,6 +328,40 @@ void render(
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eCompute,
             *pipelines.generate_matrices
+        );
+        command_buffer.dispatch(1, 1, 1);
+    }
+
+    {
+        TracyVkZone(tracy_ctx, *command_buffer, "cull instances for shadows");
+
+        command_buffer.bindPipeline(
+            vk::PipelineBindPoint::eCompute,
+            *pipelines.cull_instances_shadows
+        );
+        command_buffer.dispatchIndirect(
+            resources.misc_storage_buffer.buffer,
+            shadow_instance_dispatch_command_offset
+        );
+    }
+
+    insert_global_barrier(
+        command_buffer,
+        GlobalBarrier<1, 1> {
+            .prev_accesses =
+                std::array<ThsvsAccessType, 1> {
+                    THSVS_ACCESS_COMPUTE_SHADER_WRITE},
+            .next_accesses =
+                std::array<ThsvsAccessType, 1> {
+                    THSVS_ACCESS_COMPUTE_SHADER_READ_OTHER}}
+    );
+
+    {
+        TracyVkZone(tracy_ctx, *command_buffer, "reset buffers c");
+
+        command_buffer.bindPipeline(
+            vk::PipelineBindPoint::eCompute,
+            *pipelines.reset_buffers_c
         );
         command_buffer.dispatch(1, 1, 1);
     }

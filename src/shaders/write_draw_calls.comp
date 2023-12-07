@@ -9,11 +9,11 @@ void write_draw_calls() {
 
     uint32_t id = gl_GlobalInvocationID.x;
 
-    if (id >= total_num_meshlets()) {
+    if (id >= total_num_meshlets_for_cascade(0)) {
         return;
     }
 
-    MeshletReference meshlet_reference = get_meshlet_reference(id);
+    MeshletReference meshlet_reference = get_meshlet_reference(id, 0);
 
     Instance instance = InstanceBuffer(uniforms.instances)
                             .instances[meshlet_reference.instance_index];
@@ -65,11 +65,11 @@ void write_draw_calls_shadows() {
     uint32_t id = gl_GlobalInvocationID.x;
     uint32_t cascade_index = gl_GlobalInvocationID.y;
 
-    if (id >= total_num_meshlets()) {
+    if (id >= total_num_meshlets_for_cascade(cascade_index)) {
         return;
     }
 
-    MeshletReference meshlet_reference = get_meshlet_reference(id);
+    MeshletReference meshlet_reference = get_meshlet_reference(id, cascade_index);
 
     Instance instance = InstanceBuffer(uniforms.instances)
                             .instances[meshlet_reference.instance_index];
