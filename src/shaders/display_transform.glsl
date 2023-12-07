@@ -36,6 +36,8 @@ layout(local_size_x = 8, local_size_y = 8) in;
 
 //comp
 void display_transform() {
+    Uniforms uniforms = get_uniforms();
+
     if (gl_GlobalInvocationID.x >= uniforms.window_size.x
         || gl_GlobalInvocationID.y >= uniforms.window_size.y) {
         return;

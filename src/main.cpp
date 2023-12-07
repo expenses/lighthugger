@@ -435,20 +435,22 @@ int main() {
             temp_buffers
         )};
 
+    auto uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
+        vk::BufferCreateInfo {
+            .size = sizeof(Uniforms),
+            .usage = vk::BufferUsageFlagBits::eUniformBuffer
+                | vk::BufferUsageFlagBits::eShaderDeviceAddress},
+        {
+            .flags = vma::AllocationCreateFlagBits::eMapped
+                | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+            .usage = vma::MemoryUsage::eAuto,
+        },
+        allocator,
+        "uniform_buffer"
+    ));
+
     auto resources = Resources {
         .resizing = ResizingResources(device, allocator, extent),
-        .uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
-            vk::BufferCreateInfo {
-                .size = sizeof(Uniforms),
-                .usage = vk::BufferUsageFlagBits::eUniformBuffer},
-            {
-                .flags = vma::AllocationCreateFlagBits::eMapped
-                    | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
-                .usage = vma::MemoryUsage::eAuto,
-            },
-            allocator,
-            "uniform_buffer"
-        )),
         .shadowmap = std::move(shadowmap),
         .misc_storage_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
@@ -596,8 +598,7 @@ int main() {
     auto prev_mouse = glm::dvec2(0.0, 0.0);
     glfwGetCursorPos(window, &prev_mouse.x, &prev_mouse.y);
 
-    Uniforms* uniforms =
-        reinterpret_cast<Uniforms*>(resources.uniform_buffer.mapped_ptr);
+    Uniforms* uniforms = reinterpret_cast<Uniforms*>(uniform_buffer.mapped_ptr);
     uniforms->num_instances = instances.size();
     uniforms->total_num_meshlets = total_num_meshlets;
     uniforms->sun_intensity = glm::vec3(1.0);
@@ -620,6 +621,9 @@ int main() {
     uniforms->num_meshlets_prefix_sum = device.getBufferAddress(
         {.buffer = instance_resources.num_meshlets_prefix_sum.buffer}
     );
+
+    auto uniform_buffer_address =
+        device.getBufferAddress({.buffer = uniform_buffer.buffer.buffer});
 
     auto copy_view = true;
 
@@ -836,7 +840,8 @@ int main() {
             extent,
             graphics_queue_family,
             tracy_ctx,
-            swapchain_image_index
+            swapchain_image_index,
+            uniform_buffer_address
         );
         TracyVkCollect(tracy_ctx, *command_buffer);
 

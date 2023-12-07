@@ -20,6 +20,8 @@ uint32_t min4(uint4 values) {
 layout(local_size_x = 8, local_size_y = 8) in;
 
 void read_depth() {
+    Uniforms uniforms = get_uniforms();
+
     uint3 global_id = gl_GlobalInvocationID;
     if (global_id.x >= uniforms.window_size.x
         || global_id.y >= uniforms.window_size.y) {

@@ -7,6 +7,8 @@ layout(local_size_x = 64) in;
 void main() {
     uint32_t global_meshlet_index = gl_GlobalInvocationID.x;
 
+    Uniforms uniforms = get_uniforms();
+
     if (global_meshlet_index >= uniforms.total_num_meshlets) {
         return;
     }

@@ -15,7 +15,7 @@ calculate_world_pos(Instance instance, MeshInfo mesh_info, uint32_t index) {
 }
 
 void reset_draw_calls() {
-    DrawCallBuffer draw_call_buf = DrawCallBuffer(uniforms.draw_calls);
+    DrawCallBuffer draw_call_buf = DrawCallBuffer(get_uniforms().draw_calls);
     draw_call_buf.num_opaque = uint32_t4(0);
     draw_call_buf.num_alpha_clip = uint32_t4(0);
 }

@@ -13,6 +13,8 @@ mat4 bias_matrix = mat4(
 layout(local_size_x = 4) in;
 
 void generate_shadow_matrices() {
+    Uniforms uniforms = get_uniforms();
+
     MiscStorageBuffer buf = MiscStorageBuffer(uniforms.misc_storage);
 
     // https://github.com/SaschaWillems/Vulkan/blob/master/examples/shadowmappingcascade/shadowmappingcascade.cpp#L650-L663

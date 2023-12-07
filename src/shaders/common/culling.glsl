@@ -1,5 +1,6 @@
-
 bool cull_bounding_sphere(Instance instance, vec4 bounding_sphere) {
+    Uniforms uniforms = get_uniforms();
+
     vec3 world_space_pos =
         (instance.transform * vec4(bounding_sphere.xyz, 1.0)).xyz;
     float radius = bounding_sphere.w;
@@ -49,6 +50,7 @@ bool cull_bounding_sphere_shadows(
     vec4 bounding_sphere,
     uint32_t cascade_index
 ) {
+    Uniforms uniforms = get_uniforms();
     MiscStorageBuffer buf = MiscStorageBuffer(uniforms.misc_storage);
 
     vec3 world_space_pos =
@@ -106,6 +108,8 @@ bool cull_bounding_sphere_shadows(
 }
 
 bool cull_cone_perspective(Instance instance, Meshlet meshlet) {
+    Uniforms uniforms = get_uniforms();
+
     float3 apex = (instance.transform * float4(meshlet.cone_apex, 1.0)).xyz;
     float3 axis = normalize((instance.normal_transform * meshlet.cone_axis));
 
@@ -114,6 +118,7 @@ bool cull_cone_perspective(Instance instance, Meshlet meshlet) {
 }
 
 bool cull_cone_orthographic(Instance instance, Meshlet meshlet) {
+    Uniforms uniforms = get_uniforms();
     float3 axis = normalize((instance.normal_transform * meshlet.cone_axis));
     return dot(uniforms.sun_dir, axis) >= meshlet.cone_cutoff;
 }

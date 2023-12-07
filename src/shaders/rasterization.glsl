@@ -13,9 +13,9 @@ VertexData load_vertex_data(uint32_t vertex_index, uint32_t instance_index) {
     VertexData vertex_data;
 
     MeshletReference meshlet_reference =
-        MeshletReferenceBuffer(uniforms.meshlet_references)
+        MeshletReferenceBuffer(get_uniforms().meshlet_references)
             .meshlet_reference[instance_index];
-    vertex_data.instance = InstanceBuffer(uniforms.instances)
+    vertex_data.instance = InstanceBuffer(get_uniforms().instances)
                                .instances[meshlet_reference.instance_index];
     vertex_data.mesh_info =
         MeshInfoBuffer(vertex_data.instance.mesh_info_address).mesh_info;
@@ -43,7 +43,8 @@ void visbuffer_opaque_vertex() {
     float3 position =
         calculate_world_pos(data.instance, data.mesh_info, data.index);
 
-    gl_Position = uniforms.combined_perspective_view * float4(position, 1.0);
+    gl_Position =
+        get_uniforms().combined_perspective_view * float4(position, 1.0);
     packed = pack(triangle_index, gl_InstanceIndex);
 }
 
@@ -70,7 +71,8 @@ void visbuffer_alpha_clip_vertex() {
     float3 position =
         calculate_world_pos(data.instance, data.mesh_info, data.index);
 
-    gl_Position = uniforms.combined_perspective_view * float4(position, 1.0);
+    gl_Position =
+        get_uniforms().combined_perspective_view * float4(position, 1.0);
     packed = pack(triangle_index, gl_InstanceIndex);
     base_texture_index = data.mesh_info.base_color_texture_index;
     uv = float2(QuanitizedUvs(data.mesh_info.uvs).uvs[data.index])
@@ -94,10 +96,6 @@ void visbuffer_alpha_clip_pixel() {
     out_packed = packed;
 }
 
-layout(push_constant) uniform PushConstant {
-    ShadowPassConstant shadow_constant;
-};
-
 //vert
 
 void shadowmap_opaque_vertex() {
@@ -107,7 +105,7 @@ void shadowmap_opaque_vertex() {
         calculate_world_pos(data.instance, data.mesh_info, data.index);
 
     gl_Position =
-        MiscStorageBuffer(uniforms.misc_storage)
+        MiscStorageBuffer(get_uniforms().misc_storage)
             .misc_storage.shadow_matrices[shadow_constant.cascade_index]
         * float4(position, 1.0);
 }
@@ -124,7 +122,7 @@ void shadowmap_alpha_clip_vertex() {
         calculate_world_pos(data.instance, data.mesh_info, data.index);
 
     gl_Position =
-        MiscStorageBuffer(uniforms.misc_storage)
+        MiscStorageBuffer(get_uniforms().misc_storage)
             .misc_storage.shadow_matrices[shadow_constant.cascade_index]
         * float4(position, 1.0);
 

@@ -77,7 +77,6 @@ struct InstanceResources {
 
 struct Resources {
     ResizingResources resizing;
-    PersistentlyMappedBuffer uniform_buffer;
     ImageWithView shadowmap;
     AllocatedBuffer misc_storage_buffer;
     AllocatedBuffer draw_calls_buffer;

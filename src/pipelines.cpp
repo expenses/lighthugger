@@ -140,7 +140,8 @@ Pipelines Pipelines::compile_pipelines(
         .stageFlags = vk::ShaderStageFlagBits::eVertex
             | vk::ShaderStageFlagBits::eCompute,
         .offset = 0,
-        .size = sizeof(ShadowPassConstant)}};
+        .size = sizeof(UniformBufferAddressConstant)
+            + sizeof(UniformBufferAddressConstant)}};
 
     auto pipeline_layout =
         device.createPipelineLayout(vk::PipelineLayoutCreateInfo {

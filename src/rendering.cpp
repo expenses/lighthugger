@@ -35,10 +35,18 @@ void render(
     vk::Extent2D extent,
     uint32_t graphics_queue_family,
     tracy::VkCtx* tracy_ctx,
-    uint32_t swapchain_image_index
+    uint32_t swapchain_image_index,
+    uint64_t uniform_buffer_address
 ) {
     ZoneScoped;
     TracyVkZone(tracy_ctx, *command_buffer, "render");
+
+    command_buffer.pushConstants<UniformBufferAddressConstant>(
+        *pipelines.pipeline_layout,
+        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eCompute,
+        0,
+        {{.address = uniform_buffer_address}}
+    );
 
     command_buffer.bindDescriptorSets(
         vk::PipelineBindPoint::eCompute,
@@ -350,7 +358,7 @@ void render(
                 *pipelines.pipeline_layout,
                 vk::ShaderStageFlagBits::eVertex
                     | vk::ShaderStageFlagBits::eCompute,
-                0,
+                sizeof(UniformBufferAddressConstant),
                 {{.cascade_index = i}}
             );
             command_buffer.bindPipeline(

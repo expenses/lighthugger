@@ -11,5 +11,6 @@ void render(
     vk::Extent2D extent,
     uint32_t graphics_queue_family,
     tracy::VkCtx* tracy_ctx,
-    uint32_t swapchain_image_index
+    uint32_t swapchain_image_index,
+    uint64_t uniform_buffer_address
 );
