@@ -324,6 +324,16 @@ void render(
 
     dispatch_scalar(pipelines.reset_buffers_c);
 
+    insert_global_barrier(
+        command_buffer,
+        GlobalBarrier<1, 1> {
+            .prev_accesses =
+                std::array<ThsvsAccessType, 1> {
+                    THSVS_ACCESS_COMPUTE_SHADER_WRITE},
+            .next_accesses =
+                std::array<ThsvsAccessType, 1> {THSVS_ACCESS_INDIRECT_BUFFER}}
+    );
+
     {
         TracyVkZone(tracy_ctx, *command_buffer, "shadowmap rasterization");
 
