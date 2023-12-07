@@ -717,13 +717,14 @@ int main() {
             {.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit}
         );
 
-        data.buffer.copyBuffer(uniform_buffer.buffer.buffer, data.uniform_buffer.buffer, {
-            vk::BufferCopy {
+        data.buffer.copyBuffer(
+            uniform_buffer.buffer.buffer,
+            data.uniform_buffer.buffer,
+            {vk::BufferCopy {
                 .srcOffset = 0,
                 .dstOffset = 0,
-                .size = sizeof(Uniforms)
-            }
-        });
+                .size = sizeof(Uniforms)}}
+        );
 
         render(
             data.buffer,
@@ -734,13 +735,11 @@ int main() {
             swapchain_image_views[swapchain_image_index],
             extent,
             graphics_queue_family,
-            data.tracy_ctx,
+            data.tracy_ctx.inner,
             swapchain_image_index,
-            device.getBufferAddress(
-                {.buffer = data.uniform_buffer.buffer}
-            )
+            device.getBufferAddress({.buffer = data.uniform_buffer.buffer})
         );
-        TracyVkCollect(data.tracy_ctx, *data.buffer);
+        TracyVkCollect(data.tracy_ctx.inner, *data.buffer);
 
         data.buffer.end();
 
@@ -779,10 +778,6 @@ int main() {
     device.waitIdle();
 
     ImGui_ImplVulkan_Shutdown();
-
-    command_buffer.get().destroy();
-    command_buffer.flip();
-    command_buffer.get().destroy();
 
     return 0;
 }

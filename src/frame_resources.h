@@ -1,6 +1,6 @@
 #pragma once
-#include "allocations/image_with_view.h"
 #include "allocations/base.h"
+#include "allocations/image_with_view.h"
 #include "shared_cpu_gpu.h"
 #include "util.h"
 
@@ -92,6 +92,27 @@ struct Resources {
     vk::raii::Sampler shadowmap_comparison_sampler;
 };
 
+struct RaiiTracyCtx {
+    tracy::VkCtx* inner;
+
+    RaiiTracyCtx(tracy::VkCtx* inner_) : inner(inner_) {}
+
+    ~RaiiTracyCtx() {
+        if (inner) {
+            TracyVkDestroy(inner);
+        }
+    }
+
+    RaiiTracyCtx(RaiiTracyCtx&& other) {
+        std::swap(inner, other.inner);
+    }
+
+    RaiiTracyCtx& operator=(RaiiTracyCtx&& other) {
+        std::swap(inner, other.inner);
+        return *this;
+    }
+};
+
 template<class T>
 struct FlipFlipResource {
     std::array<T, 2> items;
@@ -117,11 +138,7 @@ struct FrameCommandData {
     vk::raii::Semaphore render_semaphore;
     vk::raii::Fence render_fence;
     AllocatedBuffer uniform_buffer;
-    tracy::VkCtx* tracy_ctx;
-
-    void destroy() {
-        TracyVkDestroy(tracy_ctx);
-    }
+    RaiiTracyCtx tracy_ctx;
 };
 
 FrameCommandData create_frame_command_data(

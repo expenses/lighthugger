@@ -49,8 +49,8 @@ struct CameraParams {
 
     void update(KeyboardState& keyboard_state) {
         int sun_left_right =
-                int(keyboard_state.right) - int(keyboard_state.left);
-            int sun_up_down = int(keyboard_state.up) - int(keyboard_state.down);
+            int(keyboard_state.right) - int(keyboard_state.left);
+        int sun_up_down = int(keyboard_state.up) - int(keyboard_state.down);
 
         update(
             glm::ivec3(
@@ -65,10 +65,8 @@ struct CameraParams {
     void update(glm::ivec3 movement_vector, glm::ivec2 sun_vector);
 
     void rotate_camera(glm::dvec2 mouse_delta) {
-        pitch -=
-            static_cast<float>(mouse_delta.y) / 1024.0f;
-        yaw +=
-            static_cast<float>(mouse_delta.x) / 1024.0f;
+        pitch -= static_cast<float>(mouse_delta.y) / 1024.0f;
+        yaw += static_cast<float>(mouse_delta.x) / 1024.0f;
         pitch = std::clamp(
             pitch,
             -std::numbers::pi_v<float> / 2.0f + 0.0001f,
@@ -85,4 +83,9 @@ void glfw_key_callback(
     int /*mods*/
 );
 
-void draw_imgui_window(Uniforms* uniforms, CameraParams& camera_params, KeyboardState& keyboard_state, bool& copy_view);
+void draw_imgui_window(
+    Uniforms* uniforms,
+    CameraParams& camera_params,
+    KeyboardState& keyboard_state,
+    bool& copy_view
+);

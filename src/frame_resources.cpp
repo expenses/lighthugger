@@ -32,12 +32,13 @@ FrameCommandData create_frame_command_data(
             vk::BufferCreateInfo {
                 .size = sizeof(Uniforms),
                 .usage = vk::BufferUsageFlagBits::eUniformBuffer
-                    | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst},
+                    | vk::BufferUsageFlagBits::eShaderDeviceAddress
+                    | vk::BufferUsageFlagBits::eTransferDst},
             {
                 .usage = vma::MemoryUsage::eAuto,
             },
             allocator,
             "uniform_buffer"
         ),
-        .tracy_ctx = tracy_ctx};
+        .tracy_ctx = RaiiTracyCtx(tracy_ctx)};
 }

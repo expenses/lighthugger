@@ -101,7 +101,12 @@ void glfw_key_callback(
     }
 }
 
-void draw_imgui_window(Uniforms* uniforms, CameraParams& camera_params, KeyboardState& keyboard_state, bool& copy_view) {
+void draw_imgui_window(
+    Uniforms* uniforms,
+    CameraParams& camera_params,
+    KeyboardState& keyboard_state,
+    bool& copy_view
+) {
     ImGui::Checkbox("debug shadowmaps", &uniforms->debug_shadowmaps);
     ImGui::Checkbox("copy view", &copy_view);
     ImGui::SliderFloat(
@@ -134,11 +139,7 @@ void draw_imgui_window(Uniforms* uniforms, CameraParams& camera_params, Keyboard
     ImGui::Text("sun_latitude: %f", camera_params.sun_latitude);
     ImGui::Text("sun_longitude: %f", camera_params.sun_longitude);
     ImGui::Text("grab_toggled: %u", keyboard_state.grab_toggled);
-    ImGui::RadioButton(
-        "Debug: Off",
-        &uniforms->debug,
-        UNIFORMS_DEBUG_OFF
-    );
+    ImGui::RadioButton("Debug: Off", &uniforms->debug, UNIFORMS_DEBUG_OFF);
     ImGui::RadioButton(
         "Debug: Cascades",
         &uniforms->debug,
