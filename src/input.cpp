@@ -19,7 +19,7 @@ glm::vec2 clamp_length(glm::vec2 vector, float max) {
 }
 
 void CameraParams::update(glm::ivec3 movement_vector, glm::ivec2 sun_vector) {
-    auto accel = 0.1f;
+    auto accel = 0.02f;
 
     if (movement_vector != glm::ivec3(0)) {
         auto normalized_movement =
@@ -27,9 +27,9 @@ void CameraParams::update(glm::ivec3 movement_vector, glm::ivec2 sun_vector) {
         velocity += normalized_movement.z * facing()
             + normalized_movement.x * right()
             + normalized_movement.y * glm::vec3(0, 1, 0);
-        velocity = clamp_length(velocity, 0.75);
+        velocity = clamp_length(velocity, 0.2);
     } else {
-        velocity *= (1.0 - accel);
+        velocity *= 0.9;
     }
 
     if (sun_vector != glm::ivec2(0)) {
