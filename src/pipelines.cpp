@@ -365,20 +365,25 @@ Pipelines Pipelines::compile_pipelines(
             pipeline_layout,
             "compiled_shaders/render_geometry.spv"
         ),
-        .expand_meshlets = create_compute_pipeline_from_shader(
+        .reset_buffers_a = create_compute_pipeline_from_shader(
             device,
             pipeline_layout,
-            "compiled_shaders/expand_meshlets.spv"
+            "compiled_shaders/compute/reset_buffers_a.spv"
         ),
-        .reset_buffers = create_compute_pipeline_from_shader(
+        .reset_buffers_b = create_compute_pipeline_from_shader(
             device,
             pipeline_layout,
-            "compiled_shaders/compute/reset_buffers.spv"
+            "compiled_shaders/compute/reset_buffers_b.spv"
         ),
         .write_draw_calls_shadows = create_compute_pipeline_from_shader(
             device,
             pipeline_layout,
             "compiled_shaders/write_draw_calls_shadows.spv"
+        ),
+        .cull_instances = create_compute_pipeline_from_shader(
+            device,
+            pipeline_layout,
+            "compiled_shaders/cull_instances.spv"
         ),
         .pipeline_layout = std::move(pipeline_layout),
         .copy_quantized_positions =

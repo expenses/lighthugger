@@ -13,8 +13,7 @@ void write_draw_calls() {
         return;
     }
 
-    MeshletReference meshlet_reference =
-        MeshletReferenceBuffer(uniforms.meshlet_references).meshlet_reference[id];
+    MeshletReference meshlet_reference = get_meshlet_reference(id);
 
     Instance instance = InstanceBuffer(uniforms.instances)
                             .instances[meshlet_reference.instance_index];
@@ -70,8 +69,7 @@ void write_draw_calls_shadows() {
         return;
     }
 
-    MeshletReference meshlet_reference =
-        MeshletReferenceBuffer(uniforms.meshlet_references).meshlet_reference[id];
+    MeshletReference meshlet_reference = get_meshlet_reference(id);
 
     Instance instance = InstanceBuffer(uniforms.instances)
                             .instances[meshlet_reference.instance_index];

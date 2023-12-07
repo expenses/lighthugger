@@ -7,6 +7,7 @@
 #extension GL_KHR_shader_subgroup_basic : require
 #extension GL_KHR_shader_subgroup_arithmetic : require
 #extension GL_EXT_control_flow_attributes : require
+#extension GL_EXT_shader_atomic_int64 : require
 
 #define float2 vec2
 #define float3 vec3

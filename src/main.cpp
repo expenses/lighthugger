@@ -122,6 +122,7 @@ int main() {
         .pNext = &vulkan_1_1_features,
         .drawIndirectCount = true,
         .storageBuffer8BitAccess = true,
+        .shaderBufferInt64Atomics = true,
         .shaderInt8 = true,
         .shaderSampledImageArrayNonUniformIndexing = true,
         .descriptorBindingPartiallyBound = true,
@@ -371,19 +372,13 @@ int main() {
         create_shadow_view(3)};
 
     std::vector<Instance> instances;
-    std::vector<uint32_t> num_meshlets_prefix_sum;
-    uint32_t total_num_meshlets = 0;
 
     for (auto& primitive : san_mig.primitives) {
         instances.push_back(Instance(
             primitive.transform,
             device.getBufferAddress({.buffer = primitive.mesh_info.buffer})
         ));
-        total_num_meshlets += primitive.num_meshlets;
-        num_meshlets_prefix_sum.push_back(total_num_meshlets);
     }
-
-    dbg(num_meshlets_prefix_sum, total_num_meshlets);
 
     auto instance_resources = InstanceResources {
         .instances = upload_via_staging_buffer(
@@ -411,15 +406,18 @@ int main() {
             allocator,
             "meshlet reference buffer"
         ),
-        .num_meshlets_prefix_sum = upload_via_staging_buffer(
-            num_meshlets_prefix_sum.data(),
-            num_meshlets_prefix_sum.size() * sizeof(uint32_t),
+        .num_meshlets_prefix_sum = AllocatedBuffer(
+            vk::BufferCreateInfo {
+                .size = sizeof(NumMeshletsPrefixSumResult) * instances.size()
+                    + sizeof(uint64_t),
+                .usage = vk::BufferUsageFlagBits::eStorageBuffer
+                    | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            },
+            {
+                .usage = vma::MemoryUsage::eAuto,
+            },
             allocator,
-            vk::BufferUsageFlagBits::eStorageBuffer
-                | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-            "num meshlets prefix sum buffer",
-            command_buffer,
-            temp_buffers
+            "num meshlets prefix sum buffer"
         )};
 
     auto uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(

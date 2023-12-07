@@ -58,10 +58,11 @@ layout(buffer_reference, scalar) buffer MiscStorageBuffer {
     MiscStorage misc_storage;
 };
 
-layout(buffer_reference, scalar) buffer PrefixSumValues {
-    uint32_t values[];
-};
-
 layout(buffer_reference, scalar) buffer UniformsBuffer {
     Uniforms uniforms;
+};
+
+layout(buffer_reference, scalar) buffer NumMeshletsPrefixSumResultBuffer {
+    uint64_t counter;
+    NumMeshletsPrefixSumResult values[];
 };

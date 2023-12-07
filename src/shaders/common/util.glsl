@@ -29,30 +29,56 @@ float convert_infinite_reverze_z_depth(float depth) {
     return NEAR_PLANE / depth;
 }
 
+uint32_t total_num_meshlets() {
+    return uint32_t(
+        NumMeshletsPrefixSumResultBuffer(get_uniforms().num_meshlets_prefix_sum)
+            .counter
+    );
+}
+
+uint32_t total_unculled_instances() {
+    return uint32_t(
+        NumMeshletsPrefixSumResultBuffer(get_uniforms().num_meshlets_prefix_sum)
+            .counter
+        >> 32
+    );
+}
+
 // See https://en.cppreference.com/w/cpp/algorithm/upper_bound.
-uint32_t binary_search_upper_bound(
-    PrefixSumValues values,
-    uint32_t count,
-    uint32_t target
-) {
+NumMeshletsPrefixSumResult binary_search_upper_bound(uint32_t target) {
+    NumMeshletsPrefixSumResultBuffer values =
+        NumMeshletsPrefixSumResultBuffer(get_uniforms().num_meshlets_prefix_sum
+        );
+    uint32_t count = uint32_t(values.counter >> 32);
     uint32_t first = 0;
 
     while (count > 0) {
         uint32_t step = (count / 2);
         uint32_t current = first + step;
-        bool greater = target >= values.values[current];
+        bool greater = target >= values.values[current].meshlets_offset;
         first = select(greater, current + 1, first);
         count = select(greater, count - (step + 1), step);
     }
 
-    return first;
-}
-
-uint32_t total_num_meshlets() {
-    return PrefixSumValues(get_uniforms().num_meshlets_prefix_sum)
-        .values[get_uniforms().num_instances - 1];
+    return values.values[first];
 }
 
 uint32_t dispatch_size(uint32_t width, uint32_t workgroup_size) {
     return ((width - 1) / workgroup_size) + 1;
+}
+
+MeshletReference get_meshlet_reference(uint32_t global_meshlet_index) {
+    NumMeshletsPrefixSumResult result =
+        binary_search_upper_bound(global_meshlet_index);
+    Instance instance = InstanceBuffer(get_uniforms().instances)
+                            .instances[result.instance_index];
+    MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
+
+    uint32_t local_meshlet_index = global_meshlet_index
+        - (result.meshlets_offset - mesh_info.num_meshlets);
+
+    MeshletReference reference;
+    reference.instance_index = result.instance_index;
+    reference.meshlet_index = uint16_t(local_meshlet_index);
+    return reference;
 }

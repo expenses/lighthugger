@@ -40,6 +40,7 @@ struct MiscStorage {
     float shadow_sphere_radii[4];
     uint32_t min_depth;
     uint32_t max_depth;
+    DispatchIndirectCommand per_instance_dispatch;
     DispatchIndirectCommand per_meshlet_dispatch;
     DispatchIndirectCommand per_shadow_meshlet_dispatch;
 };
@@ -154,3 +155,8 @@ const static uint32_t MAX_MESHLET_TRIANGLES = 124;
 const static uint32_t MAX_MESHLET_VERTICES = MAX_MESHLET_TRIANGLES * 3;
 
 const static uint16_t UNUSED_TEXTURE_INDEX = ~uint16_t(0u);
+
+struct NumMeshletsPrefixSumResult {
+    uint32_t instance_index;
+    uint32_t meshlets_offset;
+};
