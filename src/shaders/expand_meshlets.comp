@@ -9,7 +9,7 @@ void main() {
 
     Uniforms uniforms = get_uniforms();
 
-    if (global_meshlet_index >= uniforms.total_num_meshlets) {
+    if (global_meshlet_index >= total_num_meshlets()) {
         return;
     }
 

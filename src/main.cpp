@@ -190,7 +190,7 @@ int main() {
         .surface = *surface,
         .minImageCount = 3,
         // Note: normally/ideally you should be using an srgb image format!
-        // However, I'm (going to be) doing the final tonemapping in a compute shader where
+        // However, I'm doing the final tonemapping in a compute shader where
         // I can't rely on the hardware linear->srgb transfer function.
         // Additionally, for whatever reason, imgui applies it's own linear->srgb
         // transfer function.
@@ -206,25 +206,11 @@ int main() {
 
     auto swapchain_images = swapchain.getImages();
 
-    auto swapchain_image_views = create_swapchain_image_views(
+    auto swapchain_image_views = create_and_name_swapchain_image_views(
         device,
         swapchain_images,
         swapchain_create_info.imageFormat
     );
-    for (size_t i = 0; i < swapchain_images.size(); i++) {
-        VkImage c_image = swapchain_images[i];
-        std::string name = std::string("swapchain image ") + std::to_string(i);
-        device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-            .objectType = vk::ObjectType::eImage,
-            .objectHandle = reinterpret_cast<uint64_t>(c_image),
-            .pObjectName = name.data()});
-        VkImageView c_image_view = *swapchain_image_views[i];
-        name = std::string("swapchain image view ") + std::to_string(i);
-        device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-            .objectType = vk::ObjectType::eImageView,
-            .objectHandle = reinterpret_cast<uint64_t>(c_image_view),
-            .pObjectName = name.data()});
-    }
 
     vk::raii::CommandPool command_pool = device.createCommandPool({
         .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -255,10 +241,11 @@ int main() {
             .commandBufferCount = 1});
     auto command_buffer = std::move(command_buffers[0]);
 
-    auto present_semaphore = device.createSemaphore({});
-    auto render_semaphore = device.createSemaphore({});
-    auto render_fence =
-        device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
+    auto sync_resources = SyncResources {
+        .present_semaphore = device.createSemaphore({}),
+        .render_semaphore = device.createSemaphore({}),
+        .render_fence =
+            device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled})};
 
     auto descriptor_set_layouts = create_descriptor_set_layouts(device);
     auto pipelines =
@@ -456,7 +443,8 @@ int main() {
             vk::BufferCreateInfo {
                 .size = sizeof(MiscStorage),
                 .usage = vk::BufferUsageFlagBits::eStorageBuffer
-                    | vk::BufferUsageFlagBits::eShaderDeviceAddress},
+                    | vk::BufferUsageFlagBits::eShaderDeviceAddress
+                    | vk::BufferUsageFlagBits::eIndirectBuffer},
             {
                 .usage = vma::MemoryUsage::eAuto,
             },
@@ -528,9 +516,7 @@ int main() {
                 .compareEnable = true,
                 .compareOp = vk::CompareOp::eLess,
                 .minLod = 0.0f,
-                .maxLod = VK_LOD_CLAMP_NONE}),
-        .num_instances = static_cast<uint32_t>(instances.size()),
-        .total_num_meshlets = total_num_meshlets};
+                .maxLod = VK_LOD_CLAMP_NONE})};
 
     command_buffer.end();
 
@@ -600,7 +586,6 @@ int main() {
 
     Uniforms* uniforms = reinterpret_cast<Uniforms*>(uniform_buffer.mapped_ptr);
     uniforms->num_instances = instances.size();
-    uniforms->total_num_meshlets = total_num_meshlets;
     uniforms->sun_intensity = glm::vec3(1.0);
     // Set the camera to be a fixed distance away from the frustum center, so that
     // we don't get clipping on the near plane or far planes. I haven't observed any
@@ -648,31 +633,11 @@ int main() {
             swapchain = device.createSwapchainKHR(swapchain_create_info);
 
             swapchain_images = swapchain.getImages();
-            swapchain_image_views = create_swapchain_image_views(
+            swapchain_image_views = create_and_name_swapchain_image_views(
                 device,
                 swapchain_images,
                 swapchain_create_info.imageFormat
             );
-            for (size_t i = 0; i < swapchain_images.size(); i++) {
-                VkImage c_image = swapchain_images[i];
-                std::string name =
-                    std::string("swapchain image ") + std::to_string(i);
-                device.setDebugUtilsObjectNameEXT(
-                    vk::DebugUtilsObjectNameInfoEXT {
-                        .objectType = vk::ObjectType::eImage,
-                        .objectHandle = reinterpret_cast<uint64_t>(c_image),
-                        .pObjectName = name.data()}
-                );
-                VkImageView c_image_view = *swapchain_image_views[i];
-                name = std::string("swapchain image view ") + std::to_string(i);
-                device.setDebugUtilsObjectNameEXT(
-                    vk::DebugUtilsObjectNameInfoEXT {
-                        .objectType = vk::ObjectType::eImageView,
-                        .objectHandle =
-                            reinterpret_cast<uint64_t>(c_image_view),
-                        .pObjectName = name.data()}
-                );
-            }
 
             resources.resizing = ResizingResources(device, allocator, extent);
             descriptor_set.write_resizing_descriptors(
@@ -784,8 +749,10 @@ int main() {
 
         // Wait on the render fence to be signaled
         // (it's signaled before this loop starts so that we don't just block forever on the first frame)
-        check_vk_result(device.waitForFences({*render_fence}, true, u64_max));
-        device.resetFences({*render_fence});
+        check_vk_result(
+            device.waitForFences({*sync_resources.render_fence}, true, u64_max)
+        );
+        device.resetFences({*sync_resources.render_fence});
 
         // Important! This needs to happen after waiting on the fence because otherwise we get race conditions
         // due to writing to a value that the previous frame is reading from.
@@ -822,8 +789,10 @@ int main() {
         command_pool.reset();
 
         // Acquire the next swapchain image (waiting on the gpu-side and signaling the present semaphore when finished).
-        auto [acquire_err, swapchain_image_index] =
-            swapchain.acquireNextImage(u64_max, *present_semaphore);
+        auto [acquire_err, swapchain_image_index] = swapchain.acquireNextImage(
+            u64_max,
+            *sync_resources.present_semaphore
+        );
 
         // This wraps vkBeginCommandBuffer.
         command_buffer.begin(
@@ -853,21 +822,21 @@ int main() {
         // signaling the render semaphore when the commands are finished.
         vk::SubmitInfo submit_info = {
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &*present_semaphore,
+            .pWaitSemaphores = &*sync_resources.present_semaphore,
             .pWaitDstStageMask = &dst_stage_mask,
             .commandBufferCount = 1,
             .pCommandBuffers = &*command_buffer,
             .signalSemaphoreCount = 1,
-            .pSignalSemaphores = &*render_semaphore,
+            .pSignalSemaphores = &*sync_resources.render_semaphore,
         };
         // This wraps vkQueueSubmit.
-        graphics_queue.submit(submit_info, *render_fence);
+        graphics_queue.submit(submit_info, *sync_resources.render_fence);
 
         // Present the swapchain image after having wated on the render semaphore.
         // This wraps vkQueuePresentKHR.
         check_vk_result(graphics_queue.presentKHR({
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &*render_semaphore,
+            .pWaitSemaphores = &*sync_resources.render_semaphore,
             .swapchainCount = 1,
             .pSwapchains = &*swapchain,
             .pImageIndices = &swapchain_image_index,

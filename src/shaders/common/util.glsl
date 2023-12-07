@@ -47,3 +47,12 @@ uint32_t binary_search_upper_bound(
 
     return first;
 }
+
+uint32_t total_num_meshlets() {
+    return PrefixSumValues(get_uniforms().num_meshlets_prefix_sum)
+        .values[get_uniforms().num_instances - 1];
+}
+
+uint32_t dispatch_size(uint32_t width, uint32_t workgroup_size) {
+    return ((width - 1) / workgroup_size) + 1;
+}

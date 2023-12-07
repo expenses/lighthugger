@@ -12,4 +12,14 @@ void reset_buffers() {
     buf.misc_storage.max_depth = 0;
 
     reset_draw_calls();
+
+    buf.misc_storage.per_meshlet_dispatch.x =
+        dispatch_size(total_num_meshlets(), 64);
+    buf.misc_storage.per_meshlet_dispatch.y = 1;
+    buf.misc_storage.per_meshlet_dispatch.z = 1;
+
+    buf.misc_storage.per_shadow_meshlet_dispatch.x =
+        dispatch_size(total_num_meshlets(), 16);
+    buf.misc_storage.per_shadow_meshlet_dispatch.y = 1;
+    buf.misc_storage.per_shadow_meshlet_dispatch.z = 1;
 }

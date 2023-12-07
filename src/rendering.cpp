@@ -41,6 +41,11 @@ void render(
     ZoneScoped;
     TracyVkZone(tracy_ctx, *command_buffer, "render");
 
+    auto dispatch_command_offset =
+        sizeof(MiscStorage) - sizeof(DispatchIndirectCommand) * 2;
+    auto shadow_dispatch_command_offset =
+        sizeof(MiscStorage) - sizeof(DispatchIndirectCommand);
+
     command_buffer.pushConstants<UniformBufferAddressConstant>(
         *pipelines.pipeline_layout,
         vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eCompute,
@@ -141,8 +146,10 @@ void render(
             vk::PipelineBindPoint::eCompute,
             *pipelines.expand_meshlets
         );
-        command_buffer
-            .dispatch(dispatch_size(resources.total_num_meshlets, 64), 1, 1);
+        command_buffer.dispatchIndirect(
+            resources.misc_storage_buffer.buffer,
+            dispatch_command_offset
+        );
     }
 
     insert_global_barrier(
@@ -167,10 +174,9 @@ void render(
             vk::PipelineBindPoint::eCompute,
             *pipelines.write_draw_calls
         );
-        command_buffer.dispatch(
-            dispatch_size(MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS, 64),
-            1,
-            1
+        command_buffer.dispatchIndirect(
+            resources.misc_storage_buffer.buffer,
+            dispatch_command_offset
         );
     }
 
@@ -314,10 +320,9 @@ void render(
             vk::PipelineBindPoint::eCompute,
             *pipelines.write_draw_calls_shadows
         );
-        command_buffer.dispatch(
-            dispatch_size(MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS, 16),
-            1,
-            1
+        command_buffer.dispatchIndirect(
+            resources.misc_storage_buffer.buffer,
+            shadow_dispatch_command_offset
         );
     }
 

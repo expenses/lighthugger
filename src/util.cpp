@@ -10,20 +10,37 @@ void check_vk_result(vk::Result err) {
     }
 }
 
-std::vector<vk::raii::ImageView> create_swapchain_image_views(
+std::vector<vk::raii::ImageView> create_and_name_swapchain_image_views(
     const vk::raii::Device& device,
     const std::vector<vk::Image>& swapchain_images,
     vk::Format swapchain_format
 ) {
     std::vector<vk::raii::ImageView> views;
 
-    for (vk::Image image : swapchain_images) {
-        views.push_back(device.createImageView(
+    for (size_t i = 0; i < swapchain_images.size(); i++) {
+        vk::Image image = swapchain_images[i];
+        VkImage c_image = image;
+        std::string name = std::string("swapchain image ") + std::to_string(i);
+        device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+            .objectType = vk::ObjectType::eImage,
+            .objectHandle = reinterpret_cast<uint64_t>(c_image),
+            .pObjectName = name.data()});
+
+        vk::raii::ImageView view = device.createImageView(
             {.image = image,
              .viewType = vk::ImageViewType::e2D,
              .format = swapchain_format,
              .subresourceRange = COLOR_SUBRESOURCE_RANGE}
-        ));
+        );
+
+        VkImageView c_image_view = *view;
+        name = std::string("swapchain image view ") + std::to_string(i);
+        device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+            .objectType = vk::ObjectType::eImageView,
+            .objectHandle = reinterpret_cast<uint64_t>(c_image_view),
+            .pObjectName = name.data()});
+
+        views.push_back(std::move(view));
     }
 
     return views;

@@ -8,6 +8,13 @@ using namespace glm;
 const static uint8_t MESH_INFO_FLAGS_32_BIT_INDICES = uint8_t(1 << 0);
 const static uint8_t MESH_INFO_FLAGS_ALPHA_CLIP = uint8_t(1 << 1);
 
+// Same as VkDispatchIndirectCommand.
+struct DispatchIndirectCommand {
+    uint32_t x;
+    uint32_t y;
+    uint32_t z;
+};
+
 struct MeshInfo {
     uint64_t positions;
     uint64_t indices;
@@ -26,7 +33,6 @@ struct MeshInfo {
     vec3 base_color_factor;
 };
 
-// Stores depth info and draw call counts.
 struct MiscStorage {
     mat4 shadow_matrices[4];
     mat4 uv_space_shadow_matrices[4];
@@ -34,6 +40,8 @@ struct MiscStorage {
     float shadow_sphere_radii[4];
     uint32_t min_depth;
     uint32_t max_depth;
+    DispatchIndirectCommand per_meshlet_dispatch;
+    DispatchIndirectCommand per_shadow_meshlet_dispatch;
 };
 
 // This is only an int32_t because of imgui.
@@ -61,7 +69,6 @@ struct Uniforms {
     vec3 sun_dir;
     vec3 sun_intensity;
     uint32_t num_instances;
-    uint32_t total_num_meshlets;
     uvec2 window_size;
     float shadow_cam_distance;
     float cascade_split_pow;

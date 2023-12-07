@@ -86,6 +86,10 @@ struct Resources {
     vk::raii::Sampler repeat_sampler;
     vk::raii::Sampler clamp_sampler;
     vk::raii::Sampler shadowmap_comparison_sampler;
-    uint32_t num_instances;
-    uint32_t total_num_meshlets;
+};
+
+struct SyncResources {
+    vk::raii::Semaphore present_semaphore;
+    vk::raii::Semaphore render_semaphore;
+    vk::raii::Fence render_fence;
 };

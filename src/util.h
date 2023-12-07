@@ -20,7 +20,7 @@ const vk::ImageSubresourceRange DEPTH_SUBRESOURCE_RANGE = {
 
 void check_vk_result(vk::Result err);
 
-std::vector<vk::raii::ImageView> create_swapchain_image_views(
+std::vector<vk::raii::ImageView> create_and_name_swapchain_image_views(
     const vk::raii::Device& device,
     const std::vector<vk::Image>& swapchain_images,
     vk::Format swapchain_format
