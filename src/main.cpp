@@ -658,18 +658,7 @@ int main() {
             );
         }
         {
-            int sun_left_right =
-                int(keyboard_state.right) - int(keyboard_state.left);
-            int sun_up_down = int(keyboard_state.up) - int(keyboard_state.down);
-
-            camera_params.update(
-                glm::ivec3(
-                    int(keyboard_state.d) - int(keyboard_state.a),
-                    int(keyboard_state.shift) - int(keyboard_state.control),
-                    int(keyboard_state.w) - int(keyboard_state.s)
-                ),
-                glm::ivec2(sun_left_right, sun_up_down)
-            );
+            camera_params.update(keyboard_state);
 
             auto mouse = glm::dvec2(0.0, 0.0);
             glfwGetCursorPos(window, &mouse.x, &mouse.y);
@@ -677,85 +666,14 @@ int main() {
             prev_mouse = mouse;
 
             if (keyboard_state.grab_toggled) {
-                camera_params.pitch -=
-                    static_cast<float>(mouse_delta.y) / 1024.0f;
-                camera_params.yaw +=
-                    static_cast<float>(mouse_delta.x) / 1024.0f;
-                camera_params.pitch = std::clamp(
-                    camera_params.pitch,
-                    -std::numbers::pi_v<float> / 2.0f + 0.0001f,
-                    std::numbers::pi_v<float> / 2.0f
-                );
+                camera_params.rotate_camera(mouse_delta);
             }
         }
 
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        {
-            ImGui::Checkbox("debug shadowmaps", &uniforms->debug_shadowmaps);
-            ImGui::Checkbox("copy view", &copy_view);
-            ImGui::SliderFloat(
-                "shadow_cam_distance",
-                &uniforms->shadow_cam_distance,
-                0.0f,
-                10000.0f
-            );
-            ImGui::SliderFloat(
-                "cascade_split_pow",
-                &uniforms->cascade_split_pow,
-                0.0f,
-                10.0f
-            );
-            ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
-            ImGui::SliderFloat(
-                "sun_intensity",
-                &uniforms->sun_intensity.x,
-                0.0f,
-                100.0f
-            );
-            ImGui::Text(
-                "camera pos: (%f, %f, %f)",
-                camera_params.position.x,
-                camera_params.position.y,
-                camera_params.position.z
-            );
-            ImGui::Text("yaw: %f", camera_params.yaw);
-            ImGui::Text("pitch: %f", camera_params.pitch);
-            ImGui::Text("sun_latitude: %f", camera_params.sun_latitude);
-            ImGui::Text("sun_longitude: %f", camera_params.sun_longitude);
-            ImGui::Text("grab_toggled: %u", keyboard_state.grab_toggled);
-            ImGui::RadioButton(
-                "Debug: Off",
-                &uniforms->debug,
-                UNIFORMS_DEBUG_OFF
-            );
-            ImGui::RadioButton(
-                "Debug: Cascades",
-                &uniforms->debug,
-                UNIFORMS_DEBUG_CASCADES
-            );
-            ImGui::RadioButton(
-                "Debug: Triangle index",
-                &uniforms->debug,
-                UNIFORMS_DEBUG_TRIANGLE_INDEX
-            );
-            ImGui::RadioButton(
-                "Debug: Instance Index",
-                &uniforms->debug,
-                UNIFORMS_DEBUG_INSTANCE_INDEX
-            );
-            ImGui::RadioButton(
-                "Debug: Shader Clock",
-                &uniforms->debug,
-                UNIFORMS_DEBUG_SHADER_CLOCK
-            );
-            ImGui::RadioButton(
-                "Debug: Normals",
-                &uniforms->debug,
-                UNIFORMS_DEBUG_NORMALS
-            );
-        }
+        draw_imgui_window(uniforms, camera_params, keyboard_state, copy_view);
         ImGui::Render();
 
         // Wait on the render fence to be signaled

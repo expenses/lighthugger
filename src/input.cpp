@@ -19,7 +19,7 @@ glm::vec2 clamp_length(glm::vec2 vector, float max) {
 }
 
 void CameraParams::update(glm::ivec3 movement_vector, glm::ivec2 sun_vector) {
-    auto accel = 0.1f;
+    auto accel = 0.02f;
 
     if (movement_vector != glm::ivec3(0)) {
         auto normalized_movement =
@@ -27,9 +27,9 @@ void CameraParams::update(glm::ivec3 movement_vector, glm::ivec2 sun_vector) {
         velocity += normalized_movement.z * facing()
             + normalized_movement.x * right()
             + normalized_movement.y * glm::vec3(0, 1, 0);
-        velocity = clamp_length(velocity, 0.75);
+        velocity = clamp_length(velocity, 0.2);
     } else {
-        velocity *= (1.0 - accel);
+        velocity *= 0.9;
     }
 
     if (sun_vector != glm::ivec2(0)) {
@@ -99,4 +99,70 @@ void glfw_key_callback(
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
+}
+
+void draw_imgui_window(
+    Uniforms* uniforms,
+    CameraParams& camera_params,
+    KeyboardState& keyboard_state,
+    bool& copy_view
+) {
+    ImGui::Checkbox("debug shadowmaps", &uniforms->debug_shadowmaps);
+    ImGui::Checkbox("copy view", &copy_view);
+    ImGui::SliderFloat(
+        "shadow_cam_distance",
+        &uniforms->shadow_cam_distance,
+        0.0f,
+        10000.0f
+    );
+    ImGui::SliderFloat(
+        "cascade_split_pow",
+        &uniforms->cascade_split_pow,
+        0.0f,
+        10.0f
+    );
+    ImGui::SliderFloat("fov", &camera_params.fov, 0.0f, 90.0f);
+    ImGui::SliderFloat(
+        "sun_intensity",
+        &uniforms->sun_intensity.x,
+        0.0f,
+        100.0f
+    );
+    ImGui::Text(
+        "camera pos: (%f, %f, %f)",
+        camera_params.position.x,
+        camera_params.position.y,
+        camera_params.position.z
+    );
+    ImGui::Text("yaw: %f", camera_params.yaw);
+    ImGui::Text("pitch: %f", camera_params.pitch);
+    ImGui::Text("sun_latitude: %f", camera_params.sun_latitude);
+    ImGui::Text("sun_longitude: %f", camera_params.sun_longitude);
+    ImGui::Text("grab_toggled: %u", keyboard_state.grab_toggled);
+    ImGui::RadioButton("Debug: Off", &uniforms->debug, UNIFORMS_DEBUG_OFF);
+    ImGui::RadioButton(
+        "Debug: Cascades",
+        &uniforms->debug,
+        UNIFORMS_DEBUG_CASCADES
+    );
+    ImGui::RadioButton(
+        "Debug: Triangle index",
+        &uniforms->debug,
+        UNIFORMS_DEBUG_TRIANGLE_INDEX
+    );
+    ImGui::RadioButton(
+        "Debug: Instance Index",
+        &uniforms->debug,
+        UNIFORMS_DEBUG_INSTANCE_INDEX
+    );
+    ImGui::RadioButton(
+        "Debug: Shader Clock",
+        &uniforms->debug,
+        UNIFORMS_DEBUG_SHADER_CLOCK
+    );
+    ImGui::RadioButton(
+        "Debug: Normals",
+        &uniforms->debug,
+        UNIFORMS_DEBUG_NORMALS
+    );
 }
