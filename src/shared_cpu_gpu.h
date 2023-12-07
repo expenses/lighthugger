@@ -40,10 +40,6 @@ struct MiscStorage {
     float shadow_sphere_radii[4];
     uint32_t min_depth;
     uint32_t max_depth;
-    DispatchIndirectCommand per_shadow_instance_dispatch;
-    DispatchIndirectCommand per_instance_dispatch;
-    DispatchIndirectCommand per_meshlet_dispatch;
-    DispatchIndirectCommand per_shadow_meshlet_dispatch;
 };
 
 // This is only an int32_t because of imgui.
@@ -67,6 +63,7 @@ struct Uniforms {
     uint64_t draw_calls;
     uint64_t misc_storage;
     uint64_t num_meshlets_prefix_sum;
+    uint64_t dispatches;
     vec3 camera_pos;
     vec3 sun_dir;
     vec3 sun_intensity;
@@ -166,3 +163,8 @@ const static uint32_t MAX_INSTANCES = 1024;
 
 // MAX_INSTANCES * sizeof(PrefixSumValue) + sizeof(uint64_t)
 const static uint32_t PREFIX_SUM_BUFFER_SECTOR_SIZE = MAX_INSTANCES * 8 + 8;
+
+const static uint32_t PER_INSTANCE_DISPATCH = 0;
+const static uint32_t PER_SHADOW_INSTANCE_DISPATCH = 1;
+const static uint32_t PER_MESHLET_DISPATCH = 2;
+const static uint32_t PER_SHADOW_MESHLET_DISPATCH = 3;

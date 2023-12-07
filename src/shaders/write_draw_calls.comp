@@ -57,19 +57,18 @@ void write_draw_calls() {
         .meshlet_reference[meshlet_indices_buffer_offset] = meshlet_reference;
 }
 
-layout(local_size_x = 16, local_size_y = 4) in;
+layout(local_size_x = 64) in;
 
 void write_draw_calls_shadows() {
     Uniforms uniforms = get_uniforms();
 
     uint32_t id = gl_GlobalInvocationID.x;
-    uint32_t cascade_index = gl_GlobalInvocationID.y;
 
-    if (id >= total_num_meshlets_for_cascade(cascade_index)) {
+    if (id >= total_num_meshlets_for_cascade(shadow_constant.cascade_index)) {
         return;
     }
 
-    MeshletReference meshlet_reference = get_meshlet_reference(id, cascade_index);
+    MeshletReference meshlet_reference = get_meshlet_reference(id, shadow_constant.cascade_index);
 
     Instance instance = InstanceBuffer(uniforms.instances)
                             .instances[meshlet_reference.instance_index];
@@ -83,7 +82,7 @@ void write_draw_calls_shadows() {
     if (cull_bounding_sphere_shadows(
             instance,
             meshlet.bounding_sphere,
-            cascade_index
+            shadow_constant.cascade_index
         )) {
         return;
     }
@@ -98,12 +97,12 @@ void write_draw_calls_shadows() {
 
     if (alpha_clipped) {
         meshlet_draw_index = ALPHA_CLIP_DRAWS_OFFSET
-            + atomicAdd(draw_call_buffer.num_alpha_clip[cascade_index], 1);
+            + atomicAdd(draw_call_buffer.num_alpha_clip[shadow_constant.cascade_index], 1);
     } else {
         meshlet_draw_index =
-            atomicAdd(draw_call_buffer.num_opaque[cascade_index], 1);
+            atomicAdd(draw_call_buffer.num_opaque[shadow_constant.cascade_index], 1);
     }
-    meshlet_draw_index += cascade_index * MESHLET_INDICES_BUFFER_SECTION_OFFSET;
+    meshlet_draw_index += shadow_constant.cascade_index * MESHLET_INDICES_BUFFER_SECTION_OFFSET;
     uint32_t meshlet_indices_buffer_offset =
         meshlet_draw_index + 2 * MESHLET_INDICES_BUFFER_SECTION_OFFSET;
 

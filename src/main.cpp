@@ -465,6 +465,18 @@ int main() {
             allocator,
             "draw_calls_buffer"
         ),
+        .dispatches_buffer = AllocatedBuffer(
+            vk::BufferCreateInfo {
+                .size = sizeof(vk::DispatchIndirectCommand) * (3 + 4),
+                .usage = vk::BufferUsageFlagBits::eIndirectBuffer
+                    | vk::BufferUsageFlagBits::eStorageBuffer
+                    | vk::BufferUsageFlagBits::eShaderDeviceAddress},
+            {
+                .usage = vma::MemoryUsage::eAuto,
+            },
+            allocator,
+            "dispatches buffer"
+        ),
         .shadowmap_layer_views = std::move(shadowmap_layer_views),
         .display_transform_lut = load_dds(
             "external/tony-mc-mapface/shader/tony_mc_mapface.dds",
@@ -603,6 +615,8 @@ int main() {
     uniforms->num_meshlets_prefix_sum = device.getBufferAddress(
         {.buffer = instance_resources.num_meshlets_prefix_sum.buffer}
     );
+    uniforms->dispatches =
+        device.getBufferAddress({.buffer = resources.dispatches_buffer.buffer});
 
     auto uniform_buffer_address =
         device.getBufferAddress({.buffer = uniform_buffer.buffer.buffer});

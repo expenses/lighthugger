@@ -61,3 +61,7 @@ layout(buffer_reference, scalar) buffer MiscStorageBuffer {
 layout(buffer_reference, scalar) buffer UniformsBuffer {
     Uniforms uniforms;
 };
+
+layout(buffer_reference, scalar) buffer DispatchCommandsBuffer {
+    DispatchIndirectCommand commands[];
+};

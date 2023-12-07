@@ -80,6 +80,7 @@ struct Resources {
     ImageWithView shadowmap;
     AllocatedBuffer misc_storage_buffer;
     AllocatedBuffer draw_calls_buffer;
+    AllocatedBuffer dispatches_buffer;
     std::array<vk::raii::ImageView, 4> shadowmap_layer_views;
     ImageWithView display_transform_lut;
     ImageWithView skybox;

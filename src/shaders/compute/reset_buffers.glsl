@@ -12,40 +12,42 @@ void reset_buffers_a() {
     buf.misc_storage.min_depth = UINT32_T_MAX_VALUE;
     buf.misc_storage.max_depth = 0;
 
-    buf.misc_storage.per_instance_dispatch.x =
-        dispatch_size(uniforms.num_instances, 64);
-    buf.misc_storage.per_instance_dispatch.y = 1;
-    buf.misc_storage.per_instance_dispatch.z = 1;
+    DispatchCommandsBuffer dispatches =
+        DispatchCommandsBuffer(get_uniforms().dispatches);
 
-    buf.misc_storage.per_shadow_instance_dispatch.x =
+    dispatches.commands[PER_INSTANCE_DISPATCH].x =
+        dispatch_size(uniforms.num_instances, 64);
+    dispatches.commands[PER_INSTANCE_DISPATCH].y = 1;
+    dispatches.commands[PER_INSTANCE_DISPATCH].z = 1;
+
+    dispatches.commands[PER_SHADOW_INSTANCE_DISPATCH].x =
         dispatch_size(uniforms.num_instances, 16);
-    buf.misc_storage.per_shadow_instance_dispatch.y = 1;
-    buf.misc_storage.per_shadow_instance_dispatch.z = 1;
+    dispatches.commands[PER_SHADOW_INSTANCE_DISPATCH].y = 1;
+    dispatches.commands[PER_SHADOW_INSTANCE_DISPATCH].z = 1;
 
     reset_counters();
 }
 
 // After the prefix sum.
 void reset_buffers_b() {
-    MiscStorageBuffer buf = MiscStorageBuffer(get_uniforms().misc_storage);
+    DispatchCommandsBuffer dispatches =
+        DispatchCommandsBuffer(get_uniforms().dispatches);
 
-    buf.misc_storage.per_meshlet_dispatch.x =
+    dispatches.commands[PER_MESHLET_DISPATCH].x =
         dispatch_size(total_num_meshlets_for_cascade(0), 64);
-    buf.misc_storage.per_meshlet_dispatch.y = 1;
-    buf.misc_storage.per_meshlet_dispatch.z = 1;
+    dispatches.commands[PER_MESHLET_DISPATCH].y = 1;
+    dispatches.commands[PER_MESHLET_DISPATCH].z = 1;
 }
 
 // After the shadow prefix sum.
 void reset_buffers_c() {
-    MiscStorageBuffer buf = MiscStorageBuffer(get_uniforms().misc_storage);
+    DispatchCommandsBuffer dispatches =
+        DispatchCommandsBuffer(get_uniforms().dispatches);
 
-    buf.misc_storage.per_shadow_meshlet_dispatch.x = dispatch_size(
-        max(max(total_num_meshlets_for_cascade(0),
-                total_num_meshlets_for_cascade(1)),
-            max(total_num_meshlets_for_cascade(2),
-                total_num_meshlets_for_cascade(3))),
-        16
-    );
-    buf.misc_storage.per_shadow_meshlet_dispatch.y = 1;
-    buf.misc_storage.per_shadow_meshlet_dispatch.z = 1;
+    [[unroll]] for (uint32_t i = 0; i < 4; i++) {
+        dispatches.commands[PER_SHADOW_MESHLET_DISPATCH + i].x =
+            dispatch_size(total_num_meshlets_for_cascade(i), 64);
+        dispatches.commands[PER_SHADOW_MESHLET_DISPATCH + i].y = 1;
+        dispatches.commands[PER_SHADOW_MESHLET_DISPATCH + i].z = 1;
+    }
 }

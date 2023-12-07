@@ -45,6 +45,40 @@ bool cull_bounding_sphere(Instance instance, vec4 bounding_sphere) {
     return !visible;
 }
 
+bool fits_partially_inside(
+    vec2 view_pos,
+    float sphere_radius,
+    float cascade_size
+) {
+    return all(lessThan((abs(view_pos) - sphere_radius), vec2(cascade_size)));
+}
+
+bool fits_entirely_inside(
+    vec2 view_pos,
+    float sphere_radius,
+    float cascade_size
+) {
+    return all(lessThan((abs(view_pos) + sphere_radius), vec2(cascade_size)));
+}
+
+bool fits_entirely_inside_cascade(
+    vec3 world_pos,
+    float sphere_radius,
+    uint32_t cascade_index
+) {
+    MiscStorageBuffer buf = MiscStorageBuffer(get_uniforms().misc_storage);
+
+    vec2 view_pos = (buf.misc_storage.shadow_view_matrices[cascade_index]
+                     * vec4(world_pos, 1.0))
+                        .xy;
+
+    return fits_entirely_inside(
+        view_pos,
+        sphere_radius,
+        buf.misc_storage.shadow_sphere_radii[cascade_index]
+    );
+}
+
 bool cull_bounding_sphere_shadows(
     Instance instance,
     vec4 bounding_sphere,
@@ -71,40 +105,33 @@ bool cull_bounding_sphere_shadows(
     vec3 view_space_pos = (buf.misc_storage.shadow_view_matrices[cascade_index]
                            * vec4(world_space_pos, 1.0))
                               .xyz;
-    // The view space goes from negatives in the front to positives in the back.
-    // This is confusing so flipping it here makes sense I think.
-    view_space_pos.z = -view_space_pos.z;
 
-    // Is the most positive/forwards point of the object in front of the near plane?
-    bool visible = view_space_pos.z + radius > NEAR_PLANE;
-
-    visible = visible
-        && abs(view_space_pos.x) - radius
-            < buf.misc_storage.shadow_sphere_radii[cascade_index];
-    visible = visible
-        && abs(view_space_pos.y) - radius
-            < buf.misc_storage.shadow_sphere_radii[cascade_index];
-
-    // If the object fits entirely within a smaller cascade then it can be culled.
-    for (uint32_t i = 0; i < cascade_index; i++) {
-        if (!visible) {
-            break;
-        }
-
-        vec3 smaller_view_space_pos = (buf.misc_storage.shadow_view_matrices[i]
-                                       * vec4(world_space_pos, 1.0))
-                                          .xyz;
-
-        bool fits_in_smaller = abs(smaller_view_space_pos.x) + radius
-            < buf.misc_storage.shadow_sphere_radii[i];
-        fits_in_smaller = fits_in_smaller
-            && abs(smaller_view_space_pos.y) + radius
-                < buf.misc_storage.shadow_sphere_radii[i];
-
-        visible = visible && !fits_in_smaller;
+    if (!fits_partially_inside(
+            view_space_pos.xy,
+            radius,
+            buf.misc_storage.shadow_sphere_radii[cascade_index]
+        )) {
+        return true;
     }
 
-    return !visible;
+    // If the object fits entirely within a smaller cascade then it can be culled.
+
+    if (cascade_index > 0
+        && fits_entirely_inside_cascade(world_space_pos, radius, 0)) {
+        return true;
+    }
+
+    if (cascade_index > 1
+        && fits_entirely_inside_cascade(world_space_pos, radius, 1)) {
+        return true;
+    }
+
+    if (cascade_index > 2
+        && fits_entirely_inside_cascade(world_space_pos, radius, 2)) {
+        return true;
+    }
+
+    return false;
 }
 
 bool cull_cone_perspective(Instance instance, Meshlet meshlet) {

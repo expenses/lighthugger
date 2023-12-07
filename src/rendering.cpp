@@ -41,15 +41,17 @@ void render(
     ZoneScoped;
     TracyVkZone(tracy_ctx, *command_buffer, "render");
 
-    auto shadow_instance_dispatch_command_offset =
-        sizeof(MiscStorage) - sizeof(DispatchIndirectCommand) * 4;
+    auto dispatch_scalar = [&](const vk::raii::Pipeline& pipeline) {
+        command_buffer.bindPipeline(vk::PipelineBindPoint::eCompute, *pipeline);
+        command_buffer.dispatch(1, 1, 1);
+    };
 
-    auto instance_dispatch_command_offset =
-        sizeof(MiscStorage) - sizeof(DispatchIndirectCommand) * 3;
-    auto dispatch_command_offset =
-        sizeof(MiscStorage) - sizeof(DispatchIndirectCommand) * 2;
-    auto shadow_dispatch_command_offset =
-        sizeof(MiscStorage) - sizeof(DispatchIndirectCommand);
+    auto dispatch_indirect = [&](uint32_t index) {
+        command_buffer.dispatchIndirect(
+            resources.dispatches_buffer.buffer,
+            index * sizeof(vk::DispatchIndirectCommand)
+        );
+    };
 
     command_buffer.pushConstants<UniformBufferAddressConstant>(
         *pipelines.pipeline_layout,
@@ -74,15 +76,7 @@ void render(
         {}
     );
 
-    {
-        TracyVkZone(tracy_ctx, *command_buffer, "reset buffers a");
-
-        command_buffer.bindPipeline(
-            vk::PipelineBindPoint::eCompute,
-            *pipelines.reset_buffers_a
-        );
-        command_buffer.dispatch(1, 1, 1);
-    }
+    dispatch_scalar(pipelines.reset_buffers_a);
 
     insert_color_image_barriers(
         command_buffer,
@@ -149,10 +143,7 @@ void render(
             vk::PipelineBindPoint::eCompute,
             *pipelines.cull_instances
         );
-        command_buffer.dispatchIndirect(
-            resources.misc_storage_buffer.buffer,
-            instance_dispatch_command_offset
-        );
+        dispatch_indirect(PER_INSTANCE_DISPATCH);
     }
 
     insert_global_barrier(
@@ -162,15 +153,7 @@ void render(
             .next_accesses = {THSVS_ACCESS_COMPUTE_SHADER_READ_OTHER}}
     );
 
-    {
-        TracyVkZone(tracy_ctx, *command_buffer, "reset buffers b");
-
-        command_buffer.bindPipeline(
-            vk::PipelineBindPoint::eCompute,
-            *pipelines.reset_buffers_b
-        );
-        command_buffer.dispatch(1, 1, 1);
-    }
+    dispatch_scalar(pipelines.reset_buffers_b);
 
     insert_global_barrier(
         command_buffer,
@@ -196,10 +179,7 @@ void render(
             vk::PipelineBindPoint::eCompute,
             *pipelines.write_draw_calls
         );
-        command_buffer.dispatchIndirect(
-            resources.misc_storage_buffer.buffer,
-            dispatch_command_offset
-        );
+        dispatch_indirect(PER_MESHLET_DISPATCH);
     }
 
     insert_global_barrier(
@@ -319,18 +299,7 @@ void render(
         );
     }
 
-    {
-        TracyVkZone(
-            tracy_ctx,
-            *command_buffer,
-            "generate shadow matrices and reset draw calls"
-        );
-        command_buffer.bindPipeline(
-            vk::PipelineBindPoint::eCompute,
-            *pipelines.generate_matrices
-        );
-        command_buffer.dispatch(1, 1, 1);
-    }
+    dispatch_scalar(pipelines.generate_matrices);
 
     {
         TracyVkZone(tracy_ctx, *command_buffer, "cull instances for shadows");
@@ -339,10 +308,7 @@ void render(
             vk::PipelineBindPoint::eCompute,
             *pipelines.cull_instances_shadows
         );
-        command_buffer.dispatchIndirect(
-            resources.misc_storage_buffer.buffer,
-            shadow_instance_dispatch_command_offset
-        );
+        dispatch_indirect(PER_SHADOW_INSTANCE_DISPATCH);
     }
 
     insert_global_barrier(
@@ -356,42 +322,7 @@ void render(
                     THSVS_ACCESS_COMPUTE_SHADER_READ_OTHER}}
     );
 
-    {
-        TracyVkZone(tracy_ctx, *command_buffer, "reset buffers c");
-
-        command_buffer.bindPipeline(
-            vk::PipelineBindPoint::eCompute,
-            *pipelines.reset_buffers_c
-        );
-        command_buffer.dispatch(1, 1, 1);
-    }
-
-    {
-        TracyVkZone(
-            tracy_ctx,
-            *command_buffer,
-            "cull meshlets and write draw calls"
-        );
-
-        command_buffer.bindPipeline(
-            vk::PipelineBindPoint::eCompute,
-            *pipelines.write_draw_calls_shadows
-        );
-        command_buffer.dispatchIndirect(
-            resources.misc_storage_buffer.buffer,
-            shadow_dispatch_command_offset
-        );
-    }
-
-    insert_global_barrier(
-        command_buffer,
-        GlobalBarrier<1, 1> {
-            .prev_accesses =
-                std::array<ThsvsAccessType, 1> {
-                    THSVS_ACCESS_COMPUTE_SHADER_WRITE},
-            .next_accesses =
-                std::array<ThsvsAccessType, 1> {THSVS_ACCESS_INDIRECT_BUFFER}}
-    );
+    dispatch_scalar(pipelines.reset_buffers_c);
 
     {
         TracyVkZone(tracy_ctx, *command_buffer, "shadowmap rasterization");
@@ -400,6 +331,39 @@ void render(
 
         for (uint32_t i = 0; i < resources.shadowmap_layer_views.size(); i++) {
             TracyVkZone(tracy_ctx, *command_buffer, "shadowmap inner");
+
+            command_buffer.pushConstants<ShadowPassConstant>(
+                *pipelines.pipeline_layout,
+                vk::ShaderStageFlagBits::eVertex
+                    | vk::ShaderStageFlagBits::eCompute,
+                sizeof(UniformBufferAddressConstant),
+                {{.cascade_index = i}}
+            );
+
+            {
+                TracyVkZone(
+                    tracy_ctx,
+                    *command_buffer,
+                    "cull meshlets and write draw calls"
+                );
+
+                command_buffer.bindPipeline(
+                    vk::PipelineBindPoint::eCompute,
+                    *pipelines.write_draw_calls_shadows
+                );
+                dispatch_indirect(PER_SHADOW_MESHLET_DISPATCH + i);
+            }
+
+            insert_global_barrier(
+                command_buffer,
+                GlobalBarrier<1, 1> {
+                    .prev_accesses =
+                        std::array<ThsvsAccessType, 1> {
+                            THSVS_ACCESS_COMPUTE_SHADER_WRITE},
+                    .next_accesses =
+                        std::array<ThsvsAccessType, 1> {
+                            THSVS_ACCESS_INDIRECT_BUFFER}}
+            );
 
             vk::RenderingAttachmentInfoKHR depth_attachment_info = {
                 .imageView = *resources.shadowmap_layer_views[i],
@@ -415,13 +379,6 @@ void render(
                      },
                  .layerCount = 1,
                  .pDepthAttachment = &depth_attachment_info}
-            );
-            command_buffer.pushConstants<ShadowPassConstant>(
-                *pipelines.pipeline_layout,
-                vk::ShaderStageFlagBits::eVertex
-                    | vk::ShaderStageFlagBits::eCompute,
-                sizeof(UniformBufferAddressConstant),
-                {{.cascade_index = i}}
             );
             command_buffer.bindPipeline(
                 vk::PipelineBindPoint::eGraphics,
