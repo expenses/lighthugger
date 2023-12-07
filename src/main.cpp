@@ -396,7 +396,35 @@ int main() {
         num_meshlets_prefix_sum.push_back(total_num_meshlets);
     }
 
-    auto num_meshlets_prefix_sum_buf = upload_via_staging_buffer(
+    dbg(num_meshlets_prefix_sum, total_num_meshlets);
+
+    auto instance_resources = InstanceResources {
+        .instances = upload_via_staging_buffer(
+            instances.data(),
+            instances.size() * sizeof(Instance),
+            allocator,
+            vk::BufferUsageFlagBits::eStorageBuffer
+                | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            "instance buffer",
+            command_buffer,
+            temp_buffers
+        ),
+        .meshlet_references = AllocatedBuffer(
+            vk::BufferCreateInfo {
+                // Made up of 6 sections, 1 for expanded meshlets, 1 for culled + sorted meshlets
+                // for the main view and 4 for culled + sorted meshlets for each shadow view.
+                .size = sizeof(MeshletReference)
+                    * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS) * 6,
+                .usage = vk::BufferUsageFlagBits::eStorageBuffer
+                    | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            },
+            {
+                .usage = vma::MemoryUsage::eAuto,
+            },
+            allocator,
+            "meshlet reference buffer"
+        ),
+        .num_meshlets_prefix_sum = upload_via_staging_buffer(
             num_meshlets_prefix_sum.data(),
             num_meshlets_prefix_sum.size() * sizeof(uint32_t),
             allocator,
@@ -405,25 +433,7 @@ int main() {
             "num meshlets prefix sum buffer",
             command_buffer,
             temp_buffers
-        );
-
-    dbg(num_meshlets_prefix_sum, total_num_meshlets);
-
-    auto meshlets_index_buf = AllocatedBuffer(
-        vk::BufferCreateInfo {
-            // Made up of 6 sections, 1 for expanded meshlets, 1 for culled + sorted meshlets
-            // for the main view and 4 for culled + sorted meshlets for each shadow view.
-            .size = sizeof(MeshletIndex)
-                * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS) * 6,
-            .usage = vk::BufferUsageFlagBits::eStorageBuffer
-                | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-        },
-        {
-            .usage = vma::MemoryUsage::eAuto,
-        },
-        allocator,
-        "meshlets_index_buf"
-    );
+        )};
 
     auto resources = Resources {
         .resizing = ResizingResources(device, allocator, extent),
@@ -450,16 +460,6 @@ int main() {
             },
             allocator,
             "misc_storage_buffer"
-        ),
-        .instance_buffer = upload_via_staging_buffer(
-            instances.data(),
-            instances.size() * sizeof(Instance),
-            allocator,
-            vk::BufferUsageFlagBits::eStorageBuffer
-                | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-            "instance buffer",
-            command_buffer,
-            temp_buffers
         ),
         .draw_calls_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
@@ -606,17 +606,20 @@ int main() {
     // quality loss when setting this value to be absurdly high.
     uniforms->shadow_cam_distance = 1024.0;
     uniforms->cascade_split_pow = 3.0;
-    uniforms->meshlet_indices =
-        device.getBufferAddress({.buffer = meshlets_index_buf.buffer});
+    uniforms->meshlet_references = device.getBufferAddress(
+        {.buffer = instance_resources.meshlet_references.buffer}
+    );
     uniforms->instances =
-        device.getBufferAddress({.buffer = resources.instance_buffer.buffer});
+        device.getBufferAddress({.buffer = instance_resources.instances.buffer}
+        );
     uniforms->draw_calls =
         device.getBufferAddress({.buffer = resources.draw_calls_buffer.buffer});
     uniforms->misc_storage =
         device.getBufferAddress({.buffer = resources.misc_storage_buffer.buffer}
         );
-    uniforms->num_meshlets_prefix_sum = device.getBufferAddress({.buffer = num_meshlets_prefix_sum_buf.buffer}
-        );
+    uniforms->num_meshlets_prefix_sum = device.getBufferAddress(
+        {.buffer = instance_resources.num_meshlets_prefix_sum.buffer}
+    );
 
     auto copy_view = true;
 

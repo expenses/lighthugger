@@ -10,15 +10,15 @@ void write_draw_calls() {
         return;
     }
 
-    MeshletIndex meshlet_index =
-        MeshletIndexBuffer(uniforms.meshlet_indices).meshlet_index[id];
+    MeshletReference meshlet_reference =
+        MeshletReferenceBuffer(uniforms.meshlet_references).meshlet_reference[id];
 
     Instance instance = InstanceBuffer(uniforms.instances)
-                            .instances[meshlet_index.instance_index];
+                            .instances[meshlet_reference.instance_index];
     MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
 
     Meshlet meshlet =
-        MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_index.meshlet_index];
+        MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_reference.meshlet_index];
 
     if (cull_bounding_sphere(instance, meshlet.bounding_sphere)) {
         return;
@@ -51,8 +51,8 @@ void write_draw_calls() {
 
     draw_call_buffer.draw_calls[meshlet_draw_index] = draw_call;
 
-    MeshletIndexBuffer(uniforms.meshlet_indices)
-        .meshlet_index[meshlet_indices_buffer_offset] = meshlet_index;
+    MeshletReferenceBuffer(uniforms.meshlet_references)
+        .meshlet_reference[meshlet_indices_buffer_offset] = meshlet_reference;
 }
 
 layout(local_size_x = 16, local_size_y = 4) in;
@@ -65,15 +65,15 @@ void write_draw_calls_shadows() {
         return;
     }
 
-    MeshletIndex meshlet_index =
-        MeshletIndexBuffer(uniforms.meshlet_indices).meshlet_index[id];
+    MeshletReference meshlet_reference =
+        MeshletReferenceBuffer(uniforms.meshlet_references).meshlet_reference[id];
 
     Instance instance = InstanceBuffer(uniforms.instances)
-                            .instances[meshlet_index.instance_index];
+                            .instances[meshlet_reference.instance_index];
     MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
 
     Meshlet meshlet =
-        MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_index.meshlet_index];
+        MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_reference.meshlet_index];
 
     bool alpha_clipped = bool(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP);
 
@@ -112,6 +112,6 @@ void write_draw_calls_shadows() {
 
     draw_call_buffer.draw_calls[meshlet_draw_index] = draw_call;
 
-    MeshletIndexBuffer(uniforms.meshlet_indices)
-        .meshlet_index[meshlet_indices_buffer_offset] = meshlet_index;
+    MeshletReferenceBuffer(uniforms.meshlet_references)
+        .meshlet_reference[meshlet_indices_buffer_offset] = meshlet_reference;
 }

@@ -459,17 +459,14 @@ GltfMesh load_gltf(
 
                 auto texture_scale = glm::vec2(1.0);
                 auto texture_offset = glm::vec2(0.0);
-                auto albedo_texture_index =
-                    std::numeric_limits<uint16_t>::max();
-                auto metallic_roughness_texture_index =
-                    std::numeric_limits<uint16_t>::max();
-                auto normal_texture_index =
-                    std::numeric_limits<uint16_t>::max();
+                auto base_color_texture_index = UNUSED_TEXTURE_INDEX;
+                auto metallic_roughness_texture_index = UNUSED_TEXTURE_INDEX;
+                auto normal_texture_index = UNUSED_TEXTURE_INDEX;
 
                 if (material.pbrData.baseColorTexture) {
                     auto& tex = material.pbrData.baseColorTexture.value();
 
-                    albedo_texture_index =
+                    base_color_texture_index =
                         image_indices[asset.textures[tex.textureIndex]
                                           .imageIndex.value()];
 
@@ -550,8 +547,6 @@ GltfMesh load_gltf(
                 if (material.pbrData.baseColorFactor[3] != 1.0) {
                     dbg(material.pbrData.baseColorFactor);
                 }
-
-                // todo: albedo factor, proper pbr.
 
                 std::vector<float> float_positions(positions.count * 3);
 
@@ -658,11 +653,11 @@ GltfMesh load_gltf(
                     ),
                     .texture_scale = texture_scale,
                     .texture_offset = texture_offset,
-                    .albedo_texture_index = albedo_texture_index,
+                    .base_color_texture_index = base_color_texture_index,
                     .metallic_roughness_texture_index =
                         metallic_roughness_texture_index,
                     .normal_texture_index = normal_texture_index,
-                    .albedo_factor = glm::vec3(
+                    .base_color_factor = glm::vec3(
                         material.pbrData.baseColorFactor[0],
                         material.pbrData.baseColorFactor[1],
                         material.pbrData.baseColorFactor[2]

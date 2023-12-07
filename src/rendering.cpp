@@ -123,7 +123,11 @@ void render(
     );
 
     {
-        TracyVkZone(tracy_ctx, *command_buffer, "gather meshlets from instances");
+        TracyVkZone(
+            tracy_ctx,
+            *command_buffer,
+            "gather meshlets from instances"
+        );
 
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eCompute,
@@ -279,7 +283,11 @@ void render(
         );
     }
     {
-        TracyVkZone(tracy_ctx, *command_buffer, "generate shadow matrices and reset draw calls");
+        TracyVkZone(
+            tracy_ctx,
+            *command_buffer,
+            "generate shadow matrices and reset draw calls"
+        );
         command_buffer.bindPipeline(
             vk::PipelineBindPoint::eCompute,
             *pipelines.generate_matrices

@@ -3,8 +3,8 @@ layout(buffer_reference, scalar) buffer MeshInfoBuffer {
     MeshInfo mesh_info;
 };
 
-layout(buffer_reference, scalar) buffer MeshletIndexBuffer {
-    MeshletIndex meshlet_index[];
+layout(buffer_reference, scalar) buffer MeshletReferenceBuffer {
+    MeshletReference meshlet_reference[];
 };
 
 layout(buffer_reference, scalar) buffer MeshletBuffer {

@@ -69,12 +69,17 @@ struct ResizingResources {
         )) {}
 };
 
+struct InstanceResources {
+    AllocatedBuffer instances;
+    AllocatedBuffer meshlet_references;
+    AllocatedBuffer num_meshlets_prefix_sum;
+};
+
 struct Resources {
     ResizingResources resizing;
     PersistentlyMappedBuffer uniform_buffer;
     ImageWithView shadowmap;
     AllocatedBuffer misc_storage_buffer;
-    AllocatedBuffer instance_buffer;
     AllocatedBuffer draw_calls_buffer;
     std::array<vk::raii::ImageView, 4> shadowmap_layer_views;
     ImageWithView display_transform_lut;

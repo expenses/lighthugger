@@ -12,7 +12,7 @@ static const float4x4 bias_matrix = float4x4(
 );
 
 struct Material {
-    float3 albedo;
+    float3 base_color;
     float metallic;
     float roughness;
 };
@@ -102,14 +102,14 @@ void main() {
     uint32_t instance_index = packed & ((1 << 24) - 1);
     uint32_t triangle_index = packed >> 24;
 
-    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.meshlet_indices)
-                                     .meshlet_index[instance_index];
+    MeshletReference meshlet_reference = MeshletReferenceBuffer(uniforms.meshlet_references)
+                                     .meshlet_reference[instance_index];
 
     Instance instance = InstanceBuffer(uniforms.instances)
-                            .instances[meshlet_index.instance_index];
+                            .instances[meshlet_reference.instance_index];
     MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
     Meshlet meshlet =
-        MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_index.meshlet_index];
+        MeshletBuffer(mesh_info.meshlets).meshlets[meshlet_reference.meshlet_index];
     uint32_t3 micro_indices = meshlet.index_offset
         + MicroIndexBuffer(mesh_info.micro_indices + meshlet.triangle_offset)
               .indices[triangle_index];
@@ -224,21 +224,23 @@ void main() {
 
     Material material;
 
-    material.albedo = sample_texture(mesh_info.albedo_texture_index, uv).rgb
-        * mesh_info.albedo_factor;
+    material.base_color = sample_texture(mesh_info.base_color_texture_index, uv).rgb
+        * mesh_info.base_color_factor;
     float4 metallic_roughness_sample =
         sample_texture(mesh_info.metallic_roughness_texture_index, uv);
     material.roughness = metallic_roughness_sample.y;
     material.metallic = metallic_roughness_sample.z;
 
-    float3 map_normal = sample_texture(mesh_info.normal_texture_index, uv).xyz;
-    map_normal = map_normal * 255.0 / 127.0 - 128.0 / 127.0;
+    if (mesh_info.normal_texture_index != UNUSED_TEXTURE_INDEX) {
+        float3 map_normal = sample_texture(mesh_info.normal_texture_index, uv).xyz;
+        map_normal = map_normal * 255.0 / 127.0 - 128.0 / 127.0;
 
-    normal =
-        normalize(compute_cotangent_frame(normal, world_pos, uv) * map_normal);
+        normal =
+            normalize(compute_cotangent_frame(normal, world_pos, uv) * map_normal);
+    }
 
     float3 ambient_lighting = evaluate_spherical_harmonic(normal, AMBIENT_SH)
-        * diffuse_color(material.albedo, material.metallic);
+        * diffuse_color(material.base_color, material.metallic);
     float sun_intensity = PI * shadow_sum;
     float3 sun_lighting = BRDF(
                               view_vector,
@@ -246,7 +248,7 @@ void main() {
                               normal,
                               material.roughness,
                               material.metallic,
-                              material.albedo,
+                              material.base_color,
                               bool(mesh_info.flags & MESH_INFO_FLAGS_ALPHA_CLIP)
                           )
         * sun_intensity;
@@ -262,7 +264,7 @@ void main() {
         imageStore(
             rw_scene_referred_framebuffer,
             coord,
-            float4(material.albedo * debug_col, 1.0)
+            float4(material.base_color * debug_col, 1.0)
         );
     } else if (uniforms.debug == UNIFORMS_DEBUG_TRIANGLE_INDEX) {
         imageStore(
@@ -274,7 +276,7 @@ void main() {
         imageStore(
             rw_scene_referred_framebuffer,
             coord,
-            float4(DEBUG_COLOURS[meshlet_index.meshlet_index % 10], 1.0)
+            float4(DEBUG_COLOURS[meshlet_reference.meshlet_index % 10], 1.0)
         );
     } else if (uniforms.debug == UNIFORMS_DEBUG_SHADER_CLOCK) {
         uint64_t end_time = clockARB();

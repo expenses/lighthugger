@@ -12,14 +12,15 @@ struct VertexData {
 VertexData load_vertex_data(uint32_t vertex_index, uint32_t instance_index) {
     VertexData vertex_data;
 
-    MeshletIndex meshlet_index = MeshletIndexBuffer(uniforms.meshlet_indices)
-                                     .meshlet_index[instance_index];
+    MeshletReference meshlet_reference =
+        MeshletReferenceBuffer(uniforms.meshlet_references)
+            .meshlet_reference[instance_index];
     vertex_data.instance = InstanceBuffer(uniforms.instances)
-                               .instances[meshlet_index.instance_index];
+                               .instances[meshlet_reference.instance_index];
     vertex_data.mesh_info =
         MeshInfoBuffer(vertex_data.instance.mesh_info_address).mesh_info;
     Meshlet meshlet = MeshletBuffer(vertex_data.mesh_info.meshlets)
-                          .meshlets[meshlet_index.meshlet_index];
+                          .meshlets[meshlet_reference.meshlet_index];
 
     uint32_t micro_index = meshlet.index_offset
         + MicroIndexBufferSingle(
@@ -71,7 +72,7 @@ void visbuffer_alpha_clip_vertex() {
 
     gl_Position = uniforms.combined_perspective_view * float4(position, 1.0);
     packed = pack(triangle_index, gl_InstanceIndex);
-    base_texture_index = data.mesh_info.albedo_texture_index;
+    base_texture_index = data.mesh_info.base_color_texture_index;
     uv = float2(QuanitizedUvs(data.mesh_info.uvs).uvs[data.index])
             * data.mesh_info.texture_scale
         + data.mesh_info.texture_offset;
@@ -127,7 +128,7 @@ void shadowmap_alpha_clip_vertex() {
             .misc_storage.shadow_matrices[shadow_constant.cascade_index]
         * float4(position, 1.0);
 
-    base_texture_index = data.mesh_info.albedo_texture_index;
+    base_texture_index = data.mesh_info.base_color_texture_index;
     uv = float2(QuanitizedUvs(data.mesh_info.uvs).uvs[data.index])
             * data.mesh_info.texture_scale
         + data.mesh_info.texture_offset;

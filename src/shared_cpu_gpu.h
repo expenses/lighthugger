@@ -20,10 +20,10 @@ struct MeshInfo {
     vec4 bounding_sphere;
     vec2 texture_scale;
     vec2 texture_offset;
-    uint16_t albedo_texture_index;
+    uint16_t base_color_texture_index;
     uint16_t metallic_roughness_texture_index;
     uint16_t normal_texture_index;
-    vec3 albedo_factor;
+    vec3 base_color_factor;
 };
 
 // Stores depth info and draw call counts.
@@ -52,7 +52,7 @@ struct Uniforms {
     mat4 perspective;
     mat4 perspective_inverse;
     mat4 view_inverse;
-    uint64_t meshlet_indices;
+    uint64_t meshlet_references;
     uint64_t instances;
     uint64_t draw_calls;
     uint64_t misc_storage;
@@ -131,7 +131,8 @@ struct Meshlet {
     uint8_t index_count;
 };
 
-struct MeshletIndex {
+// Allows for indexing a meshlet in the mesh that an instance represents.
+struct MeshletReference {
     uint32_t instance_index;
     uint16_t meshlet_index;
 };
@@ -140,3 +141,5 @@ struct MeshletIndex {
 const static uint32_t MAX_MESHLET_UNIQUE_VERTICES = 64;
 const static uint32_t MAX_MESHLET_TRIANGLES = 124;
 const static uint32_t MAX_MESHLET_VERTICES = MAX_MESHLET_TRIANGLES * 3;
+
+const static uint16_t UNUSED_TEXTURE_INDEX = ~uint16_t(0u);

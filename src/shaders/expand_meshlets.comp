@@ -12,7 +12,7 @@ void main() {
     }
 
     InstanceBuffer instance_buffer = InstanceBuffer(uniforms.instances);
-    MeshletIndexBuffer meshlet_index_buffer = MeshletIndexBuffer(uniforms.meshlet_indices);
+    MeshletReferenceBuffer meshlet_reference_buffer = MeshletReferenceBuffer(uniforms.meshlet_references);
     DrawCallBuffer draw_call_buffer = DrawCallBuffer(uniforms.draw_calls);
     PrefixSumValues prefix_sum_values = PrefixSumValues(uniforms.num_meshlets_prefix_sum);
 
@@ -24,12 +24,12 @@ void main() {
 
     uint32_t mesh_meshlet_index = global_meshlet_index - (num_meshlets_sum - mesh_info.num_meshlets);
 
-    MeshletIndex index;
-    index.instance_index = instance_index;
-    index.meshlet_index = uint16_t(mesh_meshlet_index);
+    MeshletReference reference;
+    reference.instance_index = instance_index;
+    reference.meshlet_index = uint16_t(mesh_meshlet_index);
 
     // Write the meshlet index into the buffer.
-    meshlet_index_buffer.meshlet_index[global_meshlet_index] = index;
+    meshlet_reference_buffer.meshlet_reference[global_meshlet_index] = reference;
 
     // Combining these two shaders seems to slow things down rather than speed them up. Not sure why!
     /*

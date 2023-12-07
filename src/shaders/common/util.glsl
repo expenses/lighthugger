@@ -30,7 +30,11 @@ float convert_infinite_reverze_z_depth(float depth) {
 }
 
 // See https://en.cppreference.com/w/cpp/algorithm/upper_bound.
-uint32_t binary_search_upper_bound(PrefixSumValues values, uint32_t count, uint32_t target) {
+uint32_t binary_search_upper_bound(
+    PrefixSumValues values,
+    uint32_t count,
+    uint32_t target
+) {
     uint32_t first = 0;
 
     while (count > 0) {
