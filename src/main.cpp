@@ -649,18 +649,7 @@ int main() {
             );
         }
         {
-            int sun_left_right =
-                int(keyboard_state.right) - int(keyboard_state.left);
-            int sun_up_down = int(keyboard_state.up) - int(keyboard_state.down);
-
-            camera_params.update(
-                glm::ivec3(
-                    int(keyboard_state.d) - int(keyboard_state.a),
-                    int(keyboard_state.shift) - int(keyboard_state.control),
-                    int(keyboard_state.w) - int(keyboard_state.s)
-                ),
-                glm::ivec2(sun_left_right, sun_up_down)
-            );
+            camera_params.update(keyboard_state);
 
             auto mouse = glm::dvec2(0.0, 0.0);
             glfwGetCursorPos(window, &mouse.x, &mouse.y);
@@ -668,15 +657,7 @@ int main() {
             prev_mouse = mouse;
 
             if (keyboard_state.grab_toggled) {
-                camera_params.pitch -=
-                    static_cast<float>(mouse_delta.y) / 1024.0f;
-                camera_params.yaw +=
-                    static_cast<float>(mouse_delta.x) / 1024.0f;
-                camera_params.pitch = std::clamp(
-                    camera_params.pitch,
-                    -std::numbers::pi_v<float> / 2.0f + 0.0001f,
-                    std::numbers::pi_v<float> / 2.0f
-                );
+                camera_params.rotate_camera(mouse_delta);
             }
         }
 

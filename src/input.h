@@ -1,5 +1,19 @@
 #include "shared_cpu_gpu.h"
 
+struct KeyboardState {
+    bool left;
+    bool right;
+    bool up;
+    bool down;
+    bool w;
+    bool a;
+    bool s;
+    bool d;
+    bool shift;
+    bool control;
+    bool grab_toggled;
+};
+
 struct CameraParams {
     glm::vec3 position;
     glm::vec3 velocity = glm::vec3(0.0);
@@ -33,21 +47,34 @@ struct CameraParams {
         );
     }
 
-    void update(glm::ivec3 movement_vector, glm::ivec2 sun_vector);
-};
+    void update(KeyboardState& keyboard_state) {
+        int sun_left_right =
+                int(keyboard_state.right) - int(keyboard_state.left);
+            int sun_up_down = int(keyboard_state.up) - int(keyboard_state.down);
 
-struct KeyboardState {
-    bool left;
-    bool right;
-    bool up;
-    bool down;
-    bool w;
-    bool a;
-    bool s;
-    bool d;
-    bool shift;
-    bool control;
-    bool grab_toggled;
+        update(
+            glm::ivec3(
+                int(keyboard_state.d) - int(keyboard_state.a),
+                int(keyboard_state.shift) - int(keyboard_state.control),
+                int(keyboard_state.w) - int(keyboard_state.s)
+            ),
+            glm::ivec2(sun_left_right, sun_up_down)
+        );
+    }
+
+    void update(glm::ivec3 movement_vector, glm::ivec2 sun_vector);
+
+    void rotate_camera(glm::dvec2 mouse_delta) {
+        pitch -=
+            static_cast<float>(mouse_delta.y) / 1024.0f;
+        yaw +=
+            static_cast<float>(mouse_delta.x) / 1024.0f;
+        pitch = std::clamp(
+            pitch,
+            -std::numbers::pi_v<float> / 2.0f + 0.0001f,
+            std::numbers::pi_v<float> / 2.0f
+        );
+    }
 };
 
 void glfw_key_callback(
