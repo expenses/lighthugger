@@ -38,7 +38,7 @@ int main() {
     auto vulkan_version = VK_API_VERSION_1_3;
 
     vk::ApplicationInfo appInfo = {
-        .pApplicationName = "Hello Triangle",
+        .pApplicationName = "lighthugger",
         .applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
         .pEngineName = "No Engine",
         .engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
@@ -175,7 +175,7 @@ int main() {
     auto window = glfwCreateWindow(
         static_cast<int>(extent.width),
         static_cast<int>(extent.height),
-        "Window Title",
+        "lighthugger",
         NULL,
         NULL
     );
@@ -673,7 +673,9 @@ int main() {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        draw_imgui_window(uniforms, camera_params, keyboard_state, copy_view);
+        if (keyboard_state.ui_toggled) {
+            draw_imgui_window(uniforms, camera_params, keyboard_state, copy_view);
+        }
         ImGui::Render();
 
         // Wait on the render fence to be signaled

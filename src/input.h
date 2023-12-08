@@ -12,6 +12,7 @@ struct KeyboardState {
     bool shift;
     bool control;
     bool grab_toggled;
+    bool ui_toggled = true;
 };
 
 struct CameraParams {
