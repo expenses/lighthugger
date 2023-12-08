@@ -1,6 +1,7 @@
 # Lighthugger 🚀
 
 ![](readme/san_miguel_rendered.png)
+
 _A rendering of the San Miguel 2.0 scene from the [McGuire Computer Graphics Archive](https://casual-effects.com/data/index.html). CC BY 3.0._
 
 - A modern Vulkan 1.3 renderer
@@ -15,9 +16,11 @@ _A rendering of the San Miguel 2.0 scene from the [McGuire Computer Graphics Arc
 - GLSL shaders (I'd use HLSL if it had 8-bit int support and if atomics worked on unstructured buffers)
 
 ![](readme/san_miguel_breakdown.png)
+
 _Clockwise from top-left: Rendered scene, visibility buffer triangle IDs, visibility buffer meshlet IDs, shadow cascades_
 
 ![](readme/san_miguel_cascades.png)
+
 _Rendered view showing all 4 shadowmap cascades. Not that objects that fit in smaller cascades are culled from the larger ones._
 
 This project started out with my writing a C++ Vulkan starter project. That code is available on the `starter` branch.
