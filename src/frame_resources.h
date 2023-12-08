@@ -118,8 +118,8 @@ struct FlipFlipResource {
     std::array<T, 2> items;
     bool flipped;
 
-    FlipFlipResource(std::array<T, 2> items_) :
-        items(std::move(items_)),
+    FlipFlipResource(T a, T b) :
+        items({std::move(a), std::move(b)}),
         flipped(false) {}
 
     void flip() {
@@ -137,7 +137,6 @@ struct FrameCommandData {
     vk::raii::Semaphore swapchain_semaphore;
     vk::raii::Semaphore render_semaphore;
     vk::raii::Fence render_fence;
-    AllocatedBuffer uniform_buffer;
     RaiiTracyCtx tracy_ctx;
 };
 
@@ -145,6 +144,5 @@ FrameCommandData create_frame_command_data(
     const vk::raii::Device& device,
     const vk::raii::PhysicalDevice& phys_device,
     const vk::raii::Queue& queue,
-    vma::Allocator allocator,
     uint32_t graphics_queue_family
 );

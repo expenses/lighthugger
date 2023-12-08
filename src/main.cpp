@@ -230,21 +230,20 @@ int main() {
     // after all allocated objects are destroyed.
     RaiiAllocator raii_allocator = {.allocator = allocator};
 
-    auto command_buffer = FlipFlipResource(std::array {
+    auto command_buffer = FlipFlipResource(
         create_frame_command_data(
             device,
             phys_device,
             graphics_queue,
-            allocator,
             graphics_queue_family
         ),
         create_frame_command_data(
             device,
             phys_device,
             graphics_queue,
-            allocator,
             graphics_queue_family
-        )});
+        )
+    );
 
     auto descriptor_set_layouts = create_descriptor_set_layouts(device);
     auto pipelines =
@@ -389,10 +388,10 @@ int main() {
         ),
         .meshlet_references = AllocatedBuffer(
             vk::BufferCreateInfo {
-                // Made up of 6 sections, 1 for expanded meshlets, 1 for culled + sorted meshlets
-                // for the main view and 4 for culled + sorted meshlets for each shadow view.
+                // Made up of 2 sections, one for the visbuffer meshlets (needs to stick around
+                // until deferred rendering) and one for the meshlets of each shadow pass (transient).
                 .size = sizeof(MeshletReference)
-                    * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS) * 6,
+                    * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS) * 2,
                 .usage = vk::BufferUsageFlagBits::eStorageBuffer
                     | vk::BufferUsageFlagBits::eShaderDeviceAddress,
             },
@@ -427,8 +426,21 @@ int main() {
             .usage = vma::MemoryUsage::eAuto,
         },
         allocator,
-        "uniform_buffer"
+        "staging uniform_buffer"
     ));
+
+    auto final_uniform_buffer = AllocatedBuffer(
+        vk::BufferCreateInfo {
+            .size = sizeof(Uniforms),
+            .usage = vk::BufferUsageFlagBits::eUniformBuffer
+                | vk::BufferUsageFlagBits::eShaderDeviceAddress
+                | vk::BufferUsageFlagBits::eTransferDst},
+        {
+            .usage = vma::MemoryUsage::eAuto,
+        },
+        allocator,
+        "uniform_buffer"
+    );
 
     auto resources = Resources {
         .resizing = ResizingResources(device, allocator, extent),
@@ -448,11 +460,9 @@ int main() {
         .draw_calls_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
                 // Store the draw call counts as well as 2 sets of commands (opaque + alpha clip)
-                // for each view in use at the same time. As we're rendering the visbuffer before
-                // everything else, we can reset things before rendering the shadow views and can reuse the first set.
                 .size = DRAW_CALLS_COUNTS_SIZE
                     + sizeof(vk::DrawIndirectCommand)
-                        * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS) * 4,
+                        * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
                 .usage = vk::BufferUsageFlagBits::eIndirectBuffer
                     | vk::BufferUsageFlagBits::eStorageBuffer
                     | vk::BufferUsageFlagBits::eShaderDeviceAddress},
@@ -719,7 +729,7 @@ int main() {
 
         data.buffer.copyBuffer(
             uniform_buffer.buffer.buffer,
-            data.uniform_buffer.buffer,
+            final_uniform_buffer.buffer,
             {vk::BufferCopy {
                 .srcOffset = 0,
                 .dstOffset = 0,
@@ -737,7 +747,7 @@ int main() {
             graphics_queue_family,
             data.tracy_ctx.inner,
             swapchain_image_index,
-            device.getBufferAddress({.buffer = data.uniform_buffer.buffer})
+            device.getBufferAddress({.buffer = final_uniform_buffer.buffer})
         );
         TracyVkCollect(data.tracy_ctx.inner, *data.buffer);
 

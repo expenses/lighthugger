@@ -403,9 +403,7 @@ void render(
 
                 command_buffer.drawIndirectCount(
                     resources.draw_calls_buffer.buffer,
-                    DRAW_CALLS_COUNTS_SIZE
-                        + (MESHLET_INDICES_BUFFER_SECTION_OFFSET * i)
-                            * sizeof(vk::DrawIndirectCommand),
+                    DRAW_CALLS_COUNTS_SIZE,
                     resources.draw_calls_buffer.buffer,
                     i * sizeof(uint32_t),
                     MAX_OPAQUE_DRAWS,
@@ -426,8 +424,7 @@ void render(
                 command_buffer.drawIndirectCount(
                     resources.draw_calls_buffer.buffer,
                     DRAW_CALLS_COUNTS_SIZE
-                        + (ALPHA_CLIP_DRAWS_OFFSET
-                           + MESHLET_INDICES_BUFFER_SECTION_OFFSET * i)
+                        + (ALPHA_CLIP_DRAWS_OFFSET)
                             * sizeof(vk::DrawIndirectCommand),
                     resources.draw_calls_buffer.buffer,
                     sizeof(uint32_t) * 4 + i * sizeof(uint32_t),

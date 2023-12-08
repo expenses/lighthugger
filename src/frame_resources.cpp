@@ -4,7 +4,6 @@ FrameCommandData create_frame_command_data(
     const vk::raii::Device& device,
     const vk::raii::PhysicalDevice& phys_device,
     const vk::raii::Queue& queue,
-    vma::Allocator allocator,
     uint32_t graphics_queue_family
 ) {
     auto pool = device.createCommandPool({
@@ -28,17 +27,5 @@ FrameCommandData create_frame_command_data(
         .render_semaphore = device.createSemaphore({}),
         .render_fence =
             device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled}),
-        .uniform_buffer = AllocatedBuffer(
-            vk::BufferCreateInfo {
-                .size = sizeof(Uniforms),
-                .usage = vk::BufferUsageFlagBits::eUniformBuffer
-                    | vk::BufferUsageFlagBits::eShaderDeviceAddress
-                    | vk::BufferUsageFlagBits::eTransferDst},
-            {
-                .usage = vma::MemoryUsage::eAuto,
-            },
-            allocator,
-            "uniform_buffer"
-        ),
         .tracy_ctx = RaiiTracyCtx(tracy_ctx)};
 }
