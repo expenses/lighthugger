@@ -8,3 +8,5 @@ renderdoc.cap
 *.ktx2
 cache/*
 perf.data*
+texconv.exe
+models
