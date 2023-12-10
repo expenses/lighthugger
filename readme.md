@@ -15,6 +15,8 @@ _A rendering of the San Miguel 2.0 scene from the [McGuire Computer Graphics Arc
 - Written in C++20 and [Vulkan-Hpp](https://github.com/KhronosGroup/Vulkan-Hpp).
 - GLSL shaders (I'd use HLSL if it had 8-bit int support and if atomics worked on unstructured buffers)
 
+**MIT license available upon request.**
+
 ![](readme/san_miguel_breakdown.png)
 
 _Clockwise from top-left: Rendered scene, visibility buffer triangle IDs, visibility buffer meshlet IDs, shadow cascades_
