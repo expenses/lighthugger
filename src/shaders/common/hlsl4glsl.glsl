@@ -22,10 +22,12 @@
 #define uint3 uvec3
 #define uint4 uvec4
 #define uint8_t3 u8vec3
+#define uint8_t4 u8vec4
 #define uint16_t2 u16vec2
 #define uint16_t3 u16vec3
 #define uint16_t4 u16vec4
 #define int8_t4 i8vec4
+#define int8_t3 i8vec3
 
 #define asuint floatBitsToUint
 #define asfloat uintBitsToFloat

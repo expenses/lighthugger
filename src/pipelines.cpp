@@ -396,12 +396,18 @@ Pipelines Pipelines::compile_pipelines(
             "compiled_shaders/cull_instances_shadows.spv"
         ),
         .pipeline_layout = std::move(pipeline_layout),
-        .copy_quantized_positions =
-            {.pipeline = create_compute_pipeline_from_shader(
-                 device,
-                 copy_quantized_positions_pipeline_layout,
-                 "compiled_shaders/compute/copy_quantized_positions.spv"
-             ),
-             .layout = std::move(copy_quantized_positions_pipeline_layout)},
+        .copy_quantized_positions = create_compute_pipeline_from_shader(
+            device,
+            copy_quantized_positions_pipeline_layout,
+            "compiled_shaders/compute/copy_quantized_positions.spv"
+        ),
+        .copy_quantized_normals = create_compute_pipeline_from_shader(
+            device,
+            copy_quantized_positions_pipeline_layout,
+            "compiled_shaders/compute/copy_quantized_normals.spv"
+        ),
+        .copy_pipeline_layout =
+            std::move(copy_quantized_positions_pipeline_layout),
+
     };
 }

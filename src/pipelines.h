@@ -1,11 +1,6 @@
 #pragma once
 #include "descriptor_set.h"
 
-struct PipelineAndLayout {
-    vk::raii::Pipeline pipeline;
-    vk::raii::PipelineLayout layout;
-};
-
 struct RasterizationPipeline {
     vk::raii::Pipeline opaque;
     vk::raii::Pipeline alpha_clip;
@@ -29,7 +24,9 @@ struct Pipelines {
 
     vk::raii::PipelineLayout pipeline_layout;
 
-    PipelineAndLayout copy_quantized_positions;
+    vk::raii::Pipeline copy_quantized_positions;
+    vk::raii::Pipeline copy_quantized_normals;
+    vk::raii::PipelineLayout copy_pipeline_layout;
 
     static Pipelines compile_pipelines(
         const vk::raii::Device& device,

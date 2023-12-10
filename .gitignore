@@ -3,3 +3,10 @@ compiled_shaders
 *.tracy
 imgui.ini
 traces
+renderdoc.cap
+*.dds
+*.ktx2
+cache/*
+perf.data*
+texconv.exe
+models

@@ -32,13 +32,20 @@ struct RaiiAllocator {
     }
 };
 
+struct PhysicalDeviceInfo {
+    vk::raii::PhysicalDevice device;
+    uint32_t graphics_queue_family;
+    vk::SurfaceCapabilitiesKHR surface_caps;
+    vk::SurfaceFormatKHR surface_format;
+};
+
 int main() {
     glfwInit();
 
     auto vulkan_version = VK_API_VERSION_1_3;
 
     vk::ApplicationInfo appInfo = {
-        .pApplicationName = "Hello Triangle",
+        .pApplicationName = "lighthugger",
         .applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
         .pEngineName = "No Engine",
         .engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
@@ -67,7 +74,6 @@ int main() {
     vk::raii::Instance instance(
         context,
         vk::InstanceCreateInfo {
-            .flags = {},
             .pApplicationInfo = &appInfo,
             .enabledLayerCount = static_cast<uint32_t>(layers.size()),
             .ppEnabledLayerNames = layers.data(),
@@ -95,14 +101,97 @@ int main() {
         );
     }
 
-    // todo: physical device and queue family selection.
-    std::vector<vk::raii::PhysicalDevice> physicalDevices =
-        instance.enumeratePhysicalDevices();
-    auto phys_device = physicalDevices[0];
-    auto queueFamilyProperties = phys_device.getQueueFamilyProperties();
-    //auto queue_fam = queueFamilyProperties[0];
+    vk::Extent2D extent = {
+        .width = 640,
+        .height = 480,
+    };
 
-    uint32_t graphics_queue_family = 0;
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    auto window = glfwCreateWindow(
+        static_cast<int>(extent.width),
+        static_cast<int>(extent.height),
+        "lighthugger",
+        NULL,
+        NULL
+    );
+
+    VkSurfaceKHR _surface;
+    check_vk_result(static_cast<vk::Result>(
+        glfwCreateWindowSurface(*instance, window, NULL, &_surface)
+    ));
+    vk::raii::SurfaceKHR surface = vk::raii::SurfaceKHR(instance, _surface);
+
+    std::vector<PhysicalDeviceInfo> acceptable_devices_and_queues;
+
+    // Physical device selection.
+    for (auto phys_device : instance.enumeratePhysicalDevices()) {
+        auto props = phys_device.getProperties();
+        if (!(props.deviceType == vk::PhysicalDeviceType::eDiscreteGpu
+              || props.deviceType == vk::PhysicalDeviceType::eIntegratedGpu)) {
+            continue;
+        }
+
+        auto queue_families = phys_device.getQueueFamilyProperties();
+        std::optional<uint32_t> opt_graphics_queue_family = std::nullopt;
+        for (uint32_t i = 0; i < queue_families.size(); i++) {
+            if (queue_families[i].queueFlags & vk::QueueFlagBits::eGraphics
+                && phys_device.getSurfaceSupportKHR(i, *surface)) {
+                opt_graphics_queue_family = i;
+                break;
+            }
+        }
+
+        if (!opt_graphics_queue_family) {
+            continue;
+        }
+
+        auto graphics_queue_family = opt_graphics_queue_family.value();
+
+        auto surface_caps = phys_device.getSurfaceCapabilitiesKHR(*surface);
+
+        auto surface_formats = phys_device.getSurfaceFormatsKHR(*surface);
+        std::optional<vk::SurfaceFormatKHR> opt_surface_format = std::nullopt;
+        for (auto surface_format : surface_formats) {
+            if (surface_format.colorSpace
+                != vk::ColorSpaceKHR::eSrgbNonlinear) {
+                dbg("Got a non-srgb colorspace. If it's Display P3 or similar we should try using it.",
+                    surface_format.colorSpace);
+                continue;
+            }
+            // Note: normally/ideally you should be using an srgb image format!
+            // However, I'm doing the final tonemapping in a compute shader where
+            // I can't rely on the hardware linear->srgb transfer function.
+            // Additionally, for whatever reason, imgui applies it's own linear->srgb
+            // transfer function.
+            if (surface_format.format == vk::Format::eB8G8R8A8Unorm) {
+                opt_surface_format = surface_format;
+                break;
+            } else if (surface_format.format != vk::Format::eB8G8R8A8Srgb) {
+                dbg(surface_format.format);
+            }
+        }
+
+        if (!opt_surface_format) {
+            continue;
+        }
+
+        auto surface_format = opt_surface_format.value();
+
+        acceptable_devices_and_queues.push_back(
+            {.device = phys_device,
+             .graphics_queue_family = graphics_queue_family,
+             .surface_caps = surface_caps,
+             .surface_format = surface_format}
+        );
+    }
+
+    dbg(acceptable_devices_and_queues.size());
+
+    // todo: sort acceptable devices.
+
+    auto phys_device_info = acceptable_devices_and_queues[0];
+    auto phys_device = phys_device_info.device;
+    auto graphics_queue_family = phys_device_info.graphics_queue_family;
 
     float queue_prio = 1.0f;
 
@@ -146,7 +235,7 @@ int main() {
     auto device_extensions =
         std::array {"VK_KHR_swapchain", "VK_KHR_shader_clock"};
 
-    vk::raii::Device device = phys_device.createDevice(
+    vk::raii::Device device = phys_device_info.device.createDevice(
         {
             .pNext = &dyn_rendering_features,
             .queueCreateInfoCount = 1,
@@ -166,37 +255,11 @@ int main() {
 
     auto graphics_queue = device.getQueue(graphics_queue_family, 0);
 
-    vk::Extent2D extent = {
-        .width = 640,
-        .height = 480,
-    };
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    auto window = glfwCreateWindow(
-        static_cast<int>(extent.width),
-        static_cast<int>(extent.height),
-        "Window Title",
-        NULL,
-        NULL
-    );
-
-    VkSurfaceKHR _surface;
-    check_vk_result(static_cast<vk::Result>(
-        glfwCreateWindowSurface(*instance, window, NULL, &_surface)
-    ));
-    vk::raii::SurfaceKHR surface = vk::raii::SurfaceKHR(instance, _surface);
-
-    // Todo: get minimagecount and imageformat properly.
     vk::SwapchainCreateInfoKHR swapchain_create_info = {
         .surface = *surface,
-        .minImageCount = 3,
-        // Note: normally/ideally you should be using an srgb image format!
-        // However, I'm doing the final tonemapping in a compute shader where
-        // I can't rely on the hardware linear->srgb transfer function.
-        // Additionally, for whatever reason, imgui applies it's own linear->srgb
-        // transfer function.
-        .imageFormat = vk::Format::eB8G8R8A8Unorm,
-        .imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
+        .minImageCount = phys_device_info.surface_caps.minImageCount,
+        .imageFormat = phys_device_info.surface_format.format,
+        .imageColorSpace = phys_device_info.surface_format.colorSpace,
         .imageExtent = extent,
         .imageArrayLayers = 1,
         .imageUsage = vk::ImageUsageFlagBits::eColorAttachment
@@ -307,7 +370,7 @@ int main() {
     );
 
     auto san_mig = load_gltf(
-        "San_Miguel/packed.gltf",
+        "models/San_Miguel/packed.gltf",
         allocator,
         device,
         command_buffer.get().buffer,
@@ -674,7 +737,14 @@ int main() {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        draw_imgui_window(uniforms, camera_params, keyboard_state, copy_view);
+        if (keyboard_state.ui_toggled) {
+            draw_imgui_window(
+                uniforms,
+                camera_params,
+                keyboard_state,
+                copy_view
+            );
+        }
         ImGui::Render();
 
         {

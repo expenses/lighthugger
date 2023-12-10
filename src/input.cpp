@@ -95,6 +95,9 @@ void glfw_key_callback(
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
             }
             break;
+        case GLFW_KEY_U:
+            keyboard_state.ui_toggled ^= (action == GLFW_PRESS);
+            break;
     }
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
