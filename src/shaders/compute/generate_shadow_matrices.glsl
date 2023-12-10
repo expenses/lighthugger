@@ -13,7 +13,13 @@ mat4 bias_matrix = mat4(
 layout(local_size_x = 4) in;
 
 void generate_shadow_matrices() {
+    uint32_t cascade_index = gl_GlobalInvocationID.x;
+
     Uniforms uniforms = get_uniforms();
+
+    if ((cascade_index % 4) != (uniform_buffer.frame_index % 4)) {
+        return;
+    }
 
     MiscStorageBuffer buf = MiscStorageBuffer(uniforms.misc_storage);
 
@@ -26,7 +32,6 @@ void generate_shadow_matrices() {
 
     float4x4 invCam = uniforms.inv_perspective_view;
 
-    uint32_t cascade_index = gl_GlobalInvocationID.x;
 
     float min_distance = convert_infinite_reverze_z_depth(max_depth);
     float max_distance = convert_infinite_reverze_z_depth(min_depth);

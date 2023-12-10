@@ -12,5 +12,6 @@ void render(
     uint32_t graphics_queue_family,
     tracy::VkCtx* tracy_ctx,
     uint32_t swapchain_image_index,
-    uint64_t uniform_buffer_address
+    uint64_t uniform_buffer_address,
+    uint32_t frame_index
 );

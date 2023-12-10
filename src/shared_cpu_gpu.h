@@ -114,6 +114,7 @@ struct CopyQuantizedPositionsConstant {
 
 struct UniformBufferAddressConstant {
     uint64_t address;
+    uint32_t frame_index;
 };
 
 const static uint32_t MAX_OPAQUE_DRAWS = 200000;

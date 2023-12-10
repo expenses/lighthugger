@@ -36,7 +36,8 @@ void render(
     uint32_t graphics_queue_family,
     tracy::VkCtx* tracy_ctx,
     uint32_t swapchain_image_index,
-    uint64_t uniform_buffer_address
+    uint64_t uniform_buffer_address,
+    uint32_t frame_index
 ) {
     ZoneScoped;
     TracyVkZone(tracy_ctx, *command_buffer, "render");
@@ -57,7 +58,7 @@ void render(
         *pipelines.pipeline_layout,
         vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eCompute,
         0,
-        {{.address = uniform_buffer_address}}
+        {{.address = uniform_buffer_address, .frame_index = frame_index}}
     );
 
     command_buffer.bindDescriptorSets(
@@ -328,6 +329,10 @@ void render(
         set_scissor_and_viewport(command_buffer, 1024, 1024);
 
         for (uint32_t i = 0; i < resources.shadowmap_layer_views.size(); i++) {
+            if ((i % 4) != (frame_index % 4)) {
+                continue;
+            }
+
             TracyVkZone(tracy_ctx, *command_buffer, "shadowmap inner");
 
             command_buffer.pushConstants<ShadowPassConstant>(
@@ -342,13 +347,13 @@ void render(
 
             insert_global_barrier(
                 command_buffer,
-                GlobalBarrier<1, 1> {
+                GlobalBarrier<1, 2> {
                     .prev_accesses =
-                        std::array<ThsvsAccessType, 1> {
+                        {
                             THSVS_ACCESS_COMPUTE_SHADER_WRITE},
                     .next_accesses =
-                        std::array<ThsvsAccessType, 1> {
-                            THSVS_ACCESS_INDIRECT_BUFFER}}
+                        {
+                            THSVS_ACCESS_INDIRECT_BUFFER, THSVS_ACCESS_COMPUTE_SHADER_READ_OTHER}}
             );
 
             {

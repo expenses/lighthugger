@@ -667,6 +667,8 @@ int main() {
     uniforms->dispatches =
         device.getBufferAddress({.buffer = resources.dispatches_buffer.buffer});
 
+    uint32_t frame_index = 0;
+
     auto copy_view = true;
 
     while (!glfwWindowShouldClose(window)) {
@@ -792,8 +794,11 @@ int main() {
             graphics_queue_family,
             data.tracy_ctx.inner,
             swapchain_image_index,
-            device.getBufferAddress({.buffer = uniform_buffer.buffer.buffer})
+            device.getBufferAddress({.buffer = uniform_buffer.buffer.buffer}),
+            frame_index
         );
+        frame_index += 1;
+
         TracyVkCollect(data.tracy_ctx.inner, *data.buffer);
 
         data.buffer.end();
