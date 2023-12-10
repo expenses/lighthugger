@@ -21,7 +21,8 @@ void cull_instances() {
 
     uint8_t lod_level = uint8_t(1);
 
-    LodLevelBuffer(get_uniforms().lod_levels).lod_levels[instance_index] = lod_level;
+    LodLevelBuffer(get_uniforms().lod_levels).lod_levels[instance_index] =
+        lod_level;
 
     prefix_sum_inclusive_append(
         PrefixSumBuffer(get_uniforms().num_meshlets_prefix_sum),
@@ -54,7 +55,8 @@ void cull_instances_shadows() {
 
     uint8_t lod_level = uint8_t(1);
 
-    LodLevelBuffer(get_uniforms().lod_levels).lod_levels[instance_index] = lod_level;
+    LodLevelBuffer(get_uniforms().lod_levels).lod_levels[instance_index] =
+        lod_level;
 
     prefix_sum_inclusive_append(
         prefix_sum_buffer_for_cascade(cascade_index),

@@ -658,9 +658,9 @@ GltfMesh load_gltf(
                 );
 
                 auto lod_level = LodLevel {
-                    .num_meshlets = static_cast<uint16_t>(meshlet_buffers.num_meshlets),
-                    .meshlets_offset = 0
-                };
+                    .num_meshlets =
+                        static_cast<uint16_t>(meshlet_buffers.num_meshlets),
+                    .meshlets_offset = 0};
 
                 auto mesh_info = MeshInfo {
                     .positions = device.getBufferAddress(

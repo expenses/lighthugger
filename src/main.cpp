@@ -643,6 +643,9 @@ int main() {
     );
     uniforms->dispatches =
         device.getBufferAddress({.buffer = resources.dispatches_buffer.buffer});
+    uniforms->lod_levels =
+        device.getBufferAddress({.buffer = instance_resources.lod_levels.buffer}
+        );
 
     auto copy_view = true;
 

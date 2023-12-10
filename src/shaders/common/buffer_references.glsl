@@ -66,6 +66,7 @@ layout(buffer_reference, scalar) buffer DispatchCommandsBuffer {
     DispatchIndirectCommand commands[];
 };
 
-layout(buffer_reference, scalar, buffer_reference_align = 1) buffer LodLevelBuffer {
+layout(buffer_reference, scalar, buffer_reference_align = 1) buffer
+    LodLevelBuffer {
     uint8_t lod_levels[];
 };

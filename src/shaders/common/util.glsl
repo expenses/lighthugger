@@ -48,7 +48,8 @@ get_meshlet_reference(uint32_t global_meshlet_index, uint32_t cascade_index) {
     Instance instance =
         InstanceBuffer(get_uniforms().instances).instances[result.index];
     MeshInfo mesh_info = MeshInfoBuffer(instance.mesh_info_address).mesh_info;
-    uint8_t lod_level_index = LodLevelBuffer(get_uniforms().lod_levels).lod_levels[result.index];
+    uint8_t lod_level_index =
+        LodLevelBuffer(get_uniforms().lod_levels).lod_levels[result.index];
 
     LodLevel lod_level = mesh_info.lods[lod_level_index];
 
