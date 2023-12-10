@@ -439,6 +439,21 @@ int main() {
         ));
     }
 
+    auto create_storage_buffer = [&](size_t size, const std::string& name) {
+        return AllocatedBuffer(
+            vk::BufferCreateInfo {
+                .size = size,
+                .usage = vk::BufferUsageFlagBits::eStorageBuffer
+                    | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            },
+            {
+                .usage = vma::MemoryUsage::eAuto,
+            },
+            allocator,
+            name
+        );
+    };
+
     auto instance_resources = InstanceResources {
         .instances = upload_via_staging_buffer(
             instances.data(),
@@ -450,34 +465,20 @@ int main() {
             command_buffer.get().buffer,
             temp_buffers
         ),
-        .meshlet_references = AllocatedBuffer(
-            vk::BufferCreateInfo {
-                // Made up of 2 sections, one for the visbuffer meshlets (needs to stick around
-                // until deferred rendering) and one for the meshlets of each shadow pass (transient).
-                .size = sizeof(MeshletReference)
-                    * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS) * 2,
-                .usage = vk::BufferUsageFlagBits::eStorageBuffer
-                    | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-            },
-            {
-                .usage = vma::MemoryUsage::eAuto,
-            },
-            allocator,
+        .meshlet_references = create_storage_buffer(
+            // Made up of 2 sections, one for the visbuffer meshlets (needs to stick around
+            // until deferred rendering) and one for the meshlets of each shadow pass (transient).
+            sizeof(MeshletReference) * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS)
+                * 2,
             "meshlet reference buffer"
         ),
-        .num_meshlets_prefix_sum = AllocatedBuffer(
-            vk::BufferCreateInfo {
-                .size =
-                    (sizeof(PrefixSumValue) * MAX_INSTANCES + sizeof(uint64_t))
-                    * 4,
-                .usage = vk::BufferUsageFlagBits::eStorageBuffer
-                    | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-            },
-            {
-                .usage = vma::MemoryUsage::eAuto,
-            },
-            allocator,
+        .num_meshlets_prefix_sum = create_storage_buffer(
+            (sizeof(PrefixSumValue) * MAX_INSTANCES + sizeof(uint64_t)) * 4,
             "num meshlets prefix sum buffer"
+        ),
+        .lod_levels = create_storage_buffer(
+            MAX_INSTANCES * sizeof(uint8_t),
+            "lod levels buffer"
         )};
 
     auto uniform_buffer = UploadingBuffer(
@@ -491,43 +492,17 @@ int main() {
     auto resources = Resources {
         .resizing = ResizingResources(device, allocator, extent),
         .shadowmap = std::move(shadowmap),
-        .misc_storage_buffer = AllocatedBuffer(
-            vk::BufferCreateInfo {
-                .size = sizeof(MiscStorage),
-                .usage = vk::BufferUsageFlagBits::eStorageBuffer
-                    | vk::BufferUsageFlagBits::eShaderDeviceAddress
-                    | vk::BufferUsageFlagBits::eIndirectBuffer},
-            {
-                .usage = vma::MemoryUsage::eAuto,
-            },
-            allocator,
-            "misc_storage_buffer"
-        ),
-        .draw_calls_buffer = AllocatedBuffer(
-            vk::BufferCreateInfo {
-                // Store the draw call counts as well as 2 sets of commands (opaque + alpha clip)
-                .size = sizeof(uint32_t) * 2
-                    + sizeof(vk::DrawIndirectCommand)
-                        * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
-                .usage = vk::BufferUsageFlagBits::eIndirectBuffer
-                    | vk::BufferUsageFlagBits::eStorageBuffer
-                    | vk::BufferUsageFlagBits::eShaderDeviceAddress},
-            {
-                .usage = vma::MemoryUsage::eAuto,
-            },
-            allocator,
+        .misc_storage_buffer =
+            create_storage_buffer(sizeof(MiscStorage), "misc_storage_buffer"),
+        .draw_calls_buffer = create_storage_buffer(
+            // Store the draw call counts as well as 2 sets of commands (opaque + alpha clip)
+            sizeof(uint32_t) * 2
+                + sizeof(vk::DrawIndirectCommand)
+                    * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
             "draw_calls_buffer"
         ),
-        .dispatches_buffer = AllocatedBuffer(
-            vk::BufferCreateInfo {
-                .size = sizeof(vk::DispatchIndirectCommand) * 3,
-                .usage = vk::BufferUsageFlagBits::eIndirectBuffer
-                    | vk::BufferUsageFlagBits::eStorageBuffer
-                    | vk::BufferUsageFlagBits::eShaderDeviceAddress},
-            {
-                .usage = vma::MemoryUsage::eAuto,
-            },
-            allocator,
+        .dispatches_buffer = create_storage_buffer(
+            sizeof(vk::DispatchIndirectCommand) * 3,
             "dispatches buffer"
         ),
         .shadowmap_layer_views = std::move(shadowmap_layer_views),

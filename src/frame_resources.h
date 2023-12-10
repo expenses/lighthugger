@@ -76,6 +76,7 @@ struct InstanceResources {
     AllocatedBuffer instances;
     AllocatedBuffer meshlet_references;
     AllocatedBuffer num_meshlets_prefix_sum;
+    AllocatedBuffer lod_levels;
 };
 
 struct Resources {

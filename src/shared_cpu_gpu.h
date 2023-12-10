@@ -15,6 +15,11 @@ struct DispatchIndirectCommand {
     uint32_t z;
 };
 
+struct LodLevel {
+    uint16_t num_meshlets;
+    uint16_t meshlets_offset;
+};
+
 struct MeshInfo {
     uint64_t positions;
     uint64_t indices;
@@ -22,7 +27,7 @@ struct MeshInfo {
     uint64_t uvs;
     uint64_t micro_indices;
     uint64_t meshlets;
-    uint16_t num_meshlets;
+    LodLevel lods[3];
     uint8_t flags;
     vec4 bounding_sphere;
     vec2 texture_scale;
@@ -64,6 +69,7 @@ struct Uniforms {
     uint64_t misc_storage;
     uint64_t num_meshlets_prefix_sum;
     uint64_t dispatches;
+    uint64_t lod_levels;
     vec3 camera_pos;
     vec3 sun_dir;
     vec3 sun_intensity;

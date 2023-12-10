@@ -657,6 +657,11 @@ GltfMesh load_gltf(
                     positions.count
                 );
 
+                auto lod_level = LodLevel {
+                    .num_meshlets = static_cast<uint16_t>(meshlet_buffers.num_meshlets),
+                    .meshlets_offset = 0
+                };
+
                 auto mesh_info = MeshInfo {
                     .positions = device.getBufferAddress(
                         {.buffer = position_buffer.buffer}
@@ -675,8 +680,7 @@ GltfMesh load_gltf(
                     .meshlets = device.getBufferAddress(
                         {.buffer = meshlet_buffers.meshlets.buffer}
                     ),
-                    .num_meshlets =
-                        static_cast<uint16_t>(meshlet_buffers.num_meshlets),
+                    .lods = {lod_level, lod_level, lod_level},
                     .flags = flags,
                     .bounding_sphere = glm::vec4(
                         bounding_sphere[0],

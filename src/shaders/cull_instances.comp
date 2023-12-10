@@ -19,10 +19,14 @@ void cull_instances() {
         return;
     }
 
+    uint8_t lod_level = uint8_t(1);
+
+    LodLevelBuffer(get_uniforms().lod_levels).lod_levels[instance_index] = lod_level;
+
     prefix_sum_inclusive_append(
         PrefixSumBuffer(get_uniforms().num_meshlets_prefix_sum),
         instance_index,
-        mesh_info.num_meshlets
+        mesh_info.lods[lod_level].num_meshlets
     );
 }
 
@@ -48,9 +52,13 @@ void cull_instances_shadows() {
         return;
     }
 
+    uint8_t lod_level = uint8_t(1);
+
+    LodLevelBuffer(get_uniforms().lod_levels).lod_levels[instance_index] = lod_level;
+
     prefix_sum_inclusive_append(
         prefix_sum_buffer_for_cascade(cascade_index),
         instance_index,
-        mesh_info.num_meshlets
+        mesh_info.lods[lod_level].num_meshlets
     );
 }
