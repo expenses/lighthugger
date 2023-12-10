@@ -164,11 +164,12 @@ DescriptorSet::write_image(const ImageWithView& image, vk::Device device) {
     return index;
 }
 
-DescriptorSet::DescriptorSet(vk::raii::DescriptorSet set_,
-        std::vector<vk::raii::DescriptorSet> swapchain_image_sets_
-    ) :
-        set(std::move(set_)),
-        swapchain_image_sets(std::move(swapchain_image_sets_)) {}
+DescriptorSet::DescriptorSet(
+    vk::raii::DescriptorSet set_,
+    std::vector<vk::raii::DescriptorSet> swapchain_image_sets_
+) :
+    set(std::move(set_)),
+    swapchain_image_sets(std::move(swapchain_image_sets_)) {}
 
 void DescriptorSet::write_resizing_descriptors(
     const ResizingResources& resizing_resources,

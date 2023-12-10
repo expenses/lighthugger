@@ -30,7 +30,6 @@ FrameCommandData create_frame_command_data(
         .tracy_ctx = RaiiTracyCtx(tracy_ctx)};
 }
 
-
 RaiiTracyCtx::RaiiTracyCtx(tracy::VkCtx* inner_) : inner(inner_) {}
 
 RaiiTracyCtx::~RaiiTracyCtx() {

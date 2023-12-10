@@ -739,6 +739,6 @@ GltfMesh load_gltf(
 
 GltfMesh::~GltfMesh() {
     for (auto index : image_indices) {
-            image_index_tracker->free(index);
-        }
+        image_index_tracker->free(index);
+    }
 }
