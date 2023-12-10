@@ -2,6 +2,24 @@
 
 #include "../util.h"
 
+AllocatedImage::AllocatedImage(AllocatedImage&& other) {
+    std::swap(image, other.image);
+    std::swap(allocation, other.allocation);
+    std::swap(allocator, other.allocator);
+}
+
+AllocatedImage& AllocatedImage::operator=(AllocatedImage&& other) {
+    std::swap(image, other.image);
+    std::swap(allocation, other.allocation);
+    std::swap(allocator, other.allocator);
+    return *this;
+}
+
+AllocatedImage::~AllocatedImage() {
+    if (allocator)
+        allocator.destroyImage(image, allocation);
+}
+
 AllocatedImage::AllocatedImage(
     vk::ImageCreateInfo create_info,
     vma::Allocator allocator_,
@@ -22,6 +40,24 @@ AllocatedImage::AllocatedImage(
         .objectType = vk::ObjectType::eImage,
         .objectHandle = reinterpret_cast<uint64_t>(&*image),
         .pObjectName = name.data()});
+}
+
+AllocatedBuffer::AllocatedBuffer(AllocatedBuffer&& other) {
+    std::swap(buffer, other.buffer);
+    std::swap(allocation, other.allocation);
+    std::swap(allocator, other.allocator);
+}
+
+AllocatedBuffer::~AllocatedBuffer() {
+    if (allocator)
+        allocator.destroyBuffer(buffer, allocation);
+}
+
+AllocatedBuffer& AllocatedBuffer::operator=(AllocatedBuffer&& other) {
+    std::swap(buffer, other.buffer);
+    std::swap(allocation, other.allocation);
+    std::swap(allocator, other.allocator);
+    return *this;
 }
 
 AllocatedBuffer::AllocatedBuffer(

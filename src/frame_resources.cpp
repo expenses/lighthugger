@@ -29,3 +29,21 @@ FrameCommandData create_frame_command_data(
             device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled}),
         .tracy_ctx = RaiiTracyCtx(tracy_ctx)};
 }
+
+
+RaiiTracyCtx::RaiiTracyCtx(tracy::VkCtx* inner_) : inner(inner_) {}
+
+RaiiTracyCtx::~RaiiTracyCtx() {
+    if (inner) {
+        TracyVkDestroy(inner);
+    }
+}
+
+RaiiTracyCtx::RaiiTracyCtx(RaiiTracyCtx&& other) {
+    std::swap(inner, other.inner);
+}
+
+RaiiTracyCtx& RaiiTracyCtx::operator=(RaiiTracyCtx&& other) {
+    std::swap(inner, other.inner);
+    return *this;
+}

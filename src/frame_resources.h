@@ -1,7 +1,7 @@
 #pragma once
 #include "allocations/base.h"
 #include "allocations/image_with_view.h"
-#include "shared_cpu_gpu.h"
+#include "allocations/staging.h"
 #include "util.h"
 
 struct ResizingResources {
@@ -95,22 +95,13 @@ struct Resources {
 struct RaiiTracyCtx {
     tracy::VkCtx* inner;
 
-    RaiiTracyCtx(tracy::VkCtx* inner_) : inner(inner_) {}
+    RaiiTracyCtx(tracy::VkCtx* inner_);
 
-    ~RaiiTracyCtx() {
-        if (inner) {
-            TracyVkDestroy(inner);
-        }
-    }
+    ~RaiiTracyCtx();
 
-    RaiiTracyCtx(RaiiTracyCtx&& other) {
-        std::swap(inner, other.inner);
-    }
+    RaiiTracyCtx(RaiiTracyCtx&& other);
 
-    RaiiTracyCtx& operator=(RaiiTracyCtx&& other) {
-        std::swap(inner, other.inner);
-        return *this;
-    }
+    RaiiTracyCtx& operator=(RaiiTracyCtx&& other);
 };
 
 template<class T>
@@ -146,3 +137,45 @@ FrameCommandData create_frame_command_data(
     const vk::raii::Queue& queue,
     uint32_t graphics_queue_family
 );
+
+struct UploadingBuffer {
+    PersistentlyMappedBuffer staging;
+    AllocatedBuffer buffer;
+
+    UploadingBuffer(
+        size_t size,
+        vk::BufferUsageFlags usage,
+        const std::string& name,
+        vma::Allocator allocator
+    ) :
+        staging(PersistentlyMappedBuffer(AllocatedBuffer(
+            vk::BufferCreateInfo {
+                .size = size,
+                .usage = vk::BufferUsageFlagBits::eTransferSrc},
+            {
+                .flags = vma::AllocationCreateFlagBits::eMapped
+                    | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+                .usage = vma::MemoryUsage::eAuto,
+            },
+            allocator,
+            "staging " + name
+        ))),
+        buffer(AllocatedBuffer(
+            vk::BufferCreateInfo {
+                .size = size,
+                .usage = usage | vk::BufferUsageFlagBits::eTransferDst},
+            {
+                .usage = vma::MemoryUsage::eAuto,
+            },
+            allocator,
+            name
+        )) {}
+
+    void flush(const vk::raii::CommandBuffer& command_buffer, size_t size) {
+        command_buffer.copyBuffer(
+            staging.buffer.buffer,
+            buffer.buffer,
+            {vk::BufferCopy {.srcOffset = 0, .dstOffset = 0, .size = size}}
+        );
+    }
+};

@@ -1,5 +1,29 @@
 #include "descriptor_set.h"
 
+IndexTracker::IndexTracker() {}
+
+uint32_t IndexTracker::push() {
+    if (!free_indices.empty()) {
+        uint32_t index = free_indices.back();
+        free_indices.pop_back();
+        return index;
+    }
+
+    uint32_t index = next_index;
+    next_index += 1;
+
+    return index;
+}
+
+void IndexTracker::free(uint32_t index) {
+    free_indices.push_back(index);
+}
+
+IndexTracker::~IndexTracker() {
+    // Ensure that we've freed all images.
+    assert(free_indices.size() == next_index);
+}
+
 DescriptorSetLayouts
 create_descriptor_set_layouts(const vk::raii::Device& device) {
     auto everything_bindings = std::array {
@@ -139,6 +163,12 @@ DescriptorSet::write_image(const ImageWithView& image, vk::Device device) {
 
     return index;
 }
+
+DescriptorSet::DescriptorSet(vk::raii::DescriptorSet set_,
+        std::vector<vk::raii::DescriptorSet> swapchain_image_sets_
+    ) :
+        set(std::move(set_)),
+        swapchain_image_sets(std::move(swapchain_image_sets_)) {}
 
 void DescriptorSet::write_resizing_descriptors(
     const ResizingResources& resizing_resources,

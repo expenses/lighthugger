@@ -23,3 +23,24 @@ ImageWithView ImageWithView::create_image_with_view(
         .pObjectName = view_name.data()});
     return ImageWithView(std::move(image), std::move(view));
 }
+
+ImageWithView::ImageWithView(AllocatedImage image_, vk::raii::ImageView view_) :
+        image(std::move(image_)),
+        view(std::move(view_)) {}
+
+ImageWithView::ImageWithView(
+        vk::ImageCreateInfo create_info,
+        vma::Allocator allocator,
+        const vk::raii::Device& device,
+        const std::string& name,
+        vk::ImageSubresourceRange subresource_range,
+        vk::ImageViewType view_type
+    ) :
+        ImageWithView(ImageWithView::create_image_with_view(
+            create_info,
+            allocator,
+            device,
+            name,
+            subresource_range,
+            view_type
+        )) {}

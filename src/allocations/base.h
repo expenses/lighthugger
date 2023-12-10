@@ -5,11 +5,7 @@ struct AllocatedImage {
     vma::Allocation allocation;
     vma::Allocator allocator;
 
-    AllocatedImage(AllocatedImage&& other) {
-        std::swap(image, other.image);
-        std::swap(allocation, other.allocation);
-        std::swap(allocator, other.allocator);
-    }
+    AllocatedImage(AllocatedImage&& other);
 
     AllocatedImage(
         vk::ImageCreateInfo create_info,
@@ -17,17 +13,9 @@ struct AllocatedImage {
         const std::string& name
     );
 
-    AllocatedImage& operator=(AllocatedImage&& other) {
-        std::swap(image, other.image);
-        std::swap(allocation, other.allocation);
-        std::swap(allocator, other.allocator);
-        return *this;
-    }
+    AllocatedImage& operator=(AllocatedImage&& other);
 
-    ~AllocatedImage() {
-        if (allocator)
-            allocator.destroyImage(image, allocation);
-    }
+    ~AllocatedImage();
 };
 
 struct AllocatedBuffer {
@@ -35,11 +23,7 @@ struct AllocatedBuffer {
     vma::Allocation allocation;
     vma::Allocator allocator;
 
-    AllocatedBuffer(AllocatedBuffer&& other) {
-        std::swap(buffer, other.buffer);
-        std::swap(allocation, other.allocation);
-        std::swap(allocator, other.allocator);
-    }
+    AllocatedBuffer(AllocatedBuffer&& other);
 
     AllocatedBuffer(
         vk::BufferCreateInfo create_info,
@@ -48,15 +32,7 @@ struct AllocatedBuffer {
         const std::string& name
     );
 
-    ~AllocatedBuffer() {
-        if (allocator)
-            allocator.destroyBuffer(buffer, allocation);
-    }
+    ~AllocatedBuffer();
 
-    AllocatedBuffer& operator=(AllocatedBuffer&& other) {
-        std::swap(buffer, other.buffer);
-        std::swap(allocation, other.allocation);
-        std::swap(allocator, other.allocator);
-        return *this;
-    }
+    AllocatedBuffer& operator=(AllocatedBuffer&& other);
 };

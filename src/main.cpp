@@ -11,7 +11,6 @@
 #include "rendering.h"
 #include "resources/image_loading.h"
 #include "resources/mesh_loading.h"
-#include "sync.h"
 
 const auto u64_max = std::numeric_limits<uint64_t>::max();
 
@@ -111,13 +110,13 @@ int main() {
         static_cast<int>(extent.width),
         static_cast<int>(extent.height),
         "lighthugger",
-        NULL,
-        NULL
+        nullptr,
+        nullptr
     );
 
     VkSurfaceKHR _surface;
     check_vk_result(static_cast<vk::Result>(
-        glfwCreateWindowSurface(*instance, window, NULL, &_surface)
+        glfwCreateWindowSurface(*instance, window, nullptr, &_surface)
     ));
     vk::raii::SurfaceKHR surface = vk::raii::SurfaceKHR(instance, _surface);
 
@@ -479,30 +478,12 @@ int main() {
             "num meshlets prefix sum buffer"
         )};
 
-    auto uniform_buffer = PersistentlyMappedBuffer(AllocatedBuffer(
-        vk::BufferCreateInfo {
-            .size = sizeof(Uniforms),
-            .usage = vk::BufferUsageFlagBits::eTransferSrc},
-        {
-            .flags = vma::AllocationCreateFlagBits::eMapped
-                | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
-            .usage = vma::MemoryUsage::eAuto,
-        },
-        allocator,
-        "staging uniform_buffer"
-    ));
-
-    auto final_uniform_buffer = AllocatedBuffer(
-        vk::BufferCreateInfo {
-            .size = sizeof(Uniforms),
-            .usage = vk::BufferUsageFlagBits::eUniformBuffer
-                | vk::BufferUsageFlagBits::eShaderDeviceAddress
-                | vk::BufferUsageFlagBits::eTransferDst},
-        {
-            .usage = vma::MemoryUsage::eAuto,
-        },
-        allocator,
-        "uniform_buffer"
+    auto uniform_buffer = UploadingBuffer(
+        sizeof(Uniforms),
+        vk::BufferUsageFlagBits::eUniformBuffer
+            | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+        "uniform buffer",
+        allocator
     );
 
     auto resources = Resources {
@@ -660,7 +641,8 @@ int main() {
     auto prev_mouse = glm::dvec2(0.0, 0.0);
     glfwGetCursorPos(window, &prev_mouse.x, &prev_mouse.y);
 
-    Uniforms* uniforms = reinterpret_cast<Uniforms*>(uniform_buffer.mapped_ptr);
+    Uniforms* uniforms =
+        reinterpret_cast<Uniforms*>(uniform_buffer.staging.mapped_ptr);
     uniforms->num_instances = instances.size();
     uniforms->sun_intensity = glm::vec3(1.0);
     // Set the camera to be a fixed distance away from the frustum center, so that
@@ -797,14 +779,7 @@ int main() {
             {.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit}
         );
 
-        data.buffer.copyBuffer(
-            uniform_buffer.buffer.buffer,
-            final_uniform_buffer.buffer,
-            {vk::BufferCopy {
-                .srcOffset = 0,
-                .dstOffset = 0,
-                .size = sizeof(Uniforms)}}
-        );
+        uniform_buffer.flush(data.buffer, sizeof(Uniforms));
 
         render(
             data.buffer,
@@ -817,7 +792,7 @@ int main() {
             graphics_queue_family,
             data.tracy_ctx.inner,
             swapchain_image_index,
-            device.getBufferAddress({.buffer = final_uniform_buffer.buffer})
+            device.getBufferAddress({.buffer = uniform_buffer.buffer.buffer})
         );
         TracyVkCollect(data.tracy_ctx.inner, *data.buffer);
 

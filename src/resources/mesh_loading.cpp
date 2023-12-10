@@ -736,3 +736,9 @@ GltfMesh load_gltf(
         .primitives = std::move(primitives),
         .image_index_tracker = descriptor_set.tracker};
 }
+
+GltfMesh::~GltfMesh() {
+    for (auto index : image_indices) {
+            image_index_tracker->free(index);
+        }
+}

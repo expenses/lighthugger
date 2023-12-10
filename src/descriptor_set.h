@@ -16,29 +16,13 @@ struct IndexTracker {
     uint32_t next_index = 0;
     std::vector<uint32_t> free_indices;
 
-    IndexTracker() {}
+    IndexTracker();
 
-    uint32_t push() {
-        if (!free_indices.empty()) {
-            uint32_t index = free_indices.back();
-            free_indices.pop_back();
-            return index;
-        }
+    uint32_t push();
 
-        uint32_t index = next_index;
-        next_index += 1;
+    void free(uint32_t index);
 
-        return index;
-    }
-
-    void free(uint32_t index) {
-        free_indices.push_back(index);
-    }
-
-    ~IndexTracker() {
-        // Ensure that we've freed all images.
-        assert(free_indices.size() == next_index);
-    }
+    ~IndexTracker();
 };
 
 struct DescriptorSet {
@@ -49,9 +33,7 @@ struct DescriptorSet {
     DescriptorSet(
         vk::raii::DescriptorSet set_,
         std::vector<vk::raii::DescriptorSet> swapchain_image_sets_
-    ) :
-        set(std::move(set_)),
-        swapchain_image_sets(std::move(swapchain_image_sets_)) {}
+    );
 
     uint32_t write_image(const ImageWithView& image, vk::Device device);
 

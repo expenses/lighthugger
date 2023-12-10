@@ -110,8 +110,8 @@ Meshlets build_meshlets(
             ),
             .triangle_offset = meshlet.triangle_offset,
             .index_offset = meshlet.vertex_offset,
-            .triangle_count = meshlet.triangle_count,
-            .index_count = meshlet.vertex_count};
+            .triangle_count = static_cast<uint8_t>(meshlet.triangle_count),
+            .index_count = static_cast<uint8_t>(meshlet.vertex_count)};
     }
 
     if (uses_32_bit_indices) {
