@@ -292,20 +292,22 @@ int main() {
     // after all allocated objects are destroyed.
     RaiiAllocator raii_allocator = {.allocator = allocator};
 
-    auto command_buffer = FlipFlipResource(
-        create_frame_command_data(
-            device,
-            phys_device,
-            graphics_queue,
-            graphics_queue_family
-        ),
-        create_frame_command_data(
-            device,
-            phys_device,
-            graphics_queue,
-            graphics_queue_family
-        )
-    );
+    auto command_buffer = FlipFlipResource {
+        .items =
+            std::array {
+                create_frame_command_data(
+                    device,
+                    phys_device,
+                    graphics_queue,
+                    graphics_queue_family
+                ),
+                create_frame_command_data(
+                    device,
+                    phys_device,
+                    graphics_queue,
+                    graphics_queue_family
+                )},
+        .flipped = false};
 
     auto descriptor_set_layouts = create_descriptor_set_layouts(device);
     auto pipelines =

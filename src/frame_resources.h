@@ -109,10 +109,6 @@ struct FlipFlipResource {
     std::array<T, 2> items;
     bool flipped;
 
-    FlipFlipResource(T a, T b) :
-        items({std::move(a), std::move(b)}),
-        flipped(false) {}
-
     void flip() {
         flipped = !flipped;
     }
