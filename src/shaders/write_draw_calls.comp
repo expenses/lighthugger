@@ -45,13 +45,7 @@ void write_draw_calls() {
     uint32_t meshlet_indices_buffer_offset =
         meshlet_draw_index;
 
-    DrawIndirectCommand draw_call;
-    draw_call.vertexCount = meshlet.triangle_count * 3;
-    draw_call.instanceCount = 1;
-    draw_call.firstVertex = 0;
-    draw_call.firstInstance = meshlet_indices_buffer_offset;
-
-    draw_call_buffer.draw_calls[meshlet_draw_index] = draw_call;
+    atomicAdd(draw_call_buffer.draw_calls[uint32_t(alpha_clipped)].vertexCount, MAX_MESHLET_VERTICES);
 
     MeshletReferenceBuffer(uniforms.meshlet_references)
         .meshlet_reference[meshlet_indices_buffer_offset] = meshlet_reference;
@@ -105,13 +99,7 @@ void write_draw_calls_shadows() {
     uint32_t meshlet_indices_buffer_offset =
         meshlet_draw_index + MESHLET_INDICES_BUFFER_SECTION_OFFSET;
 
-    DrawIndirectCommand draw_call;
-    draw_call.vertexCount = meshlet.triangle_count * 3;
-    draw_call.instanceCount = 1;
-    draw_call.firstVertex = 0;
-    draw_call.firstInstance = meshlet_indices_buffer_offset;
-
-    draw_call_buffer.draw_calls[meshlet_draw_index] = draw_call;
+    atomicAdd(draw_call_buffer.draw_calls[uint32_t(alpha_clipped) + (shadow_constant.cascade_index + 1) * 2].vertexCount, MAX_MESHLET_VERTICES);
 
     MeshletReferenceBuffer(uniforms.meshlet_references)
         .meshlet_reference[meshlet_indices_buffer_offset] = meshlet_reference;

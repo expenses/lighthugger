@@ -25,6 +25,17 @@ void reset_buffers_a() {
     dispatches.commands[PER_SHADOW_INSTANCE_DISPATCH].y = 1;
     dispatches.commands[PER_SHADOW_INSTANCE_DISPATCH].z = 1;
 
+    DrawIndirectCommand command;
+    command.firstVertex = 0;
+    command.vertexCount = 0;
+    command.firstInstance = 0;
+    command.instanceCount = 1;
+
+    DrawCallBuffer draw_call_buffer = DrawCallBuffer(get_uniforms().draw_calls);
+
+    for (uint i = 0; i < 10; i++) {
+        draw_call_buffer.draw_calls[i] = command;
+    }
     reset_counters();
 }
 

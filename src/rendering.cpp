@@ -232,12 +232,10 @@ void render(
                 "visbuffer: opaque geometry"
             );
 
-            command_buffer.drawIndirectCount(
+            command_buffer.drawIndirect(
                 resources.draw_calls_buffer.buffer,
                 DRAW_CALLS_COUNTS_SIZE,
-                resources.draw_calls_buffer.buffer,
-                0,
-                MAX_OPAQUE_DRAWS,
+                1,
                 sizeof(vk::DrawIndirectCommand)
             );
         }
@@ -252,13 +250,10 @@ void render(
                 "visbuffer: alpha clip geometry"
             );
 
-            command_buffer.drawIndirectCount(
+            command_buffer.drawIndirect(
                 resources.draw_calls_buffer.buffer,
-                DRAW_CALLS_COUNTS_SIZE
-                    + ALPHA_CLIP_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
-                resources.draw_calls_buffer.buffer,
-                sizeof(uint32_t) * 4,
-                MAX_ALPHA_CLIP_DRAWS,
+                DRAW_CALLS_COUNTS_SIZE + sizeof(vk::DrawIndirectCommand),
+                1,
                 sizeof(vk::DrawIndirectCommand)
             );
         }
@@ -401,12 +396,11 @@ void render(
                     "shadowmap: opaque geometry"
                 );
 
-                command_buffer.drawIndirectCount(
+                command_buffer.drawIndirect(
                     resources.draw_calls_buffer.buffer,
-                    DRAW_CALLS_COUNTS_SIZE,
-                    resources.draw_calls_buffer.buffer,
-                    i * sizeof(uint32_t),
-                    MAX_OPAQUE_DRAWS,
+                    DRAW_CALLS_COUNTS_SIZE
+                        + (i + 1) * 2 * sizeof(vk::DrawIndirectCommand),
+                    1,
                     sizeof(vk::DrawIndirectCommand)
                 );
             }
@@ -421,14 +415,11 @@ void render(
                     "shadowmap: alpha clip geometry"
                 );
 
-                command_buffer.drawIndirectCount(
+                command_buffer.drawIndirect(
                     resources.draw_calls_buffer.buffer,
                     DRAW_CALLS_COUNTS_SIZE
-                        + (ALPHA_CLIP_DRAWS_OFFSET)
-                            * sizeof(vk::DrawIndirectCommand),
-                    resources.draw_calls_buffer.buffer,
-                    sizeof(uint32_t) * 4 + i * sizeof(uint32_t),
-                    MAX_ALPHA_CLIP_DRAWS,
+                        + (1 + (i + 1) * 2) * sizeof(vk::DrawIndirectCommand),
+                    1,
                     sizeof(vk::DrawIndirectCommand)
                 );
             }

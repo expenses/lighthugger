@@ -6,6 +6,7 @@
 struct VertexData {
     Instance instance;
     MeshInfo mesh_info;
+    Meshlet meshlet;
     uint32_t index;
 };
 
@@ -19,12 +20,13 @@ VertexData load_vertex_data(uint32_t vertex_index, uint32_t instance_index) {
                                .instances[meshlet_reference.instance_index];
     vertex_data.mesh_info =
         MeshInfoBuffer(vertex_data.instance.mesh_info_address).mesh_info;
-    Meshlet meshlet = MeshletBuffer(vertex_data.mesh_info.meshlets)
-                          .meshlets[meshlet_reference.meshlet_index];
+    vertex_data.meshlet = MeshletBuffer(vertex_data.mesh_info.meshlets)
+                              .meshlets[meshlet_reference.meshlet_index];
 
-    uint32_t micro_index = meshlet.index_offset
+    uint32_t micro_index = vertex_data.meshlet.index_offset
         + MicroIndexBufferSingle(
-              vertex_data.mesh_info.micro_indices + meshlet.triangle_offset
+              vertex_data.mesh_info.micro_indices
+              + vertex_data.meshlet.triangle_offset
         )
               .indices[vertex_index];
 
@@ -36,16 +38,22 @@ VertexData load_vertex_data(uint32_t vertex_index, uint32_t instance_index) {
 layout(location = 0) flat out uint32_t packed;
 
 void visbuffer_opaque_vertex() {
-    uint32_t triangle_index = gl_VertexIndex / 3;
+    uint32_t vertex_index = gl_VertexIndex % MAX_MESHLET_VERTICES;
+    uint32_t triangle_index = vertex_index / 3;
+    uint32_t instance_index = gl_VertexIndex / MAX_MESHLET_VERTICES;
+    VertexData data = load_vertex_data(vertex_index, instance_index);
 
-    VertexData data = load_vertex_data(gl_VertexIndex, gl_InstanceIndex);
+    if (triangle_index >= data.meshlet.triangle_count) {
+        gl_Position = float4(0);
+        return;
+    }
 
     float3 position =
         calculate_world_pos(data.instance, data.mesh_info, data.index);
 
     gl_Position =
         get_uniforms().combined_perspective_view * float4(position, 1.0);
-    packed = pack(triangle_index, gl_InstanceIndex);
+    packed = pack(triangle_index, instance_index);
 }
 
 //frag
@@ -64,16 +72,22 @@ layout(location = 1) out float2 uv;
 layout(location = 2) flat out uint32_t base_texture_index;
 
 void visbuffer_alpha_clip_vertex() {
-    uint32_t triangle_index = gl_VertexIndex / 3;
+    uint32_t vertex_index = gl_VertexIndex % MAX_MESHLET_VERTICES;
+    uint32_t triangle_index = vertex_index / 3;
+    uint32_t instance_index = gl_VertexIndex / MAX_MESHLET_VERTICES;
+    instance_index += ALPHA_CLIP_DRAWS_OFFSET;
+    VertexData data = load_vertex_data(vertex_index, instance_index);
 
-    VertexData data = load_vertex_data(gl_VertexIndex, gl_InstanceIndex);
-
+    if (triangle_index >= data.meshlet.triangle_count) {
+        gl_Position = float4(0);
+        return;
+    }
     float3 position =
         calculate_world_pos(data.instance, data.mesh_info, data.index);
 
     gl_Position =
         get_uniforms().combined_perspective_view * float4(position, 1.0);
-    packed = pack(triangle_index, gl_InstanceIndex);
+    packed = pack(triangle_index, instance_index);
     base_texture_index = data.mesh_info.base_color_texture_index;
     uv = float2(QuanitizedUvs(data.mesh_info.uvs).uvs[data.index])
             * data.mesh_info.texture_scale
@@ -99,7 +113,17 @@ void visbuffer_alpha_clip_pixel() {
 //vert
 
 void shadowmap_opaque_vertex() {
-    VertexData data = load_vertex_data(gl_VertexIndex, gl_InstanceIndex);
+    uint32_t vertex_index = gl_VertexIndex % MAX_MESHLET_VERTICES;
+    uint32_t triangle_index = vertex_index / 3;
+    uint32_t instance_index = gl_VertexIndex / MAX_MESHLET_VERTICES;
+    instance_index += MESHLET_INDICES_BUFFER_SECTION_OFFSET;
+    VertexData data = load_vertex_data(vertex_index, instance_index);
+
+
+    if (triangle_index >= data.meshlet.triangle_count) {
+        gl_Position = float4(0);
+        return;
+    }
 
     float3 position =
         calculate_world_pos(data.instance, data.mesh_info, data.index);
@@ -116,7 +140,18 @@ layout(location = 0) out float2 uv;
 layout(location = 1) flat out uint32_t base_texture_index;
 
 void shadowmap_alpha_clip_vertex() {
-    VertexData data = load_vertex_data(gl_VertexIndex, gl_InstanceIndex);
+    uint32_t vertex_index = gl_VertexIndex % MAX_MESHLET_VERTICES;
+    uint32_t triangle_index = vertex_index / 3;
+    uint32_t instance_index = gl_VertexIndex / MAX_MESHLET_VERTICES;
+    instance_index +=
+        ALPHA_CLIP_DRAWS_OFFSET + MESHLET_INDICES_BUFFER_SECTION_OFFSET;
+    VertexData data = load_vertex_data(vertex_index, instance_index);
+
+
+    if (triangle_index >= data.meshlet.triangle_count) {
+        gl_Position = float4(0);
+        return;
+    }
 
     float3 position =
         calculate_world_pos(data.instance, data.mesh_info, data.index);
