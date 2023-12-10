@@ -78,10 +78,36 @@ void copy_uint16_t4_to_uint16_3(
 ) {
     command_buffer.bindPipeline(
         vk::PipelineBindPoint::eCompute,
-        *pipelines.copy_quantized_positions.pipeline
+        *pipelines.copy_quantized_positions
     );
     command_buffer.pushConstants<CopyQuantizedPositionsConstant>(
-        *pipelines.copy_quantized_positions.layout,
+        *pipelines.copy_pipeline_layout,
+        vk::ShaderStageFlagBits::eCompute,
+        0,
+        {{.dst = device.getBufferAddress({.buffer = copy_dst.buffer}),
+          .src =
+              device.getBufferAddress({.buffer = copy_src.buffer}) + src_offset,
+
+          .count = count}}
+    );
+    command_buffer.dispatch(dispatch_size(count, 64), 1, 1);
+}
+
+void copy_uint8_t4_to_uint8_3(
+    const vk::raii::Device& device,
+    const vk::raii::CommandBuffer& command_buffer,
+    const AllocatedBuffer& copy_dst,
+    const AllocatedBuffer& copy_src,
+    const Pipelines& pipelines,
+    uint32_t count,
+    uint32_t src_offset
+) {
+    command_buffer.bindPipeline(
+        vk::PipelineBindPoint::eCompute,
+        *pipelines.copy_quantized_normals
+    );
+    command_buffer.pushConstants<CopyQuantizedPositionsConstant>(
+        *pipelines.copy_pipeline_layout,
         vk::ShaderStageFlagBits::eCompute,
         0,
         {{.dst = device.getBufferAddress({.buffer = copy_dst.buffer}),
@@ -440,19 +466,26 @@ GltfMesh load_gltf(
                 auto& normals = get_accessor("NORMAL");
                 assert(normals.componentType == fastgltf::ComponentType::Byte);
                 assert(normals.type == fastgltf::AccessorType::Vec3);
-                auto normals_buffer_size = normals.count * sizeof(int8_t) * 4;
-                auto normals_buffer = create_buffer(
-                    normals.count * sizeof(int8_t) * 4,
-                    "normals"
-                );
-                copy_buffer_to_final(
-                    normals,
-                    asset,
-                    staging_buffers,
-                    normals_buffer,
-                    command_buffer,
-                    normals_buffer_size
-                );
+                auto normals_buffer_size = normals.count * sizeof(int8_t) * 3;
+                auto normals_buffer =
+                    create_buffer(normals_buffer_size, "normals");
+                {
+                    auto& normals_buffer_view =
+                        asset.bufferViews[normals.bufferViewIndex.value()];
+
+                    {
+                        copy_uint8_t4_to_uint8_3(
+                            device,
+                            command_buffer,
+                            normals_buffer,
+                            staging_buffers[normals_buffer_view.bufferIndex]
+                                .buffer,
+                            pipelines,
+                            normals.count,
+                            normals_buffer_view.byteOffset + normals.byteOffset
+                        );
+                    }
+                }
 
                 auto material_index = primitive.materialIndex.value();
                 auto& material = asset.materials[material_index];

@@ -39,9 +39,9 @@ layout(buffer_reference, scalar) buffer QuanitizedUvs {
     uint16_t2 uvs[];
 };
 
-// todo: can change this to int8_t3 now that everything is in glsl.
-layout(buffer_reference, scalar) buffer QuanitizedNormals {
-    int8_t4 normals[];
+layout(buffer_reference, scalar, buffer_reference_align = 1) buffer
+    QuanitizedNormals {
+    int8_t3 normals[];
 };
 
 layout(buffer_reference, scalar) buffer InstanceBuffer {

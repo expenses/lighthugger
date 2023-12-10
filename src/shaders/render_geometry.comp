@@ -156,13 +156,13 @@ void main() {
         interpolate(
             bary,
             normalize(float3(
-                QuanitizedNormals(mesh_info.normals).normals[indices.x].xyz
+                QuanitizedNormals(mesh_info.normals).normals[indices.x]
             )),
             normalize(float3(
-                QuanitizedNormals(mesh_info.normals).normals[indices.y].xyz
+                QuanitizedNormals(mesh_info.normals).normals[indices.y]
             )),
             normalize(float3(
-                QuanitizedNormals(mesh_info.normals).normals[indices.z].xyz
+                QuanitizedNormals(mesh_info.normals).normals[indices.z]
             ))
         )
             .value;
