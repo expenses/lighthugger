@@ -234,7 +234,7 @@ void render(
 
             command_buffer.drawIndirectCount(
                 resources.draw_calls_buffer.buffer,
-                DRAW_CALLS_COUNTS_SIZE,
+                sizeof(uint32_t) * 2,
                 resources.draw_calls_buffer.buffer,
                 0,
                 MAX_OPAQUE_DRAWS,
@@ -254,10 +254,10 @@ void render(
 
             command_buffer.drawIndirectCount(
                 resources.draw_calls_buffer.buffer,
-                DRAW_CALLS_COUNTS_SIZE
+                sizeof(uint32_t) * 2
                     + ALPHA_CLIP_DRAWS_OFFSET * sizeof(vk::DrawIndirectCommand),
                 resources.draw_calls_buffer.buffer,
-                sizeof(uint32_t) * 4,
+                sizeof(uint32_t),
                 MAX_ALPHA_CLIP_DRAWS,
                 sizeof(vk::DrawIndirectCommand)
             );
@@ -322,18 +322,6 @@ void render(
                     THSVS_ACCESS_COMPUTE_SHADER_READ_OTHER}}
     );
 
-    dispatch_scalar(pipelines.reset_buffers_c);
-
-    insert_global_barrier(
-        command_buffer,
-        GlobalBarrier<1, 1> {
-            .prev_accesses =
-                std::array<ThsvsAccessType, 1> {
-                    THSVS_ACCESS_COMPUTE_SHADER_WRITE},
-            .next_accesses =
-                std::array<ThsvsAccessType, 1> {THSVS_ACCESS_INDIRECT_BUFFER}}
-    );
-
     {
         TracyVkZone(tracy_ctx, *command_buffer, "shadowmap rasterization");
 
@@ -350,6 +338,19 @@ void render(
                 {{.cascade_index = i}}
             );
 
+            dispatch_scalar(pipelines.reset_buffers_c);
+
+            insert_global_barrier(
+                command_buffer,
+                GlobalBarrier<1, 1> {
+                    .prev_accesses =
+                        std::array<ThsvsAccessType, 1> {
+                            THSVS_ACCESS_COMPUTE_SHADER_WRITE},
+                    .next_accesses =
+                        std::array<ThsvsAccessType, 1> {
+                            THSVS_ACCESS_INDIRECT_BUFFER}}
+            );
+
             {
                 TracyVkZone(
                     tracy_ctx,
@@ -361,7 +362,7 @@ void render(
                     vk::PipelineBindPoint::eCompute,
                     *pipelines.write_draw_calls_shadows
                 );
-                dispatch_indirect(PER_SHADOW_MESHLET_DISPATCH + i);
+                dispatch_indirect(PER_MESHLET_DISPATCH);
             }
 
             insert_global_barrier(
@@ -403,9 +404,9 @@ void render(
 
                 command_buffer.drawIndirectCount(
                     resources.draw_calls_buffer.buffer,
-                    DRAW_CALLS_COUNTS_SIZE,
+                    sizeof(uint32_t) * 2,
                     resources.draw_calls_buffer.buffer,
-                    i * sizeof(uint32_t),
+                    0,
                     MAX_OPAQUE_DRAWS,
                     sizeof(vk::DrawIndirectCommand)
                 );
@@ -423,11 +424,11 @@ void render(
 
                 command_buffer.drawIndirectCount(
                     resources.draw_calls_buffer.buffer,
-                    DRAW_CALLS_COUNTS_SIZE
+                    sizeof(uint32_t) * 2
                         + (ALPHA_CLIP_DRAWS_OFFSET)
                             * sizeof(vk::DrawIndirectCommand),
                     resources.draw_calls_buffer.buffer,
-                    sizeof(uint32_t) * 4 + i * sizeof(uint32_t),
+                    sizeof(uint32_t),
                     MAX_ALPHA_CLIP_DRAWS,
                     sizeof(vk::DrawIndirectCommand)
                 );

@@ -504,7 +504,7 @@ int main() {
         .draw_calls_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
                 // Store the draw call counts as well as 2 sets of commands (opaque + alpha clip)
-                .size = DRAW_CALLS_COUNTS_SIZE
+                .size = sizeof(uint32_t) * 2
                     + sizeof(vk::DrawIndirectCommand)
                         * (MAX_OPAQUE_DRAWS + MAX_ALPHA_CLIP_DRAWS),
                 .usage = vk::BufferUsageFlagBits::eIndirectBuffer
@@ -518,7 +518,7 @@ int main() {
         ),
         .dispatches_buffer = AllocatedBuffer(
             vk::BufferCreateInfo {
-                .size = sizeof(vk::DispatchIndirectCommand) * (3 + 4),
+                .size = sizeof(vk::DispatchIndirectCommand) * 3,
                 .usage = vk::BufferUsageFlagBits::eIndirectBuffer
                     | vk::BufferUsageFlagBits::eStorageBuffer
                     | vk::BufferUsageFlagBits::eShaderDeviceAddress},

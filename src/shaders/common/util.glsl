@@ -60,8 +60,8 @@ get_meshlet_reference(uint32_t global_meshlet_index, uint32_t cascade_index) {
 
 void reset_counters() {
     DrawCallBuffer draw_call_buf = DrawCallBuffer(get_uniforms().draw_calls);
-    draw_call_buf.num_opaque = uint32_t4(0);
-    draw_call_buf.num_alpha_clip = uint32_t4(0);
+    draw_call_buf.num_opaque = 0;
+    draw_call_buf.num_alpha_clip = 0;
 
     prefix_sum_reset(prefix_sum_buffer_for_cascade(0));
     prefix_sum_reset(prefix_sum_buffer_for_cascade(1));

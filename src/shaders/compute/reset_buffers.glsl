@@ -44,10 +44,14 @@ void reset_buffers_c() {
     DispatchCommandsBuffer dispatches =
         DispatchCommandsBuffer(get_uniforms().dispatches);
 
-    [[unroll]] for (uint32_t i = 0; i < 4; i++) {
-        dispatches.commands[PER_SHADOW_MESHLET_DISPATCH + i].x =
-            dispatch_size(total_num_meshlets_for_cascade(i), 64);
-        dispatches.commands[PER_SHADOW_MESHLET_DISPATCH + i].y = 1;
-        dispatches.commands[PER_SHADOW_MESHLET_DISPATCH + i].z = 1;
-    }
+    dispatches.commands[PER_MESHLET_DISPATCH].x = dispatch_size(
+        total_num_meshlets_for_cascade(shadow_constant.cascade_index),
+        64
+    );
+    dispatches.commands[PER_MESHLET_DISPATCH].y = 1;
+    dispatches.commands[PER_MESHLET_DISPATCH].z = 1;
+
+    DrawCallBuffer draw_call_buf = DrawCallBuffer(get_uniforms().draw_calls);
+    draw_call_buf.num_opaque = 0;
+    draw_call_buf.num_alpha_clip = 0;
 }

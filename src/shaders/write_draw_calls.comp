@@ -38,9 +38,9 @@ void write_draw_calls() {
 
     if (alpha_clipped) {
         meshlet_draw_index = ALPHA_CLIP_DRAWS_OFFSET
-            + atomicAdd(draw_call_buffer.num_alpha_clip[0], 1);
+            + atomicAdd(draw_call_buffer.num_alpha_clip, 1);
     } else {
-        meshlet_draw_index = atomicAdd(draw_call_buffer.num_opaque[0], 1);
+        meshlet_draw_index = atomicAdd(draw_call_buffer.num_opaque, 1);
     }
     uint32_t meshlet_indices_buffer_offset =
         meshlet_draw_index;
@@ -97,10 +97,10 @@ void write_draw_calls_shadows() {
 
     if (alpha_clipped) {
         meshlet_draw_index = ALPHA_CLIP_DRAWS_OFFSET
-            + atomicAdd(draw_call_buffer.num_alpha_clip[shadow_constant.cascade_index], 1);
+            + atomicAdd(draw_call_buffer.num_alpha_clip, 1);
     } else {
         meshlet_draw_index =
-            atomicAdd(draw_call_buffer.num_opaque[shadow_constant.cascade_index], 1);
+            atomicAdd(draw_call_buffer.num_opaque, 1);
     }
     uint32_t meshlet_indices_buffer_offset =
         meshlet_draw_index + MESHLET_INDICES_BUFFER_SECTION_OFFSET;

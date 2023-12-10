@@ -124,9 +124,6 @@ const static uint32_t ALPHA_CLIP_DRAWS_OFFSET = MAX_OPAQUE_DRAWS;
 const static uint32_t MESHLET_INDICES_BUFFER_SECTION_OFFSET =
     ALPHA_CLIP_DRAWS_OFFSET + MAX_ALPHA_CLIP_DRAWS;
 
-// sizeof(uint32_t4) * 2
-const static uint32_t DRAW_CALLS_COUNTS_SIZE = 4 * 4 * 2;
-
 const static float NEAR_PLANE = 0.01f;
 
 struct Meshlet {
@@ -167,4 +164,3 @@ const static uint32_t PREFIX_SUM_BUFFER_SECTOR_SIZE = MAX_INSTANCES * 8 + 8;
 const static uint32_t PER_INSTANCE_DISPATCH = 0;
 const static uint32_t PER_SHADOW_INSTANCE_DISPATCH = 1;
 const static uint32_t PER_MESHLET_DISPATCH = 2;
-const static uint32_t PER_SHADOW_MESHLET_DISPATCH = 3;
